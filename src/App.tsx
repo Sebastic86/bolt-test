@@ -1,14 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import TeamCard from './components/TeamCard';
 import { Team } from './types';
-import { mockTeams } from './data/teams'; // Using mock data for now
+// import { mockTeams } from './data/teams'; // No longer using mock data
+import { supabase } from './lib/supabaseClient'; // Import Supabase client
 import { Dices } from 'lucide-react';
 
-// Simulate API fetch
+// Fetch teams from Supabase
 const fetchTeams = async (): Promise<Team[]> => {
-  // Replace with actual API call in the future
-  await new Promise(resolve => setTimeout(resolve, 50)); // Simulate network delay
-  return mockTeams;
+  console.log("Fetching teams from Supabase...");
+  const { data, error } = await supabase
+    .from('teams') // Ensure this matches your table name
+    .select(`
+      id,
+      name,
+      league,
+      rating,
+      logoUrl,
+      overallRating,
+      attackRating,
+      midfieldRating,
+      defendRating
+    `); // Select all required columns
+
+  if (error) {
+    console.error("Error fetching teams:", error);
+    throw new Error(`Failed to fetch teams: ${error.message}`);
+  }
+
+  console.log("Teams fetched successfully:", data);
+
+  // Assuming column names match the Team type camelCase directly (as defined in migration)
+  // If Supabase columns were snake_case (e.g., logo_url), you'd map here:
+  // return data.map(team => ({ ...team, logoUrl: team.logo_url }));
+  return data || []; // Return empty array if data is null
 };
 
 // Function to get two different random teams
@@ -25,29 +49,6 @@ const getRandomMatch = (teams: Team[]): [Team, Team] | null => {
   return [teams[index1], teams[index2]];
 };
 
-// Helper function to format rating difference
-const formatDifference = (diff: number): string => {
-  if (diff > 0) {
-    return `(+${diff})`;
-  } else if (diff < 0) {
-    return `(${diff})`; // Negative sign is already included
-  } else {
-    return `(0)`;
-  }
-};
-
-// Helper function to get color class for difference
-const getDifferenceColor = (diff: number): string => {
-  if (diff > 0) {
-    return 'text-green-600'; // Positive difference
-  } else if (diff < 0) {
-    return 'text-red-600'; // Negative difference
-  } else {
-    return 'text-gray-500'; // No difference
-  }
-};
-
-
 function App() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [match, setMatch] = useState<[Team, Team] | null>(null);
@@ -56,22 +57,29 @@ function App() {
 
   useEffect(() => {
     setLoading(true);
+    setError(null); // Reset error on new fetch attempt
     fetchTeams()
       .then(data => {
-        setTeams(data);
-        setMatch(getRandomMatch(data)); // Set initial match
-        setError(null);
+        if (data.length === 0) {
+          console.warn("No teams found in the database.");
+          // Suggest seeding if the table is empty
+          setError("No teams found. Please ensure the database table 'teams' exists and contains data. You might need to run the seed script.");
+        } else {
+          setTeams(data);
+          setMatch(getRandomMatch(data)); // Set initial match
+        }
       })
       .catch(err => {
-        console.error("Failed to fetch teams:", err);
-        setError("Failed to load teams. Please try again later.");
+        console.error("Failed to fetch teams in useEffect:", err);
+        // Use the error message thrown from fetchTeams
+        setError(err.message || "Failed to load teams. Please check the console and ensure the database is reachable and populated.");
         setTeams([]);
         setMatch(null);
       })
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleGenerateMatch = () => {
     if (teams.length > 0) {
@@ -87,6 +95,22 @@ function App() {
     defend: match[0].defendRating - match[1].defendRating,
   } : null;
 
+  // Prepare differences for each team card
+  const team1Differences = differences ? {
+    overall: differences.overall,
+    attack: differences.attack,
+    midfield: differences.midfield,
+    defend: differences.defend,
+  } : undefined;
+
+  const team2Differences = differences ? {
+    overall: -differences.overall,
+    attack: -differences.attack,
+    midfield: -differences.midfield,
+    defend: -differences.defend,
+  } : undefined;
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4 flex flex-col items-center justify-center">
       <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8 text-center">
@@ -94,56 +118,48 @@ function App() {
       </h1>
 
       {loading && <p className="text-gray-600">Loading teams...</p>}
-      {error && <p className="text-red-600 bg-red-100 p-3 rounded">{error}</p>}
+      {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center">{error}</p>}
 
-      {!loading && !error && match && differences && (
+      {!loading && !error && match && (
         <div className="w-full max-w-4xl mb-8"> {/* Increased max-width slightly */}
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8"> {/* Adjusted gap */}
             {/* Team 1 Card */}
             <div className="w-full md:w-auto">
-              <TeamCard team={match[0]} />
+              <TeamCard team={match[0]} differences={team1Differences} />
             </div>
 
-            {/* VS Separator & Differences */}
-            <div className="flex flex-col items-center my-4 md:my-0 gap-2">
+            {/* VS Separator */}
+            <div className="flex flex-col items-center my-4 md:my-0">
               <div className="text-2xl font-bold text-gray-700">VS</div>
-              {/* Rating Differences Display */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-center font-medium">
-                 {/* Overall Diff */}
-                 <span className="text-right text-gray-600">OVR:</span>
-                 <span className={`text-left ${getDifferenceColor(differences.overall)}`}>{formatDifference(differences.overall)}</span>
-                 {/* Attack Diff */}
-                 <span className="text-right text-gray-600">ATT:</span>
-                 <span className={`text-left ${getDifferenceColor(differences.attack)}`}>{formatDifference(differences.attack)}</span>
-                 {/* Midfield Diff */}
-                 <span className="text-right text-gray-600">MID:</span>
-                 <span className={`text-left ${getDifferenceColor(differences.midfield)}`}>{formatDifference(differences.midfield)}</span>
-                 {/* Defend Diff */}
-                 <span className="text-right text-gray-600">DEF:</span>
-                 <span className={`text-left ${getDifferenceColor(differences.defend)}`}>{formatDifference(differences.defend)}</span>
-              </div>
             </div>
 
             {/* Team 2 Card */}
             <div className="w-full md:w-auto">
-              <TeamCard team={match[1]} />
+              <TeamCard team={match[1]} differences={team2Differences} />
             </div>
           </div>
         </div>
       )}
 
+      {/* Show button only if not loading, no error, and teams are loaded */}
       {!loading && !error && teams.length > 0 && (
          <button
           onClick={handleGenerateMatch}
           className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
-          disabled={teams.length < 2}
+          disabled={teams.length < 2} // Disable if less than 2 teams loaded
         >
           <Dices className="w-5 h-5 mr-2" />
           Generate New Match
         </button>
       )}
-       {!loading && !error && teams.length < 2 && (
-         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mt-4">Not enough teams loaded to generate a match.</p>
+
+      {/* Informative message if loading finished but not enough teams */}
+       {!loading && !error && teams.length < 2 && teams.length > 0 && (
+         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mt-4 text-center">Only {teams.length} team loaded. Need at least 2 to generate a match.</p>
+       )}
+       {/* Message if loading finished and NO teams were loaded (different from error state) */}
+       {!loading && !error && teams.length === 0 && !loading && ( // Added !loading check here
+         <p className="text-gray-600 mt-4 text-center">No teams available to display.</p>
        )}
     </div>
   );

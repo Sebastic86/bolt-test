@@ -1,17 +1,16 @@
 import React from 'react';
 import { Team } from '../types';
-import * as LucideIcons from 'lucide-react'; // Import all icons
+import * as LucideIcons from 'lucide-react'; // Keep Star icon import
 
 interface TeamCardProps {
   team: Team;
+  differences?: {
+    overall?: number;
+    attack?: number;
+    midfield?: number;
+    defend?: number;
+  };
 }
-
-// Helper to get icon component by name
-const getIcon = (name: string): React.ElementType => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const IconComponent = (LucideIcons as any)[name];
-  return IconComponent || LucideIcons.ShieldQuestion; // Default icon if not found
-};
 
 // Helper function to get rating color classes
 const getRatingClasses = (rating: number): string => {
@@ -28,14 +27,50 @@ const getRatingClasses = (rating: number): string => {
   }
 };
 
-const TeamCard: React.FC<TeamCardProps> = ({ team }) => {
-  const Icon = getIcon(team.logoIconName);
+// Helper function to format rating difference
+const formatDifference = (diff: number | undefined): string => {
+  if (diff === undefined) return '';
+  if (diff > 0) {
+    return `(+${diff})`;
+  } else if (diff < 0) {
+    return `(${diff})`; // Negative sign is already included
+  } else {
+    return `(0)`;
+  }
+};
+
+// Helper function to get color class for difference
+const getDifferenceColor = (diff: number | undefined): string => {
+  if (diff === undefined) return '';
+  if (diff > 0) {
+    return 'text-green-600'; // Positive difference
+  } else if (diff < 0) {
+    return 'text-red-600'; // Negative difference
+  } else {
+    return 'text-gray-500'; // No difference
+  }
+};
+
+
+const TeamCard: React.FC<TeamCardProps> = ({ team, differences }) => {
+  // No longer need getIcon helper
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-gray-200 flex items-center space-x-4">
       {/* Left Side: Logo */}
-      <div className="flex-shrink-0">
-        <Icon className="w-16 h-16 text-blue-600" />
+      <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded bg-gray-100">
+        {/* Use img tag for logoUrl */}
+        <img
+          src={team.logoUrl}
+          alt={`${team.name} logo`}
+          className="w-full h-full object-contain" // Use object-contain to fit logo without stretching
+          onError={(e) => {
+            // Optional: Handle image loading errors, e.g., show a default image
+            const target = e.target as HTMLImageElement;
+            target.src = 'https://via.placeholder.com/64.png?text=Error'; // Fallback placeholder
+            target.alt = `${team.name} logo (Error loading)`;
+          }}
+        />
       </div>
 
       {/* Right Side: Details */}
@@ -49,24 +84,51 @@ const TeamCard: React.FC<TeamCardProps> = ({ team }) => {
             <LucideIcons.Star className="w-4 h-4 mr-1" fill="currentColor" />
             <span className="text-sm font-medium">{team.rating.toFixed(1)}</span>
           </div>
-          <div className="text-sm text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
-            <span className="font-semibold">OVR:</span> {team.overallRating}
+          <div className="text-sm text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded flex items-center space-x-1">
+            <span className="font-semibold">OVR:</span>
+            <span>{team.overallRating}</span>
+            {differences?.overall !== undefined && (
+              <span className={`text-xs font-medium ${getDifferenceColor(differences.overall)}`}>
+                {formatDifference(differences.overall)}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Attack, Midfield, Defend Ratings */}
         <div className="grid grid-cols-3 gap-2 text-xs text-center">
           {/* Attack Rating */}
-          <div className={`${getRatingClasses(team.attackRating)} p-1 rounded`}>
-            <span className="font-semibold block sm:inline">ATT:</span> {team.attackRating}
+          <div className={`${getRatingClasses(team.attackRating)} p-1 rounded flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
+            <div>
+              <span className="font-semibold">ATT:</span> {team.attackRating}
+            </div>
+            {differences?.attack !== undefined && (
+              <span className={`font-medium ${getDifferenceColor(differences.attack)}`}>
+                {formatDifference(differences.attack)}
+              </span>
+            )}
           </div>
           {/* Midfield Rating */}
-          <div className={`${getRatingClasses(team.midfieldRating)} p-1 rounded`}>
-            <span className="font-semibold block sm:inline">MID:</span> {team.midfieldRating}
+          <div className={`${getRatingClasses(team.midfieldRating)} p-1 rounded flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
+             <div>
+               <span className="font-semibold">MID:</span> {team.midfieldRating}
+             </div>
+            {differences?.midfield !== undefined && (
+              <span className={`font-medium ${getDifferenceColor(differences.midfield)}`}>
+                {formatDifference(differences.midfield)}
+              </span>
+            )}
           </div>
           {/* Defend Rating */}
-          <div className={`${getRatingClasses(team.defendRating)} p-1 rounded`}>
-            <span className="font-semibold block sm:inline">DEF:</span> {team.defendRating}
+          <div className={`${getRatingClasses(team.defendRating)} p-1 rounded flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
+            <div>
+              <span className="font-semibold">DEF:</span> {team.defendRating}
+            </div>
+            {differences?.defend !== undefined && (
+              <span className={`font-medium ${getDifferenceColor(differences.defend)}`}>
+                {formatDifference(differences.defend)}
+              </span>
+            )}
           </div>
         </div>
       </div>
