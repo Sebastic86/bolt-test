@@ -25,6 +25,29 @@ const getRandomMatch = (teams: Team[]): [Team, Team] | null => {
   return [teams[index1], teams[index2]];
 };
 
+// Helper function to format rating difference
+const formatDifference = (diff: number): string => {
+  if (diff > 0) {
+    return `(+${diff})`;
+  } else if (diff < 0) {
+    return `(${diff})`; // Negative sign is already included
+  } else {
+    return `(0)`;
+  }
+};
+
+// Helper function to get color class for difference
+const getDifferenceColor = (diff: number): string => {
+  if (diff > 0) {
+    return 'text-green-600'; // Positive difference
+  } else if (diff < 0) {
+    return 'text-red-600'; // Negative difference
+  } else {
+    return 'text-gray-500'; // No difference
+  }
+};
+
+
 function App() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [match, setMatch] = useState<[Team, Team] | null>(null);
@@ -56,6 +79,14 @@ function App() {
     }
   };
 
+  // Calculate differences if match exists
+  const differences = match ? {
+    overall: match[0].overallRating - match[1].overallRating,
+    attack: match[0].attackRating - match[1].attackRating,
+    midfield: match[0].midfieldRating - match[1].midfieldRating,
+    defend: match[0].defendRating - match[1].defendRating,
+  } : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4 flex flex-col items-center justify-center">
       <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8 text-center">
@@ -65,19 +96,36 @@ function App() {
       {loading && <p className="text-gray-600">Loading teams...</p>}
       {error && <p className="text-red-600 bg-red-100 p-3 rounded">{error}</p>}
 
-      {!loading && !error && match && (
-        <div className="w-full max-w-3xl mb-8">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10">
+      {!loading && !error && match && differences && (
+        <div className="w-full max-w-4xl mb-8"> {/* Increased max-width slightly */}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8"> {/* Adjusted gap */}
             {/* Team 1 Card */}
-            <div className="w-full md:w-1/2">
+            <div className="w-full md:w-auto">
               <TeamCard team={match[0]} />
             </div>
 
-            {/* VS Separator */}
-            <div className="text-2xl font-bold text-gray-700 my-4 md:my-0">VS</div>
+            {/* VS Separator & Differences */}
+            <div className="flex flex-col items-center my-4 md:my-0 gap-2">
+              <div className="text-2xl font-bold text-gray-700">VS</div>
+              {/* Rating Differences Display */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-center font-medium">
+                 {/* Overall Diff */}
+                 <span className="text-right text-gray-600">OVR:</span>
+                 <span className={`text-left ${getDifferenceColor(differences.overall)}`}>{formatDifference(differences.overall)}</span>
+                 {/* Attack Diff */}
+                 <span className="text-right text-gray-600">ATT:</span>
+                 <span className={`text-left ${getDifferenceColor(differences.attack)}`}>{formatDifference(differences.attack)}</span>
+                 {/* Midfield Diff */}
+                 <span className="text-right text-gray-600">MID:</span>
+                 <span className={`text-left ${getDifferenceColor(differences.midfield)}`}>{formatDifference(differences.midfield)}</span>
+                 {/* Defend Diff */}
+                 <span className="text-right text-gray-600">DEF:</span>
+                 <span className={`text-left ${getDifferenceColor(differences.defend)}`}>{formatDifference(differences.defend)}</span>
+              </div>
+            </div>
 
             {/* Team 2 Card */}
-            <div className="w-full md:w-1/2">
+            <div className="w-full md:w-auto">
               <TeamCard team={match[1]} />
             </div>
           </div>
