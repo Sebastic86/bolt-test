@@ -6,6 +6,27 @@ import { Team } from './types';
 import { supabase } from './lib/supabaseClient';
 import { Dices, Settings } from 'lucide-react'; // Import Settings icon
 
+// --- Constants for Session Storage ---
+const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
+const MAX_RATING_STORAGE_KEY = 'fcGeneratorMaxRating';
+
+// --- Helper Functions for Session Storage ---
+const getInitialRating = (key: string, defaultValue: number): number => {
+  try {
+    const storedValue = sessionStorage.getItem(key);
+    if (storedValue !== null) {
+      const parsedValue = parseFloat(storedValue);
+      // Basic validation
+      if (!isNaN(parsedValue) && parsedValue >= 0 && parsedValue <= 5) {
+        return parsedValue;
+      }
+    }
+  } catch (error) {
+    console.error(`Error reading ${key} from sessionStorage:`, error);
+  }
+  return defaultValue;
+};
+
 // Fetch all teams from Supabase (filtering happens client-side now)
 const fetchAllTeams = async (): Promise<Team[]> => {
   console.log("Fetching all teams from Supabase...");
@@ -63,9 +84,13 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Settings State
-  const [minRating, setMinRating] = useState<number>(0);
-  const [maxRating, setMaxRating] = useState<number>(5);
+  // Settings State - Initialize from sessionStorage
+  const [minRating, setMinRating] = useState<number>(() =>
+    getInitialRating(MIN_RATING_STORAGE_KEY, 0)
+  );
+  const [maxRating, setMaxRating] = useState<number>(() =>
+    getInitialRating(MAX_RATING_STORAGE_KEY, 5)
+  );
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
 
   // Edit Modal State
@@ -89,7 +114,7 @@ function App() {
           setAllTeams([]);
         } else {
           setAllTeams(data);
-          // Initial match generation uses the default filters (0-5) via filteredTeams
+          // Initial match generation uses the potentially session-loaded filters via filteredTeams
         }
       })
       .catch(err => {
@@ -101,13 +126,11 @@ function App() {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, []); // Empty dependency array: Fetch teams only once
 
   // Effect to set initial match or update when filters change
   useEffect(() => {
     if (!loading && filteredTeams.length > 0) {
-        // Only set a new initial match if no match exists or if filters changed
-        // causing the current match to become invalid (optional, prevents resetting match on every filter change)
         const currentMatchIsValid = match &&
                                     filteredTeams.some(t => t.id === match[0].id) &&
                                     filteredTeams.some(t => t.id === match[1].id);
@@ -118,6 +141,7 @@ function App() {
     } else if (!loading && filteredTeams.length < 2) {
         setMatch(null); // Clear match if not enough teams meet criteria
     }
+    // Intentionally not depending on `match` here to avoid re-running when match changes internally
   }, [filteredTeams, loading]); // Depend on filteredTeams and loading state
 
 
@@ -144,28 +168,22 @@ function App() {
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
     let newOpponent = match[otherTeamIndex];
 
-    // Check if the *newly selected* team is the same as the opponent
     if (newOpponent.id === newTeam.id) {
-      // If they are the same, pick a new random opponent from the *filtered* list
       const potentialOpponent = getRandomTeam(filteredTeams, newTeam.id);
       if (potentialOpponent) {
         newOpponent = potentialOpponent;
       } else {
-         // Fallback: If no other opponent is available (e.g., only 1 team in filter)
-         // Keep the original opponent, resulting in same teams (edge case)
-         // Or display an error/prevent selection? For now, allow it.
          console.warn("Could not find a different opponent within the current filter.");
       }
     }
 
     const updatedMatch: [Team, Team] = [...match];
     updatedMatch[editingTeamIndex] = newTeam;
-    updatedMatch[otherTeamIndex] = newOpponent; // Use potentially updated opponent
+    updatedMatch[otherTeamIndex] = newOpponent;
     setMatch(updatedMatch);
 
-
     handleCloseEditModal();
-  }, [match, editingTeamIndex, filteredTeams]); // Depend on filteredTeams
+  }, [match, editingTeamIndex, filteredTeams]);
 
   // --- Settings Modal Handlers ---
   const handleOpenSettingsModal = () => {
@@ -177,9 +195,20 @@ function App() {
   };
 
   const handleSaveSettings = (newMinRating: number, newMaxRating: number) => {
+    // Update state
     setMinRating(newMinRating);
     setMaxRating(newMaxRating);
-    // The useEffect depending on filteredTeams will handle updating the match
+
+    // Save to sessionStorage
+    try {
+      sessionStorage.setItem(MIN_RATING_STORAGE_KEY, newMinRating.toString());
+      sessionStorage.setItem(MAX_RATING_STORAGE_KEY, newMaxRating.toString());
+    } catch (error) {
+      console.error("Error saving settings to sessionStorage:", error);
+      // Optionally notify the user that settings couldn't be saved
+    }
+
+    // The useEffect depending on filteredTeams will handle updating the match if needed
   };
 
 
@@ -226,7 +255,7 @@ function App() {
 
        {/* Buttons Container */}
        {!loading && !error && allTeams.length > 0 && (
-         <div className="flex items-center space-x-4">
+         <div className="flex items-center space-x-4 mt-4"> {/* Added margin-top */}
            {/* Generate New Match Button */}
            <button
              onClick={handleGenerateNewMatch}
@@ -252,7 +281,7 @@ function App() {
       {/* Informative messages */}
        {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
          <p className="text-yellow-700 bg-yellow-100 p-3 rounded mt-4 text-center">
-           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars). Need at least 2 to generate a match.
+           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars). Need at least 2 to generate a match. Adjust settings or wait for more teams.
          </p>
        )}
        {!loading && !error && allTeams.length === 0 && (
