@@ -30,6 +30,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
   // Fetch available players when modal opens
   useEffect(() => {
     if (isOpen) {
+      console.log('[AddMatchModal] Modal opened, fetching players...'); // DEBUG
       setLoadingPlayers(true);
       setError(null);
       setTeam1Players([]); // Reset selections
@@ -42,16 +43,25 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
         .order('name', { ascending: true })
         .then(({ data, error }) => {
           if (error) {
-            console.error('Error fetching players:', error);
+            console.error('[AddMatchModal] Error fetching players:', error); // DEBUG
             setError('Failed to load players.');
             setAvailablePlayers([]);
           } else {
+            console.log('[AddMatchModal] Players fetched successfully:', data); // DEBUG
             setAvailablePlayers(data || []);
           }
           setLoadingPlayers(false);
         });
+    } else {
+        console.log('[AddMatchModal] Modal closed.'); // DEBUG
     }
   }, [isOpen]);
+
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log('[AddMatchModal] Available players state updated:', availablePlayers);
+  }, [availablePlayers]);
+
 
   const handleAddPlayer = (teamNumber: 1 | 2) => {
     const selectedPlayerId = teamNumber === 1 ? selectedPlayerId1 : selectedPlayerId2;
@@ -64,34 +74,36 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
         setError(`Maximum ${MAX_PLAYERS_PER_TEAM} players per team.`);
         return;
     }
-    // Prevent adding the same player twice to the *same* team
     if (currentTeamPlayers.some(p => p.id === selectedPlayerId)) {
         setError('Player already added to this team.');
         return;
     }
-     // Prevent adding a player who is already on the *other* team
      const otherTeamPlayers = teamNumber === 1 ? team2Players : team1Players;
      if (otherTeamPlayers.some(p => p.id === selectedPlayerId)) {
          setError('Player already selected for the other team.');
          return;
      }
 
-
     const playerToAdd = availablePlayers.find(p => p.id === selectedPlayerId);
     if (playerToAdd) {
+      console.log(`[AddMatchModal] Adding player ${playerToAdd.name} to team ${teamNumber}`); // DEBUG
       setTeamPlayers([...currentTeamPlayers, playerToAdd]);
-      setSelectedPlayerId(''); // Reset dropdown
-      setError(null); // Clear error on successful add
+      setSelectedPlayerId('');
+      setError(null);
+    } else {
+        console.warn(`[AddMatchModal] Could not find player with ID ${selectedPlayerId} in available players.`); // DEBUG
     }
   };
 
   const handleRemovePlayer = (teamNumber: 1 | 2, playerId: string) => {
     const currentTeamPlayers = teamNumber === 1 ? team1Players : team2Players;
     const setTeamPlayers = teamNumber === 1 ? setTeam1Players : setTeam2Players;
+    console.log(`[AddMatchModal] Removing player ${playerId} from team ${teamNumber}`); // DEBUG
     setTeamPlayers(currentTeamPlayers.filter(p => p.id !== playerId));
   };
 
   const handleSaveMatch = async () => {
+    // ... (save logic remains the same)
     if (!matchTeams) {
       setError('Cannot save match, teams not available.');
       return;
@@ -103,64 +115,63 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
 
     setSaving(true);
     setError(null);
+    console.log('[AddMatchModal] Saving match...'); // DEBUG
 
     try {
-      // 1. Insert into matches table
       const { data: matchData, error: matchError } = await supabase
         .from('matches')
         .insert({
           team1_id: matchTeams[0].id,
           team2_id: matchTeams[1].id,
-          // Scores are initially null
         })
-        .select('id') // Select the ID of the newly created match
-        .single(); // Expecting a single row back
+        .select('id')
+        .single();
 
       if (matchError || !matchData) {
-        console.error('Error inserting match:', matchError);
+        console.error('[AddMatchModal] Error inserting match:', matchError);
         throw new Error('Failed to save match details.');
       }
 
       const newMatchId = matchData.id;
+      console.log(`[AddMatchModal] Match inserted with ID: ${newMatchId}`); // DEBUG
 
-      // 2. Prepare match_players data
       const playersToInsert = [
         ...team1Players.map(p => ({ match_id: newMatchId, player_id: p.id, team_number: 1 as const })),
         ...team2Players.map(p => ({ match_id: newMatchId, player_id: p.id, team_number: 2 as const })),
       ];
 
-      // 3. Insert into match_players table (if any players were added)
       if (playersToInsert.length > 0) {
+        console.log('[AddMatchModal] Inserting match players:', playersToInsert); // DEBUG
         const { error: playersError } = await supabase
           .from('match_players')
           .insert(playersToInsert);
 
         if (playersError) {
-          console.error('Error inserting match players:', playersError);
-          // Note: Ideally, you'd handle potential rollback/cleanup here if players fail
-          // For simplicity, we'll just show an error.
+          console.error('[AddMatchModal] Error inserting match players:', playersError);
           throw new Error('Failed to save player assignments for the match.');
         }
       }
 
-      console.log('Match saved successfully!');
-      onMatchSaved(); // Trigger history refresh
-      onClose(); // Close modal
+      console.log('[AddMatchModal] Match saved successfully!');
+      onMatchSaved();
+      onClose();
 
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred while saving.');
-      console.error(err);
+      console.error('[AddMatchModal] Save match error:', err); // DEBUG
     } finally {
       setSaving(false);
     }
   };
 
-  // Filter available players for dropdowns (exclude already selected players)
+  // Filter available players for dropdowns
   const getFilteredAvailablePlayers = (teamNumber: 1 | 2): Player[] => {
     const selectedOnThisTeam = (teamNumber === 1 ? team1Players : team2Players).map(p => p.id);
     const selectedOnOtherTeam = (teamNumber === 1 ? team2Players : team1Players).map(p => p.id);
     const allSelectedIds = new Set([...selectedOnThisTeam, ...selectedOnOtherTeam]);
-    return availablePlayers.filter(p => !allSelectedIds.has(p.id));
+    const filtered = availablePlayers.filter(p => !allSelectedIds.has(p.id));
+    // console.log(`[AddMatchModal] Filtering available players for team ${teamNumber}. All: ${availablePlayers.length}, Selected IDs: ${[...allSelectedIds]}, Filtered: ${filtered.length}`); // DEBUG (can be noisy)
+    return filtered;
   };
 
 
@@ -169,7 +180,6 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl relative my-8">
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
@@ -187,7 +197,8 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
           <>
             {/* Team Display */}
             <div className="flex justify-around items-center mb-6 border-b pb-4">
-              <div className="text-center">
+              {/* ... team display ... */}
+               <div className="text-center">
                 <img src={matchTeams[0].logoUrl} alt={matchTeams[0].name} className="w-12 h-12 mx-auto mb-1 object-contain"/>
                 <span className="font-semibold">{matchTeams[0].name}</span>
               </div>
@@ -209,12 +220,13 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                       value={selectedPlayerId1}
                       onChange={(e) => setSelectedPlayerId1(e.target.value)}
                       className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:opacity-50"
-                      disabled={team1Players.length >= MAX_PLAYERS_PER_TEAM || saving}
+                      disabled={team1Players.length >= MAX_PLAYERS_PER_TEAM || saving || getFilteredAvailablePlayers(1).length === 0}
                     >
                       <option value="">-- Select Player --</option>
-                      {getFilteredAvailablePlayers(1).map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
+                      {getFilteredAvailablePlayers(1).map(p => {
+                        // console.log(`[AddMatchModal] Rendering option for Team 1: ${p.name} (${p.id})`); // DEBUG (can be noisy)
+                        return <option key={p.id} value={p.id}>{p.name}</option>;
+                      })}
                     </select>
                     <button
                       onClick={() => handleAddPlayer(1)}
@@ -226,6 +238,13 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                     </button>
                   </div>
                 )}
+                 {/* Add message if no players available */}
+                 {!loadingPlayers && getFilteredAvailablePlayers(1).length === 0 && availablePlayers.length > 0 && (
+                    <p className="text-xs text-gray-500">No more players available to add.</p>
+                 )}
+                 {!loadingPlayers && availablePlayers.length === 0 && (
+                     <p className="text-xs text-red-500">No players found in the database.</p>
+                 )}
                 <ul className="space-y-1 text-sm">
                   {team1Players.map(p => (
                     <li key={p.id} className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
@@ -252,12 +271,13 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                       value={selectedPlayerId2}
                       onChange={(e) => setSelectedPlayerId2(e.target.value)}
                       className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:opacity-50"
-                      disabled={team2Players.length >= MAX_PLAYERS_PER_TEAM || saving}
+                      disabled={team2Players.length >= MAX_PLAYERS_PER_TEAM || saving || getFilteredAvailablePlayers(2).length === 0}
                     >
                       <option value="">-- Select Player --</option>
-                       {getFilteredAvailablePlayers(2).map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
+                       {getFilteredAvailablePlayers(2).map(p => {
+                        // console.log(`[AddMatchModal] Rendering option for Team 2: ${p.name} (${p.id})`); // DEBUG (can be noisy)
+                        return <option key={p.id} value={p.id}>{p.name}</option>;
+                       })}
                     </select>
                     <button
                       onClick={() => handleAddPlayer(2)}
@@ -268,6 +288,13 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                       <UserPlus className="w-5 h-5" />
                     </button>
                   </div>
+                 )}
+                  {/* Add message if no players available */}
+                 {!loadingPlayers && getFilteredAvailablePlayers(2).length === 0 && availablePlayers.length > 0 && (
+                    <p className="text-xs text-gray-500">No more players available to add.</p>
+                 )}
+                 {!loadingPlayers && availablePlayers.length === 0 && (
+                     <p className="text-xs text-red-500">No players found in the database.</p>
                  )}
                 <ul className="space-y-1 text-sm">
                   {team2Players.map(p => (
