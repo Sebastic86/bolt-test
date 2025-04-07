@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Match, Player, Team, MatchPlayer, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, RefreshCw, ChevronDown, ChevronUp, X } from 'lucide-react'; // Import X icon
 
 interface MatchHistoryProps {
   refreshTrigger: number; // Increment to trigger refresh
@@ -225,7 +225,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
                                 disabled={loading}
                                 title="Cancel Edit"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4" /> {/* This line caused the error */}
                             </button>
                         </>
                     ) : (
