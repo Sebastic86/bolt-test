@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { Team } from '../types'; // Assuming your types file defines the database schema structure
+import { Team, Player, Match, MatchPlayer } from '../types'; // Import new types
 
 // Ensure environment variables are loaded
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -9,15 +9,29 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Supabase URL and Anon Key must be provided in .env file");
 }
 
-// Define Database interface matching Supabase schema (adjust if needed)
-// This helps with type safety but doesn't require generating types from Supabase CLI
+// Define Database interface matching Supabase schema
 interface Database {
   public: {
     Tables: {
       teams: {
-        Row: Team; // Use your existing Team type (now updated with logoUrl)
-        Insert: Omit<Team, 'id'>; // Type for inserting new teams (omit auto-generated id)
-        Update: Partial<Team>; // Type for updating teams
+        Row: Team;
+        Insert: Omit<Team, 'id'>;
+        Update: Partial<Team>;
+      }
+      players: { // Add players table
+        Row: Player;
+        Insert: Omit<Player, 'id' | 'created_at'>; // Name is required for insert
+        Update: Partial<Player>;
+      }
+      matches: { // Add matches table
+        Row: Match;
+        Insert: Omit<Match, 'id' | 'played_at' | 'created_at'>; // team IDs required, scores optional
+        Update: Partial<Match>; // Likely updating scores
+      }
+      match_players: { // Add match_players table
+        Row: MatchPlayer;
+        Insert: Omit<MatchPlayer, 'id' | 'created_at'>; // match_id, player_id, team_number required
+        Update: never; // Updates disallowed by policy
       }
     }
     Views: {

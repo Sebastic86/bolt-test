@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TeamCard from './components/TeamCard';
 import EditTeamModal from './components/EditTeamModal';
-import SettingsModal from './components/SettingsModal'; // Import SettingsModal
-import { Team } from './types';
+import SettingsModal from './components/SettingsModal';
+import AddMatchModal from './components/AddMatchModal'; // Import AddMatchModal
+import MatchHistory from './components/MatchHistory'; // Import MatchHistory
+import { Team, Player } from './types'; // Import Player type
 import { supabase } from './lib/supabaseClient';
-import { Dices, Settings } from 'lucide-react'; // Import Settings icon
+import { Dices, Settings, PlusSquare } from 'lucide-react'; // Import PlusSquare icon
 
 // --- Constants for Session Storage ---
 const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
@@ -16,7 +18,6 @@ const getInitialRating = (key: string, defaultValue: number): number => {
     const storedValue = sessionStorage.getItem(key);
     if (storedValue !== null) {
       const parsedValue = parseFloat(storedValue);
-      // Basic validation
       if (!isNaN(parsedValue) && parsedValue >= 0 && parsedValue <= 5) {
         return parsedValue;
       }
@@ -27,30 +28,28 @@ const getInitialRating = (key: string, defaultValue: number): number => {
   return defaultValue;
 };
 
-// Fetch all teams from Supabase (filtering happens client-side now)
+// Fetch all teams from Supabase
 const fetchAllTeams = async (): Promise<Team[]> => {
-  console.log("Fetching all teams from Supabase...");
-  const { data, error } = await supabase
-    .from('teams')
-    .select(`
-      id,
-      name,
-      league,
-      rating,
-      logoUrl,
-      overallRating,
-      attackRating,
-      midfieldRating,
-      defendRating
-    `);
-
+  console.log("Fetching all teams...");
+  const { data, error } = await supabase.from('teams').select('*');
   if (error) {
     console.error("Error fetching teams:", error);
     throw new Error(`Failed to fetch teams: ${error.message}`);
   }
-  console.log("All teams fetched successfully:", data);
   return data || [];
 };
+
+// Fetch all players from Supabase
+const fetchAllPlayers = async (): Promise<Player[]> => {
+    console.log("Fetching all players...");
+    const { data, error } = await supabase.from('players').select('*').order('name');
+    if (error) {
+        console.error("Error fetching players:", error);
+        throw new Error(`Failed to fetch players: ${error.message}`);
+    }
+    return data || [];
+};
+
 
 // Function to get a random team from a filtered list
 const getRandomTeam = (teams: Team[], excludeId?: string): Team | null => {
@@ -79,70 +78,76 @@ const getInitialMatch = (teams: Team[]): [Team, Team] | null => {
 
 
 function App() {
-  const [allTeams, setAllTeams] = useState<Team[]>([]); // Store all fetched teams
+  const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]); // State for players
   const [match, setMatch] = useState<[Team, Team] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Settings State - Initialize from sessionStorage
-  const [minRating, setMinRating] = useState<number>(() =>
-    getInitialRating(MIN_RATING_STORAGE_KEY, 0)
-  );
-  const [maxRating, setMaxRating] = useState<number>(() =>
-    getInitialRating(MAX_RATING_STORAGE_KEY, 5)
-  );
+  // Settings State
+  const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 0));
+  const [maxRating, setMaxRating] = useState<number>(() => getInitialRating(MAX_RATING_STORAGE_KEY, 5));
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
 
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [editingTeamIndex, setEditingTeamIndex] = useState<0 | 1 | null>(null);
 
+  // Add Match Modal State
+  const [isAddMatchModalOpen, setIsAddMatchModalOpen] = useState<boolean>(false);
+
+  // Match History State
+  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
+
+
   // Filtered teams based on rating settings
   const filteredTeams = useMemo(() => {
     return allTeams.filter(team => team.rating >= minRating && team.rating <= maxRating);
   }, [allTeams, minRating, maxRating]);
 
-  // Fetch all teams once on mount
+  // Fetch initial data (teams and players)
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetchAllTeams()
-      .then(data => {
-        if (data.length === 0) {
+    Promise.all([fetchAllTeams(), fetchAllPlayers()])
+      .then(([teamsData, playersData]) => {
+        if (teamsData.length === 0) {
           console.warn("No teams found in the database.");
-          setError("No teams found. Please ensure the database table 'teams' exists and contains data.");
+          setError("No teams found. Please ensure the 'teams' table exists and contains data.");
           setAllTeams([]);
         } else {
-          setAllTeams(data);
-          // Initial match generation uses the potentially session-loaded filters via filteredTeams
+          setAllTeams(teamsData);
         }
+        setAllPlayers(playersData); // Store players
       })
       .catch(err => {
-        console.error("Failed to fetch teams in useEffect:", err);
-        setError(err.message || "Failed to load teams.");
+        console.error("Failed to fetch initial data:", err);
+        setError(err.message || "Failed to load initial data.");
         setAllTeams([]);
+        setAllPlayers([]);
         setMatch(null);
       })
       .finally(() => {
         setLoading(false);
       });
-  }, []); // Empty dependency array: Fetch teams only once
+  }, []);
 
-  // Effect to set initial match or update when filters change
+  // Effect to set initial match or update when filters/teams change
   useEffect(() => {
-    if (!loading && filteredTeams.length > 0) {
+    if (!loading && allTeams.length > 0) { // Check allTeams before filtering
         const currentMatchIsValid = match &&
                                     filteredTeams.some(t => t.id === match[0].id) &&
                                     filteredTeams.some(t => t.id === match[1].id);
 
         if (!currentMatchIsValid) {
              setMatch(getInitialMatch(filteredTeams));
+        } else if (filteredTeams.length < 2) {
+             setMatch(null); // Clear match if filters make current one invalid and <2 teams remain
         }
-    } else if (!loading && filteredTeams.length < 2) {
-        setMatch(null); // Clear match if not enough teams meet criteria
+    } else if (!loading && allTeams.length === 0) {
+        setMatch(null); // No teams loaded
     }
-    // Intentionally not depending on `match` here to avoid re-running when match changes internally
-  }, [filteredTeams, loading]); // Depend on filteredTeams and loading state
+  }, [filteredTeams, loading, allTeams, match]); // Add allTeams and match dependencies
 
 
   const handleGenerateNewMatch = () => {
@@ -156,94 +161,78 @@ function App() {
     setEditingTeamIndex(index);
     setIsEditModalOpen(true);
   };
-
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setEditingTeamIndex(null);
   };
-
   const handleUpdateTeam = useCallback((newTeam: Team) => {
     if (editingTeamIndex === null || !match) return;
-
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
     let newOpponent = match[otherTeamIndex];
-
     if (newOpponent.id === newTeam.id) {
       const potentialOpponent = getRandomTeam(filteredTeams, newTeam.id);
-      if (potentialOpponent) {
-        newOpponent = potentialOpponent;
-      } else {
-         console.warn("Could not find a different opponent within the current filter.");
-      }
+      if (potentialOpponent) newOpponent = potentialOpponent;
+      else console.warn("Could not find a different opponent within the current filter.");
     }
-
     const updatedMatch: [Team, Team] = [...match];
     updatedMatch[editingTeamIndex] = newTeam;
     updatedMatch[otherTeamIndex] = newOpponent;
     setMatch(updatedMatch);
-
     handleCloseEditModal();
   }, [match, editingTeamIndex, filteredTeams]);
 
   // --- Settings Modal Handlers ---
-  const handleOpenSettingsModal = () => {
-    setIsSettingsModalOpen(true);
-  };
-
-  const handleCloseSettingsModal = () => {
-    setIsSettingsModalOpen(false);
-  };
-
+  const handleOpenSettingsModal = () => setIsSettingsModalOpen(true);
+  const handleCloseSettingsModal = () => setIsSettingsModalOpen(false);
   const handleSaveSettings = (newMinRating: number, newMaxRating: number) => {
-    // Update state
     setMinRating(newMinRating);
     setMaxRating(newMaxRating);
-
-    // Save to sessionStorage
     try {
       sessionStorage.setItem(MIN_RATING_STORAGE_KEY, newMinRating.toString());
       sessionStorage.setItem(MAX_RATING_STORAGE_KEY, newMaxRating.toString());
     } catch (error) {
       console.error("Error saving settings to sessionStorage:", error);
-      // Optionally notify the user that settings couldn't be saved
     }
+  };
 
-    // The useEffect depending on filteredTeams will handle updating the match if needed
+  // --- Add Match Modal Handlers ---
+  const handleOpenAddMatchModal = () => setIsAddMatchModalOpen(true);
+  const handleCloseAddMatchModal = () => setIsAddMatchModalOpen(false);
+  const handleMatchSaved = () => {
+    setRefreshHistoryTrigger(prev => prev + 1); // Increment trigger to refresh history
   };
 
 
-  // Calculate differences if match exists
+  // Calculate differences
   const differences = match ? {
     overall: match[0].overallRating - match[1].overallRating,
     attack: match[0].attackRating - match[1].attackRating,
     midfield: match[0].midfieldRating - match[1].midfieldRating,
     defend: match[0].defendRating - match[1].defendRating,
   } : null;
-
   const team1Differences = differences ? { overall: differences.overall, attack: differences.attack, midfield: differences.midfield, defend: differences.defend } : undefined;
   const team2Differences = differences ? { overall: -differences.overall, attack: -differences.attack, midfield: -differences.midfield, defend: -differences.defend } : undefined;
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4 flex flex-col items-center justify-center">
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8 text-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4 flex flex-col items-center"> {/* Removed justify-center for scrolling */}
+      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mt-8 mb-6 text-center"> {/* Adjusted margin */}
         EA FC Random Match Generator
       </h1>
 
-      {loading && <p className="text-gray-600">Loading teams...</p>}
-      {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center">{error}</p>}
+      {loading && <p className="text-gray-600">Loading initial data...</p>}
+      {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center mb-4">{error}</p>}
 
+      {/* Match Display */}
       {!loading && !error && match && (
-        <div className="w-full max-w-4xl mb-8">
+        <div className="w-full max-w-4xl mb-6"> {/* Adjusted margin */}
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
             <TeamCard
               team={match[0]}
               differences={team1Differences}
               onEdit={() => handleOpenEditModal(0)}
             />
-            <div className="flex flex-col items-center my-4 md:my-0">
-              <div className="text-2xl font-bold text-gray-700">VS</div>
-            </div>
+            <div className="text-2xl font-bold text-gray-700 my-2 md:my-0">VS</div>
             <TeamCard
               team={match[1]}
               differences={team2Differences}
@@ -255,22 +244,33 @@ function App() {
 
        {/* Buttons Container */}
        {!loading && !error && allTeams.length > 0 && (
-         <div className="flex items-center space-x-4 mt-4"> {/* Added margin-top */}
-           {/* Generate New Match Button */}
+         <div className="flex items-center justify-center space-x-4 mb-6"> {/* Centered buttons, added margin */}
            <button
              onClick={handleGenerateNewMatch}
-             className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
-             disabled={filteredTeams.length < 2} // Disable based on filtered teams
+             className="flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
+             disabled={filteredTeams.length < 2}
+             title="Generate New Random Matchup"
            >
              <Dices className="w-5 h-5 mr-2" />
-             Generate New Match
+             New Matchup
            </button>
 
-           {/* Settings Button */}
+            {/* Add Match Button */}
+           <button
+             onClick={handleOpenAddMatchModal}
+             className="flex items-center justify-center px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
+             disabled={!match} // Disable if no match is displayed
+             title="Add Current Matchup to History"
+           >
+             <PlusSquare className="w-5 h-5 mr-2" />
+             Add Match
+           </button>
+
            <button
              onClick={handleOpenSettingsModal}
-             className="p-3 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition duration-150 ease-in-out"
+             className="p-2.5 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition duration-150 ease-in-out"
              aria-label="Open settings"
+             title="Settings"
            >
              <Settings className="w-5 h-5" />
            </button>
@@ -280,30 +280,44 @@ function App() {
 
       {/* Informative messages */}
        {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
-         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mt-4 text-center">
+         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
            Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars). Need at least 2 to generate a match. Adjust settings or wait for more teams.
          </p>
        )}
        {!loading && !error && allTeams.length === 0 && (
-         <p className="text-gray-600 mt-4 text-center">No teams available to display.</p>
+         <p className="text-gray-600 mb-6 text-center">No teams available to display.</p>
        )}
 
-      {/* Edit Team Modal */}
+       {/* Match History */}
+       {!loading && !error && (
+           <MatchHistory
+                refreshTrigger={refreshHistoryTrigger}
+                allTeams={allTeams}
+                allPlayers={allPlayers}
+            />
+       )}
+
+
+      {/* Modals */}
       <EditTeamModal
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
-        allTeams={filteredTeams} // Pass filtered teams to the edit modal
+        allTeams={filteredTeams}
         onTeamSelected={handleUpdateTeam}
         currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined}
       />
-
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={handleCloseSettingsModal}
         onSave={handleSaveSettings}
         initialMinRating={minRating}
         initialMaxRating={maxRating}
+      />
+       <AddMatchModal
+        isOpen={isAddMatchModalOpen}
+        onClose={handleCloseAddMatchModal}
+        matchTeams={match} // Pass the current match teams
+        onMatchSaved={handleMatchSaved}
       />
     </div>
   );
