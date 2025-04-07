@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TeamCard from './components/TeamCard';
+import EditTeamModal from './components/EditTeamModal'; // Import the modal
 import { Team } from './types';
-// import { mockTeams } from './data/teams'; // No longer using mock data
-import { supabase } from './lib/supabaseClient'; // Import Supabase client
+import { supabase } from './lib/supabaseClient';
 import { Dices } from 'lucide-react';
 
 // Fetch teams from Supabase
 const fetchTeams = async (): Promise<Team[]> => {
   console.log("Fetching teams from Supabase...");
   const { data, error } = await supabase
-    .from('teams') // Ensure this matches your table name
+    .from('teams')
     .select(`
       id,
       name,
@@ -20,34 +20,40 @@ const fetchTeams = async (): Promise<Team[]> => {
       attackRating,
       midfieldRating,
       defendRating
-    `); // Select all required columns
+    `);
 
   if (error) {
     console.error("Error fetching teams:", error);
     throw new Error(`Failed to fetch teams: ${error.message}`);
   }
-
   console.log("Teams fetched successfully:", data);
-
-  // Assuming column names match the Team type camelCase directly (as defined in migration)
-  // If Supabase columns were snake_case (e.g., logo_url), you'd map here:
-  // return data.map(team => ({ ...team, logoUrl: team.logo_url }));
-  return data || []; // Return empty array if data is null
+  return data || [];
 };
 
 // Function to get two different random teams
-const getRandomMatch = (teams: Team[]): [Team, Team] | null => {
-  if (teams.length < 2) {
-    return null; // Not enough teams
+const getRandomTeam = (teams: Team[], excludeId?: string): Team | null => {
+  if (teams.length === 0) return null;
+  if (teams.length === 1 && teams[0].id === excludeId) return null; // Cannot pick if only one team exists and it's excluded
+
+  let availableTeams = teams;
+  if (excludeId) {
+    availableTeams = teams.filter(team => team.id !== excludeId);
+    if (availableTeams.length === 0) return null; // No other team to pick
   }
-  let index1 = Math.floor(Math.random() * teams.length);
-  let index2 = Math.floor(Math.random() * teams.length);
-  // Ensure the teams are different
-  while (index1 === index2) {
-    index2 = Math.floor(Math.random() * teams.length);
-  }
-  return [teams[index1], teams[index2]];
+
+  const randomIndex = Math.floor(Math.random() * availableTeams.length);
+  return availableTeams[randomIndex];
 };
+
+const getInitialMatch = (teams: Team[]): [Team, Team] | null => {
+  if (teams.length < 2) return null;
+  const team1 = getRandomTeam(teams);
+  if (!team1) return null;
+  const team2 = getRandomTeam(teams, team1.id);
+  if (!team2) return null; // Should theoretically not happen if length >= 2
+  return [team1, team2];
+};
+
 
 function App() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -55,37 +61,80 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingTeamIndex, setEditingTeamIndex] = useState<0 | 1 | null>(null);
+
   useEffect(() => {
     setLoading(true);
-    setError(null); // Reset error on new fetch attempt
+    setError(null);
     fetchTeams()
       .then(data => {
         if (data.length === 0) {
           console.warn("No teams found in the database.");
-          // Suggest seeding if the table is empty
-          setError("No teams found. Please ensure the database table 'teams' exists and contains data. You might need to run the seed script.");
+          setError("No teams found. Please ensure the database table 'teams' exists and contains data.");
         } else {
           setTeams(data);
-          setMatch(getRandomMatch(data)); // Set initial match
+          setMatch(getInitialMatch(data)); // Set initial match
         }
       })
       .catch(err => {
         console.error("Failed to fetch teams in useEffect:", err);
-        // Use the error message thrown from fetchTeams
-        setError(err.message || "Failed to load teams. Please check the console and ensure the database is reachable and populated.");
+        setError(err.message || "Failed to load teams.");
         setTeams([]);
         setMatch(null);
       })
       .finally(() => {
         setLoading(false);
       });
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
-  const handleGenerateMatch = () => {
-    if (teams.length > 0) {
-      setMatch(getRandomMatch(teams));
+  const handleGenerateNewMatch = () => {
+    if (teams.length >= 2) {
+      setMatch(getInitialMatch(teams));
     }
   };
+
+  // --- Modal Handlers ---
+  const handleOpenEditModal = (index: 0 | 1) => {
+    setEditingTeamIndex(index);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingTeamIndex(null);
+  };
+
+  const handleUpdateTeam = useCallback((newTeam: Team) => {
+    if (editingTeamIndex === null || !match) return;
+
+    // Ensure the new team is not the same as the *other* team in the match
+    const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
+    if (match[otherTeamIndex].id === newTeam.id) {
+      // If the selected team is the same as the opponent, pick a new random opponent
+      const newOpponent = getRandomTeam(teams, newTeam.id);
+      if (newOpponent) {
+        const updatedMatch: [Team, Team] = [...match];
+        updatedMatch[editingTeamIndex] = newTeam;
+        updatedMatch[otherTeamIndex] = newOpponent;
+        setMatch(updatedMatch);
+      } else {
+        // Fallback: just update the edited team (should be rare)
+         const updatedMatch: [Team, Team] = [...match];
+         updatedMatch[editingTeamIndex] = newTeam;
+         setMatch(updatedMatch);
+      }
+    } else {
+      // Update the team at the specific index
+      const updatedMatch: [Team, Team] = [...match];
+      updatedMatch[editingTeamIndex] = newTeam;
+      setMatch(updatedMatch);
+    }
+
+    handleCloseModal(); // Close modal after selection
+  }, [match, editingTeamIndex, teams]); // Include dependencies
+
 
   // Calculate differences if match exists
   const differences = match ? {
@@ -121,11 +170,15 @@ function App() {
       {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center">{error}</p>}
 
       {!loading && !error && match && (
-        <div className="w-full max-w-4xl mb-8"> {/* Increased max-width slightly */}
-          <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8"> {/* Adjusted gap */}
+        <div className="w-full max-w-4xl mb-8">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
             {/* Team 1 Card */}
             <div className="w-full md:w-auto">
-              <TeamCard team={match[0]} differences={team1Differences} />
+              <TeamCard
+                team={match[0]}
+                differences={team1Differences}
+                onEdit={() => handleOpenEditModal(0)} // Pass edit handler
+              />
             </div>
 
             {/* VS Separator */}
@@ -135,32 +188,44 @@ function App() {
 
             {/* Team 2 Card */}
             <div className="w-full md:w-auto">
-              <TeamCard team={match[1]} differences={team2Differences} />
+              <TeamCard
+                team={match[1]}
+                differences={team2Differences}
+                onEdit={() => handleOpenEditModal(1)} // Pass edit handler
+              />
             </div>
           </div>
         </div>
       )}
 
-      {/* Show button only if not loading, no error, and teams are loaded */}
+      {/* Generate New Match Button */}
       {!loading && !error && teams.length > 0 && (
          <button
-          onClick={handleGenerateMatch}
+          onClick={handleGenerateNewMatch}
           className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
-          disabled={teams.length < 2} // Disable if less than 2 teams loaded
+          disabled={teams.length < 2}
         >
           <Dices className="w-5 h-5 mr-2" />
           Generate New Match
         </button>
       )}
 
-      {/* Informative message if loading finished but not enough teams */}
+      {/* Informative messages */}
        {!loading && !error && teams.length < 2 && teams.length > 0 && (
          <p className="text-yellow-700 bg-yellow-100 p-3 rounded mt-4 text-center">Only {teams.length} team loaded. Need at least 2 to generate a match.</p>
        )}
-       {/* Message if loading finished and NO teams were loaded (different from error state) */}
-       {!loading && !error && teams.length === 0 && !loading && ( // Added !loading check here
+       {!loading && !error && teams.length === 0 && (
          <p className="text-gray-600 mt-4 text-center">No teams available to display.</p>
        )}
+
+      {/* Edit Team Modal */}
+      <EditTeamModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        allTeams={teams}
+        onTeamSelected={handleUpdateTeam}
+        currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined}
+      />
     </div>
   );
 }

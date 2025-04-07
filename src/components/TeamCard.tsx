@@ -1,6 +1,7 @@
 import React from 'react';
 import { Team } from '../types';
 import * as LucideIcons from 'lucide-react'; // Keep Star icon import
+import { Pencil } from 'lucide-react'; // Import Pencil icon
 
 interface TeamCardProps {
   team: Team;
@@ -10,6 +11,7 @@ interface TeamCardProps {
     midfield?: number;
     defend?: number;
   };
+  onEdit?: () => void; // Add onEdit prop
 }
 
 // Helper function to get rating color classes
@@ -52,30 +54,38 @@ const getDifferenceColor = (diff: number | undefined): string => {
 };
 
 
-const TeamCard: React.FC<TeamCardProps> = ({ team, differences }) => {
-  // No longer need getIcon helper
+const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-gray-200 flex items-center space-x-4">
+    <div className="relative bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-gray-200 flex items-center space-x-4">
+      {/* Edit Button */}
+      {onEdit && (
+        <button
+          onClick={onEdit}
+          className="absolute top-2 right-2 p-1 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100 transition-colors duration-150"
+          aria-label="Edit team"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+      )}
+
       {/* Left Side: Logo */}
       <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded bg-gray-100">
-        {/* Use img tag for logoUrl */}
         <img
           src={team.logoUrl}
           alt={`${team.name} logo`}
-          className="w-full h-full object-contain" // Use object-contain to fit logo without stretching
+          className="w-full h-full object-contain"
           onError={(e) => {
-            // Optional: Handle image loading errors, e.g., show a default image
             const target = e.target as HTMLImageElement;
-            target.src = 'https://via.placeholder.com/64.png?text=Error'; // Fallback placeholder
+            target.src = 'https://via.placeholder.com/64.png?text=Error';
             target.alt = `${team.name} logo (Error loading)`;
           }}
         />
       </div>
 
       {/* Right Side: Details */}
-      <div className="flex-grow min-w-0"> {/* Added min-w-0 for better truncation */}
-        <h3 className="text-lg font-semibold mb-0.5 truncate text-gray-800">{team.name}</h3>
+      <div className="flex-grow min-w-0">
+        <h3 className="text-lg font-semibold mb-0.5 truncate text-gray-800 pr-8">{team.name}</h3> {/* Added padding-right */}
         <p className="text-sm text-gray-500 mb-1 truncate">{team.league}</p>
 
         {/* Star Rating & Overall */}
