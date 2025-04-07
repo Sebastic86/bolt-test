@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TeamCard from './components/TeamCard';
-import EditTeamModal from './components/EditTeamModal'; // Import the modal
+import EditTeamModal from './components/EditTeamModal';
+import SettingsModal from './components/SettingsModal'; // Import SettingsModal
 import { Team } from './types';
 import { supabase } from './lib/supabaseClient';
-import { Dices } from 'lucide-react';
+import { Dices, Settings } from 'lucide-react'; // Import Settings icon
 
-// Fetch teams from Supabase
-const fetchTeams = async (): Promise<Team[]> => {
-  console.log("Fetching teams from Supabase...");
+// Fetch all teams from Supabase (filtering happens client-side now)
+const fetchAllTeams = async (): Promise<Team[]> => {
+  console.log("Fetching all teams from Supabase...");
   const { data, error } = await supabase
     .from('teams')
     .select(`
@@ -26,62 +27,75 @@ const fetchTeams = async (): Promise<Team[]> => {
     console.error("Error fetching teams:", error);
     throw new Error(`Failed to fetch teams: ${error.message}`);
   }
-  console.log("Teams fetched successfully:", data);
+  console.log("All teams fetched successfully:", data);
   return data || [];
 };
 
-// Function to get two different random teams
+// Function to get a random team from a filtered list
 const getRandomTeam = (teams: Team[], excludeId?: string): Team | null => {
   if (teams.length === 0) return null;
-  if (teams.length === 1 && teams[0].id === excludeId) return null; // Cannot pick if only one team exists and it's excluded
+  if (teams.length === 1 && teams[0].id === excludeId) return null;
 
   let availableTeams = teams;
   if (excludeId) {
     availableTeams = teams.filter(team => team.id !== excludeId);
-    if (availableTeams.length === 0) return null; // No other team to pick
+    if (availableTeams.length === 0) return null;
   }
 
   const randomIndex = Math.floor(Math.random() * availableTeams.length);
   return availableTeams[randomIndex];
 };
 
+// Function to get an initial match from a filtered list
 const getInitialMatch = (teams: Team[]): [Team, Team] | null => {
   if (teams.length < 2) return null;
   const team1 = getRandomTeam(teams);
   if (!team1) return null;
   const team2 = getRandomTeam(teams, team1.id);
-  if (!team2) return null; // Should theoretically not happen if length >= 2
+  if (!team2) return null;
   return [team1, team2];
 };
 
 
 function App() {
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [allTeams, setAllTeams] = useState<Team[]>([]); // Store all fetched teams
   const [match, setMatch] = useState<[Team, Team] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  // Settings State
+  const [minRating, setMinRating] = useState<number>(0);
+  const [maxRating, setMaxRating] = useState<number>(5);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [editingTeamIndex, setEditingTeamIndex] = useState<0 | 1 | null>(null);
 
+  // Filtered teams based on rating settings
+  const filteredTeams = useMemo(() => {
+    return allTeams.filter(team => team.rating >= minRating && team.rating <= maxRating);
+  }, [allTeams, minRating, maxRating]);
+
+  // Fetch all teams once on mount
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetchTeams()
+    fetchAllTeams()
       .then(data => {
         if (data.length === 0) {
           console.warn("No teams found in the database.");
           setError("No teams found. Please ensure the database table 'teams' exists and contains data.");
+          setAllTeams([]);
         } else {
-          setTeams(data);
-          setMatch(getInitialMatch(data)); // Set initial match
+          setAllTeams(data);
+          // Initial match generation uses the default filters (0-5) via filteredTeams
         }
       })
       .catch(err => {
         console.error("Failed to fetch teams in useEffect:", err);
         setError(err.message || "Failed to load teams.");
-        setTeams([]);
+        setAllTeams([]);
         setMatch(null);
       })
       .finally(() => {
@@ -89,51 +103,84 @@ function App() {
       });
   }, []);
 
+  // Effect to set initial match or update when filters change
+  useEffect(() => {
+    if (!loading && filteredTeams.length > 0) {
+        // Only set a new initial match if no match exists or if filters changed
+        // causing the current match to become invalid (optional, prevents resetting match on every filter change)
+        const currentMatchIsValid = match &&
+                                    filteredTeams.some(t => t.id === match[0].id) &&
+                                    filteredTeams.some(t => t.id === match[1].id);
+
+        if (!currentMatchIsValid) {
+             setMatch(getInitialMatch(filteredTeams));
+        }
+    } else if (!loading && filteredTeams.length < 2) {
+        setMatch(null); // Clear match if not enough teams meet criteria
+    }
+  }, [filteredTeams, loading]); // Depend on filteredTeams and loading state
+
+
   const handleGenerateNewMatch = () => {
-    if (teams.length >= 2) {
-      setMatch(getInitialMatch(teams));
+    if (filteredTeams.length >= 2) {
+      setMatch(getInitialMatch(filteredTeams));
     }
   };
 
-  // --- Modal Handlers ---
+  // --- Edit Modal Handlers ---
   const handleOpenEditModal = (index: 0 | 1) => {
     setEditingTeamIndex(index);
-    setIsModalOpen(true);
+    setIsEditModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
     setEditingTeamIndex(null);
   };
 
   const handleUpdateTeam = useCallback((newTeam: Team) => {
     if (editingTeamIndex === null || !match) return;
 
-    // Ensure the new team is not the same as the *other* team in the match
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
-    if (match[otherTeamIndex].id === newTeam.id) {
-      // If the selected team is the same as the opponent, pick a new random opponent
-      const newOpponent = getRandomTeam(teams, newTeam.id);
-      if (newOpponent) {
-        const updatedMatch: [Team, Team] = [...match];
-        updatedMatch[editingTeamIndex] = newTeam;
-        updatedMatch[otherTeamIndex] = newOpponent;
-        setMatch(updatedMatch);
+    let newOpponent = match[otherTeamIndex];
+
+    // Check if the *newly selected* team is the same as the opponent
+    if (newOpponent.id === newTeam.id) {
+      // If they are the same, pick a new random opponent from the *filtered* list
+      const potentialOpponent = getRandomTeam(filteredTeams, newTeam.id);
+      if (potentialOpponent) {
+        newOpponent = potentialOpponent;
       } else {
-        // Fallback: just update the edited team (should be rare)
-         const updatedMatch: [Team, Team] = [...match];
-         updatedMatch[editingTeamIndex] = newTeam;
-         setMatch(updatedMatch);
+         // Fallback: If no other opponent is available (e.g., only 1 team in filter)
+         // Keep the original opponent, resulting in same teams (edge case)
+         // Or display an error/prevent selection? For now, allow it.
+         console.warn("Could not find a different opponent within the current filter.");
       }
-    } else {
-      // Update the team at the specific index
-      const updatedMatch: [Team, Team] = [...match];
-      updatedMatch[editingTeamIndex] = newTeam;
-      setMatch(updatedMatch);
     }
 
-    handleCloseModal(); // Close modal after selection
-  }, [match, editingTeamIndex, teams]); // Include dependencies
+    const updatedMatch: [Team, Team] = [...match];
+    updatedMatch[editingTeamIndex] = newTeam;
+    updatedMatch[otherTeamIndex] = newOpponent; // Use potentially updated opponent
+    setMatch(updatedMatch);
+
+
+    handleCloseEditModal();
+  }, [match, editingTeamIndex, filteredTeams]); // Depend on filteredTeams
+
+  // --- Settings Modal Handlers ---
+  const handleOpenSettingsModal = () => {
+    setIsSettingsModalOpen(true);
+  };
+
+  const handleCloseSettingsModal = () => {
+    setIsSettingsModalOpen(false);
+  };
+
+  const handleSaveSettings = (newMinRating: number, newMaxRating: number) => {
+    setMinRating(newMinRating);
+    setMaxRating(newMaxRating);
+    // The useEffect depending on filteredTeams will handle updating the match
+  };
 
 
   // Calculate differences if match exists
@@ -144,20 +191,8 @@ function App() {
     defend: match[0].defendRating - match[1].defendRating,
   } : null;
 
-  // Prepare differences for each team card
-  const team1Differences = differences ? {
-    overall: differences.overall,
-    attack: differences.attack,
-    midfield: differences.midfield,
-    defend: differences.defend,
-  } : undefined;
-
-  const team2Differences = differences ? {
-    overall: -differences.overall,
-    attack: -differences.attack,
-    midfield: -differences.midfield,
-    defend: -differences.defend,
-  } : undefined;
+  const team1Differences = differences ? { overall: differences.overall, attack: differences.attack, midfield: differences.midfield, defend: differences.defend } : undefined;
+  const team2Differences = differences ? { overall: -differences.overall, attack: -differences.attack, midfield: -differences.midfield, defend: -differences.defend } : undefined;
 
 
   return (
@@ -172,59 +207,74 @@ function App() {
       {!loading && !error && match && (
         <div className="w-full max-w-4xl mb-8">
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-            {/* Team 1 Card */}
-            <div className="w-full md:w-auto">
-              <TeamCard
-                team={match[0]}
-                differences={team1Differences}
-                onEdit={() => handleOpenEditModal(0)} // Pass edit handler
-              />
-            </div>
-
-            {/* VS Separator */}
+            <TeamCard
+              team={match[0]}
+              differences={team1Differences}
+              onEdit={() => handleOpenEditModal(0)}
+            />
             <div className="flex flex-col items-center my-4 md:my-0">
               <div className="text-2xl font-bold text-gray-700">VS</div>
             </div>
-
-            {/* Team 2 Card */}
-            <div className="w-full md:w-auto">
-              <TeamCard
-                team={match[1]}
-                differences={team2Differences}
-                onEdit={() => handleOpenEditModal(1)} // Pass edit handler
-              />
-            </div>
+            <TeamCard
+              team={match[1]}
+              differences={team2Differences}
+              onEdit={() => handleOpenEditModal(1)}
+            />
           </div>
         </div>
       )}
 
-      {/* Generate New Match Button */}
-      {!loading && !error && teams.length > 0 && (
-         <button
-          onClick={handleGenerateNewMatch}
-          className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
-          disabled={teams.length < 2}
-        >
-          <Dices className="w-5 h-5 mr-2" />
-          Generate New Match
-        </button>
-      )}
+       {/* Buttons Container */}
+       {!loading && !error && allTeams.length > 0 && (
+         <div className="flex items-center space-x-4">
+           {/* Generate New Match Button */}
+           <button
+             onClick={handleGenerateNewMatch}
+             className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
+             disabled={filteredTeams.length < 2} // Disable based on filtered teams
+           >
+             <Dices className="w-5 h-5 mr-2" />
+             Generate New Match
+           </button>
+
+           {/* Settings Button */}
+           <button
+             onClick={handleOpenSettingsModal}
+             className="p-3 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition duration-150 ease-in-out"
+             aria-label="Open settings"
+           >
+             <Settings className="w-5 h-5" />
+           </button>
+         </div>
+       )}
+
 
       {/* Informative messages */}
-       {!loading && !error && teams.length < 2 && teams.length > 0 && (
-         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mt-4 text-center">Only {teams.length} team loaded. Need at least 2 to generate a match.</p>
+       {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
+         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mt-4 text-center">
+           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars). Need at least 2 to generate a match.
+         </p>
        )}
-       {!loading && !error && teams.length === 0 && (
+       {!loading && !error && allTeams.length === 0 && (
          <p className="text-gray-600 mt-4 text-center">No teams available to display.</p>
        )}
 
       {/* Edit Team Modal */}
       <EditTeamModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        allTeams={teams}
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        allTeams={filteredTeams} // Pass filtered teams to the edit modal
         onTeamSelected={handleUpdateTeam}
         currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={handleCloseSettingsModal}
+        onSave={handleSaveSettings}
+        initialMinRating={minRating}
+        initialMaxRating={maxRating}
       />
     </div>
   );
