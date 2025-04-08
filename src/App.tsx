@@ -4,8 +4,8 @@ import EditTeamModal from './components/EditTeamModal';
 import SettingsModal from './components/SettingsModal';
 import AddMatchModal from './components/AddMatchModal';
 import MatchHistory from './components/MatchHistory';
-import PlayerStandings from './components/PlayerStandings'; // Import PlayerStandings
-import { Team, Player, Match, MatchPlayer, MatchHistoryItem, PlayerStanding } from './types'; // Import PlayerStanding type
+import PlayerStandings from './components/PlayerStandings';
+import { Team, Player, Match, MatchPlayer, MatchHistoryItem, PlayerStanding } from './types';
 import { supabase } from './lib/supabaseClient';
 import { Dices, Settings, PlusSquare } from 'lucide-react';
 
@@ -100,7 +100,7 @@ function App() {
   const [matchesToday, setMatchesToday] = useState<MatchHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0); // Keep trigger for manual refresh
+  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
 
 
   // Filtered teams based on rating settings
@@ -225,7 +225,6 @@ function App() {
                                     filteredTeams.some(t => t.id === match[1].id);
 
         if (!currentMatchIsValid) {
-             // Generate initial match considering teams that haven't played today
              const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
              const availableForInitialMatch = filteredTeams.filter(t => !playedTeamIds.has(t.id));
              setMatch(getInitialMatch(availableForInitialMatch));
@@ -236,31 +235,20 @@ function App() {
         setMatch(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredTeams, loading, allTeams, matchesToday]); // Add matchesToday dependency
+  }, [filteredTeams, loading, allTeams, matchesToday]);
 
 
   const handleGenerateNewMatch = () => {
-    // 1. Get IDs of teams that played today
     const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
-    console.log("[App] Teams played today:", playedTeamIds);
-
-    // 2. Filter available teams (based on rating filter) excluding those that played
     const availableTeamsForNewMatchup = filteredTeams.filter(team => !playedTeamIds.has(team.id));
-    console.log("[App] Available teams for new matchup (after filtering played):", availableTeamsForNewMatchup.length);
 
     if (availableTeamsForNewMatchup.length >= 2) {
       const newMatch = getInitialMatch(availableTeamsForNewMatchup);
       setMatch(newMatch);
-      if (!newMatch) {
-          setError("Could not generate a new matchup from the available teams.");
-      } else {
-          setError(null); // Clear previous errors if successful
-      }
+      setError(null);
     } else {
-      // Not enough teams left that haven't played today within the filter
-      setMatch(null); // Clear the current match display
+      setMatch(null);
       setError(`Not enough teams available for a new matchup within the current filter (${minRating.toFixed(1)}-${maxRating.toFixed(1)} stars) that haven't played today. Only ${availableTeamsForNewMatchup.length} team(s) remaining.`);
-      console.warn("Cannot generate new match: Not enough unplayed teams available in the current filter.");
     }
   };
 
@@ -276,16 +264,14 @@ function App() {
   const handleUpdateTeam = useCallback((newTeam: Team) => {
     if (editingTeamIndex === null || !match) return;
 
-    // Exclude teams played today AND the new team itself when finding a new opponent
     const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
     const potentialOpponentPool = filteredTeams.filter(t => !playedTeamIds.has(t.id) && t.id !== newTeam.id);
 
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
     let newOpponent = match[otherTeamIndex];
 
-    // If the current opponent is the same as the new team OR has already played today, find a new one
     if (newOpponent.id === newTeam.id || playedTeamIds.has(newOpponent.id)) {
-      const potentialOpponent = getRandomTeam(potentialOpponentPool); // Already excludes newTeam.id
+      const potentialOpponent = getRandomTeam(potentialOpponentPool);
       if (potentialOpponent) {
         newOpponent = potentialOpponent;
       } else {
@@ -312,14 +298,43 @@ function App() {
     } catch (error) {
       console.error("Error saving settings to sessionStorage:", error);
     }
-    setError(null); // Clear errors when settings change
+    setError(null);
   };
+
+  // --- Player Name Update Handler ---
+  const handleUpdatePlayerName = async (playerId: string, newName: string): Promise<boolean> => {
+    console.log(`[App] Attempting to update player ${playerId} to name: ${newName}`);
+    try {
+      const { error } = await supabase
+        .from('players')
+        .update({ name: newName })
+        .eq('id', playerId);
+
+      if (error) {
+        console.error(`[App] Error updating player ${playerId}:`, error);
+        throw error; // Re-throw to be caught below
+      }
+
+      // Update local state for immediate UI feedback
+      setAllPlayers(prevPlayers =>
+        prevPlayers.map(p => (p.id === playerId ? { ...p, name: newName } : p))
+      );
+      console.log(`[App] Player ${playerId} updated successfully locally.`);
+      setRefreshHistoryTrigger(prev => prev + 1); // Refresh history/standings as player name changed
+      return true; // Indicate success
+
+    } catch (err) {
+      // Error already logged above
+      return false; // Indicate failure
+    }
+  };
+
 
   // --- Add Match Modal Handlers ---
   const handleOpenAddMatchModal = () => setIsAddMatchModalOpen(true);
   const handleCloseAddMatchModal = () => setIsAddMatchModalOpen(false);
   const handleMatchSaved = () => {
-    setRefreshHistoryTrigger(prev => prev + 1); // Increment trigger to refresh history
+    setRefreshHistoryTrigger(prev => prev + 1);
   };
 
   // --- Manual Refresh Handler ---
@@ -348,11 +363,10 @@ function App() {
     console.log("[App] Calculating player standings...");
     const standingsMap = new Map<string, PlayerStanding>();
 
-    // Initialize map with all players
     allPlayers.forEach(player => {
       standingsMap.set(player.id, {
         playerId: player.id,
-        playerName: player.name,
+        playerName: player.name, // Use updated name from allPlayers state
         points: 0,
         goalsFor: 0,
         goalsAgainst: 0,
@@ -360,10 +374,9 @@ function App() {
       });
     });
 
-    // Process completed matches
     matchesToday.forEach(match => {
       if (match.team1_score === null || match.team2_score === null) {
-        return; // Skip incomplete matches
+        return;
       }
 
       const score1 = match.team1_score;
@@ -372,7 +385,6 @@ function App() {
       if (score1 > score2) winnerTeamNumber = 1;
       else if (score2 > score1) winnerTeamNumber = 2;
 
-      // Process Team 1 Players
       match.team1_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
@@ -381,13 +393,9 @@ function App() {
           if (winnerTeamNumber === 1) {
             standing.points += 1;
           }
-        } else {
-            // This case should ideally not happen if map is initialized correctly
-            console.warn(`Player ${player.name} (${player.id}) not found in initial standings map.`);
         }
       });
 
-      // Process Team 2 Players
       match.team2_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
@@ -396,34 +404,25 @@ function App() {
           if (winnerTeamNumber === 2) {
             standing.points += 1;
           }
-        } else {
-             console.warn(`Player ${player.name} (${player.id}) not found in initial standings map.`);
         }
       });
     });
 
-    // Calculate goal difference and convert map to array
     const standingsArray = Array.from(standingsMap.values()).map(s => ({
         ...s,
         goalDifference: s.goalsFor - s.goalsAgainst
     }));
 
-
-    // Sort the array: 1. Points (DESC), 2. Goal Difference (DESC), 3. Goals For (DESC)
     standingsArray.sort((a, b) => {
-      if (b.points !== a.points) {
-        return b.points - a.points; // Higher points first
-      }
-      if (b.goalDifference !== a.goalDifference) {
-          return b.goalDifference - a.goalDifference; // Higher goal difference first
-      }
-      return b.goalsFor - a.goalsFor; // Higher goals for first
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+      return b.goalsFor - a.goalsFor;
     });
 
     console.log("[App] Player standings calculated:", standingsArray);
     return standingsArray;
 
-  }, [matchesToday, allPlayers]);
+  }, [matchesToday, allPlayers]); // Depend on allPlayers now
 
 
   return (
@@ -439,17 +438,9 @@ function App() {
       {!loading && !error && match && (
         <div className="w-full max-w-4xl mb-6">
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-            <TeamCard
-              team={match[0]}
-              differences={team1Differences}
-              onEdit={() => handleOpenEditModal(0)}
-            />
+            <TeamCard team={match[0]} differences={team1Differences} onEdit={() => handleOpenEditModal(0)} />
             <div className="text-2xl font-bold text-gray-700 my-2 md:my-0">VS</div>
-            <TeamCard
-              team={match[1]}
-              differences={team2Differences}
-              onEdit={() => handleOpenEditModal(1)}
-            />
+            <TeamCard team={match[1]} differences={team2Differences} onEdit={() => handleOpenEditModal(1)} />
           </div>
         </div>
       )}
@@ -459,41 +450,20 @@ function App() {
          </p>
        )}
 
-
        {/* Buttons Container */}
        {!loading && !error && allTeams.length > 0 && (
          <div className="flex items-center justify-center space-x-4 mb-6">
-           <button
-             onClick={handleGenerateNewMatch}
-             className="flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-             disabled={!canGenerateNewMatch} // Disable if less than 2 unplayed teams available
-             title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
-           >
-             <Dices className="w-5 h-5 mr-2" />
-             New Matchup
+           <button onClick={handleGenerateNewMatch} className="flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed" disabled={!canGenerateNewMatch} title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}>
+             <Dices className="w-5 h-5 mr-2" /> New Matchup
            </button>
-
-           <button
-             onClick={handleOpenAddMatchModal}
-             className="flex items-center justify-center px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
-             disabled={!match} // Disable if no match is displayed
-             title="Add Current Matchup to History"
-           >
-             <PlusSquare className="w-5 h-5 mr-2" />
-             Add Match
+           <button onClick={handleOpenAddMatchModal} className="flex items-center justify-center px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50" disabled={!match} title="Add Current Matchup to History">
+             <PlusSquare className="w-5 h-5 mr-2" /> Add Match
            </button>
-
-           <button
-             onClick={handleOpenSettingsModal}
-             className="p-2.5 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition duration-150 ease-in-out"
-             aria-label="Open settings"
-             title="Settings"
-           >
+           <button onClick={handleOpenSettingsModal} className="p-2.5 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition duration-150 ease-in-out" aria-label="Open settings" title="Settings">
              <Settings className="w-5 h-5" />
            </button>
          </div>
        )}
-
 
       {/* Informative messages */}
        {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
@@ -512,46 +482,26 @@ function App() {
 
        {/* Match History */}
        {!loading && !error && (
-           <MatchHistory
-                matchesToday={matchesToday}
-                loading={loadingHistory}
-                error={historyError}
-                onRefresh={handleManualRefreshHistory}
-                allPlayers={allPlayers}
-            />
+           <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} />
        )}
 
        {/* Player Standings */}
        {!loading && !error && (
-            <PlayerStandings
-                standings={playerStandings}
-                loading={loadingHistory} // Use history loading state as standings depend on it
-                error={historyError} // Use history error state
-            />
+            <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} />
        )}
 
-
       {/* Modals */}
-      <EditTeamModal
-        isOpen={isEditModalOpen}
-        onClose={handleCloseEditModal}
-        allTeams={filteredTeams.filter(team => !playedTeamIdsToday.has(team.id))}
-        onTeamSelected={handleUpdateTeam}
-        currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined}
-      />
+      <EditTeamModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} allTeams={filteredTeams.filter(team => !playedTeamIdsToday.has(team.id))} onTeamSelected={handleUpdateTeam} currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined} />
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={handleCloseSettingsModal}
         onSave={handleSaveSettings}
         initialMinRating={minRating}
         initialMaxRating={maxRating}
+        allPlayers={allPlayers} // Pass players
+        onUpdatePlayerName={handleUpdatePlayerName} // Pass handler
       />
-       <AddMatchModal
-        isOpen={isAddMatchModalOpen}
-        onClose={handleCloseAddMatchModal}
-        matchTeams={match}
-        onMatchSaved={handleMatchSaved}
-      />
+       <AddMatchModal isOpen={isAddMatchModalOpen} onClose={handleCloseAddMatchModal} matchTeams={match} onMatchSaved={handleMatchSaved} />
     </div>
   );
 }
