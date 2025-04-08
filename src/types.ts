@@ -45,3 +45,13 @@ export interface MatchHistoryItem extends Match {
     team1_players: Player[];
     team2_players: Player[];
 }
+
+// Type for player standings data
+export interface PlayerStanding {
+  playerId: string;
+  playerName: string;
+  points: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number; // Added for sorting
+}

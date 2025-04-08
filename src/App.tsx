@@ -4,7 +4,8 @@ import EditTeamModal from './components/EditTeamModal';
 import SettingsModal from './components/SettingsModal';
 import AddMatchModal from './components/AddMatchModal';
 import MatchHistory from './components/MatchHistory';
-import { Team, Player, Match, MatchPlayer, MatchHistoryItem } from './types'; // Import necessary types
+import PlayerStandings from './components/PlayerStandings'; // Import PlayerStandings
+import { Team, Player, Match, MatchPlayer, MatchHistoryItem, PlayerStanding } from './types'; // Import PlayerStanding type
 import { supabase } from './lib/supabaseClient';
 import { Dices, Settings, PlusSquare } from 'lucide-react';
 
@@ -107,7 +108,7 @@ function App() {
     return allTeams.filter(team => team.rating >= minRating && team.rating <= maxRating);
   }, [allTeams, minRating, maxRating]);
 
-  // Fetch Today's Match History (moved from MatchHistory component)
+  // Fetch Today's Match History
   const fetchTodaysMatches = useCallback(async () => {
     setLoadingHistory(true);
     setHistoryError(null);
@@ -289,9 +290,6 @@ function App() {
         newOpponent = potentialOpponent;
       } else {
         console.warn("Could not find a different, unplayed opponent within the current filter.");
-        // Keep the original opponent for now, or maybe clear the match?
-        // For now, let's proceed but the opponent might be invalid.
-        // A better approach might be to show an error or prevent the edit if no valid opponent exists.
       }
     }
 
@@ -344,6 +342,88 @@ function App() {
   const playedTeamIdsToday = useMemo(() => new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id])), [matchesToday]);
   const availableForNewMatchupCount = useMemo(() => filteredTeams.filter(team => !playedTeamIdsToday.has(team.id)).length, [filteredTeams, playedTeamIdsToday]);
   const canGenerateNewMatch = availableForNewMatchupCount >= 2;
+
+  // Calculate Player Standings
+  const playerStandings = useMemo(() => {
+    console.log("[App] Calculating player standings...");
+    const standingsMap = new Map<string, PlayerStanding>();
+
+    // Initialize map with all players
+    allPlayers.forEach(player => {
+      standingsMap.set(player.id, {
+        playerId: player.id,
+        playerName: player.name,
+        points: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDifference: 0,
+      });
+    });
+
+    // Process completed matches
+    matchesToday.forEach(match => {
+      if (match.team1_score === null || match.team2_score === null) {
+        return; // Skip incomplete matches
+      }
+
+      const score1 = match.team1_score;
+      const score2 = match.team2_score;
+      let winnerTeamNumber: 1 | 2 | null = null;
+      if (score1 > score2) winnerTeamNumber = 1;
+      else if (score2 > score1) winnerTeamNumber = 2;
+
+      // Process Team 1 Players
+      match.team1_players.forEach(player => {
+        const standing = standingsMap.get(player.id);
+        if (standing) {
+          standing.goalsFor += score1;
+          standing.goalsAgainst += score2;
+          if (winnerTeamNumber === 1) {
+            standing.points += 1;
+          }
+        } else {
+            // This case should ideally not happen if map is initialized correctly
+            console.warn(`Player ${player.name} (${player.id}) not found in initial standings map.`);
+        }
+      });
+
+      // Process Team 2 Players
+      match.team2_players.forEach(player => {
+        const standing = standingsMap.get(player.id);
+        if (standing) {
+          standing.goalsFor += score2;
+          standing.goalsAgainst += score1;
+          if (winnerTeamNumber === 2) {
+            standing.points += 1;
+          }
+        } else {
+             console.warn(`Player ${player.name} (${player.id}) not found in initial standings map.`);
+        }
+      });
+    });
+
+    // Calculate goal difference and convert map to array
+    const standingsArray = Array.from(standingsMap.values()).map(s => ({
+        ...s,
+        goalDifference: s.goalsFor - s.goalsAgainst
+    }));
+
+
+    // Sort the array: 1. Points (DESC), 2. Goal Difference (DESC), 3. Goals For (DESC)
+    standingsArray.sort((a, b) => {
+      if (b.points !== a.points) {
+        return b.points - a.points; // Higher points first
+      }
+      if (b.goalDifference !== a.goalDifference) {
+          return b.goalDifference - a.goalDifference; // Higher goal difference first
+      }
+      return b.goalsFor - a.goalsFor; // Higher goals for first
+    });
+
+    console.log("[App] Player standings calculated:", standingsArray);
+    return standingsArray;
+
+  }, [matchesToday, allPlayers]);
 
 
   return (
@@ -436,8 +516,17 @@ function App() {
                 matchesToday={matchesToday}
                 loading={loadingHistory}
                 error={historyError}
-                onRefresh={handleManualRefreshHistory} // Pass refresh handler
-                allPlayers={allPlayers} // Pass players for score editing logic if needed there
+                onRefresh={handleManualRefreshHistory}
+                allPlayers={allPlayers}
+            />
+       )}
+
+       {/* Player Standings */}
+       {!loading && !error && (
+            <PlayerStandings
+                standings={playerStandings}
+                loading={loadingHistory} // Use history loading state as standings depend on it
+                error={historyError} // Use history error state
             />
        )}
 
@@ -446,7 +535,6 @@ function App() {
       <EditTeamModal
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
-        // Pass teams filtered by rating *and* excluding those played today for selection
         allTeams={filteredTeams.filter(team => !playedTeamIdsToday.has(team.id))}
         onTeamSelected={handleUpdateTeam}
         currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined}
