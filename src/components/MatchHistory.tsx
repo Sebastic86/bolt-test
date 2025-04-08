@@ -16,6 +16,27 @@ interface LogoErrorState {
   [logoKey: string]: boolean; // e.g., { 'matchId-team1': true, 'matchId-team2': false }
 }
 
+// Helper function to format date/time
+const formatDateTimeEuropean = (isoString: string): string => {
+    try {
+        const date = new Date(isoString);
+        // Use 'en-GB' for DD/MM/YYYY format, adjust options for 24-hour time
+        const options: Intl.DateTimeFormatOptions = {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false, // Use 24-hour format
+        };
+        return date.toLocaleString('en-GB', options);
+    } catch (e) {
+        console.error("Error formatting date:", e);
+        return "Invalid Date";
+    }
+};
+
+
 const MatchHistory: React.FC<MatchHistoryProps> = ({
   matchesToday,
   loading,
@@ -321,7 +342,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                   </div>
                 )}
                  <div className="text-right text-xs text-gray-400 mt-1">
-                   Played: {new Date(match.played_at).toLocaleString()}
+                   Played: {formatDateTimeEuropean(match.played_at)} {/* Use the formatting function */}
                  </div>
               </li>
             );
