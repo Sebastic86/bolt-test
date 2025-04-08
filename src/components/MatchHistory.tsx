@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2 } from 'lucide-react'; // Import Trash2
 
 interface MatchHistoryProps {
-  matchesToday: MatchHistoryItem[]; // Receive matches from parent
-  loading: boolean; // Receive loading state from parent
-  error: string | null; // Receive error state from parent
-  onRefresh: () => void; // Receive refresh handler from parent
-  allPlayers: Player[]; // Keep for potential future use or context
+  matchesToday: MatchHistoryItem[];
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+  allPlayers: Player[];
 }
 
 const MatchHistory: React.FC<MatchHistoryProps> = ({
@@ -18,16 +18,13 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   onRefresh,
   allPlayers,
 }) => {
-  // Score editing state remains local
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
   const [score1Input, setScore1Input] = useState<string>('');
   const [score2Input, setScore2Input] = useState<string>('');
   const [savingScore, setSavingScore] = useState<boolean>(false);
-
-  // Player list expansion state remains local
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null); // State for delete loading
 
-  // Calculate the set of match IDs to highlight based on refined rules
   const highlightedMatchIds = useMemo(() => {
     let maxDiff = -1;
     const completedMatches = matchesToday.filter(
@@ -35,30 +32,24 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
     );
 
     if (completedMatches.length === 0) {
-      return new Set<string>(); // No completed matches, nothing to highlight
+      return new Set<string>();
     }
 
-    // 1. Find the maximum goal difference
     completedMatches.forEach(match => {
-      // Scores are guaranteed non-null here by the filter above
       const diff = Math.abs(match.team1_score! - match.team2_score!);
       if (diff > maxDiff) {
         maxDiff = diff;
       }
     });
 
-    // 2. Find all matches with the maximum goal difference
     const matchesWithMaxDiff = completedMatches.filter(match => {
       const diff = Math.abs(match.team1_score! - match.team2_score!);
       return diff === maxDiff;
     });
 
-    // 3. Handle ties or single winner
     if (matchesWithMaxDiff.length <= 1) {
-      // If 0 or 1 match has the max difference, highlight it (or none)
       return new Set<string>(matchesWithMaxDiff.map(m => m.id));
     } else {
-      // Tie-breaker: Highest total goals among those tied for max difference
       let maxTotalGoals = -1;
       matchesWithMaxDiff.forEach(match => {
         const totalGoals = match.team1_score! + match.team2_score!;
@@ -67,7 +58,6 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
         }
       });
 
-      // 4. Find all matches with max difference AND max total goals
       const finalMatchesToHighlight = matchesWithMaxDiff.filter(match => {
         const totalGoals = match.team1_score! + match.team2_score!;
         return totalGoals === maxTotalGoals;
@@ -75,7 +65,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
 
       return new Set<string>(finalMatchesToHighlight.map(m => m.id));
     }
-  }, [matchesToday]); // Recalculate only when matchesToday changes
+  }, [matchesToday]);
 
   const handleEditScoreClick = (match: MatchHistoryItem) => {
     setEditingScoreMatchId(match.id);
@@ -108,7 +98,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       if (updateError) throw updateError;
 
       setEditingScoreMatchId(null);
-      onRefresh(); // Trigger parent refresh
+      onRefresh();
 
     } catch (err: any) {
       console.error('Error updating score:', err);
@@ -117,6 +107,33 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       setSavingScore(false);
     }
   };
+
+  const handleDeleteMatch = async (matchId: string, team1Name: string, team2Name: string) => {
+    const confirmed = window.confirm(`Are you sure you want to delete the match: ${team1Name} vs ${team2Name}? This action cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingMatchId(matchId); // Indicate deletion in progress for this match
+    try {
+      const { error: deleteError } = await supabase
+        .from('matches')
+        .delete()
+        .eq('id', matchId);
+
+      if (deleteError) throw deleteError;
+
+      console.log(`Match ${matchId} deleted successfully.`);
+      onRefresh(); // Refresh the list from the parent
+
+    } catch (err: any) {
+      console.error('Error deleting match:', err);
+      alert('Failed to delete match.'); // Inform user
+    } finally {
+      setDeletingMatchId(null); // Reset deletion state
+    }
+  };
+
 
   const toggleExpandMatch = (matchId: string) => {
     setExpandedMatchId(prevId => (prevId === matchId ? null : matchId));
@@ -129,7 +146,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
         <button
             onClick={onRefresh}
             className="p-2 text-gray-500 hover:text-blue-600 disabled:opacity-50"
-            disabled={loading || savingScore}
+            disabled={loading || savingScore || !!deletingMatchId} // Disable refresh if deleting any match
             aria-label="Refresh match history"
             title="Refresh History"
         >
@@ -146,12 +163,12 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       {!loading && !error && matchesToday.length > 0 && (
         <ul className="space-y-4">
           {matchesToday.map((match) => {
-            // Determine if this match should be highlighted using the calculated set
             const shouldHighlight = highlightedMatchIds.has(match.id);
             const highlightClasses = shouldHighlight ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-gray-200 bg-white';
+            const isDeletingThisMatch = deletingMatchId === match.id; // Check if this specific match is being deleted
 
             return (
-              <li key={match.id} className={`rounded-lg shadow p-4 border transition-all duration-200 ${highlightClasses}`}>
+              <li key={match.id} className={`rounded-lg shadow p-4 border transition-all duration-200 ${highlightClasses} ${isDeletingThisMatch ? 'opacity-50' : ''}`}>
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-2">
                    {/* Teams and Score */}
                    <div className="flex items-center space-x-2 flex-grow mb-2 sm:mb-0 min-w-0">
@@ -165,7 +182,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                                   onChange={(e) => setScore1Input(e.target.value)}
                                   className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center"
                                   min="0"
-                                  disabled={savingScore}
+                                  disabled={savingScore || isDeletingThisMatch}
                               />
                               <span>-</span>
                               <input
@@ -174,7 +191,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                                   onChange={(e) => setScore2Input(e.target.value)}
                                   className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center"
                                   min="0"
-                                  disabled={savingScore}
+                                  disabled={savingScore || isDeletingThisMatch}
                               />
                           </div>
                       ) : (
@@ -195,7 +212,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               <button
                                   onClick={() => handleSaveScore(match.id)}
                                   className="p-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
-                                  disabled={savingScore}
+                                  disabled={savingScore || isDeletingThisMatch}
                                   title="Save Score"
                               >
                                   <Save className="w-4 h-4" />
@@ -203,7 +220,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               <button
                                   onClick={handleCancelEditScore}
                                   className="p-1 bg-gray-400 text-white rounded hover:bg-gray-500 disabled:opacity-50"
-                                  disabled={savingScore}
+                                  disabled={savingScore || isDeletingThisMatch}
                                   title="Cancel Edit"
                               >
                                   <X className="w-4 h-4" />
@@ -213,7 +230,8 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           <button
                               onClick={() => handleEditScoreClick(match)}
                               className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
-                              disabled={savingScore || loading}
+                              disabled={savingScore || loading || !!deletingMatchId} // Disable if any deletion is happening
+                              title={match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                           >
                               {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                           </button>
@@ -222,9 +240,18 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           onClick={() => toggleExpandMatch(match.id)}
                           className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
                           title={expandedMatchId === match.id ? "Collapse Players" : "Expand Players"}
-                          disabled={savingScore || loading}
+                          disabled={savingScore || loading || !!deletingMatchId} // Disable if any deletion is happening
                       >
                           {expandedMatchId === match.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                      {/* Delete Button */}
+                      <button
+                          onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
+                          className={`p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`}
+                          disabled={savingScore || loading || !!deletingMatchId} // Disable if any deletion is happening or saving score
+                          title="Delete Match"
+                      >
+                          {isDeletingThisMatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                       </button>
                    </div>
                 </div>
