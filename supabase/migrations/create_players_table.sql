@@ -1,4 +1,3 @@
-```sql
 /*
   # Create players table
 
@@ -54,4 +53,3 @@ CREATE POLICY "Allow users to delete their own player info (Placeholder)"
   FOR DELETE
   TO authenticated
   USING (false); -- Initially restrict direct deletes
-```

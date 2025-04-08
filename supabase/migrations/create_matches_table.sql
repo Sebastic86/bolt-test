@@ -1,4 +1,3 @@
-```sql
 /*
   # Create matches table
 
@@ -70,4 +69,3 @@ CREATE POLICY "Disallow deleting matches"
   FOR DELETE
   TO authenticated
   USING (false); -- Prevent deletion
-```

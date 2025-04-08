@@ -1,4 +1,3 @@
-```sql
 /*
   # Create match_players table
 
@@ -72,4 +71,3 @@ CREATE POLICY "Disallow deleting match players directly"
   FOR DELETE
   TO authenticated
   USING (false); -- Prevent direct deletion (use CASCADE from matches/players)
-```

@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TeamCard from './components/TeamCard';
 import EditTeamModal from './components/EditTeamModal';
 import SettingsModal from './components/SettingsModal';
-import AddMatchModal from './components/AddMatchModal'; // Import AddMatchModal
-import MatchHistory from './components/MatchHistory'; // Import MatchHistory
-import { Team, Player } from './types'; // Import Player type
+import AddMatchModal from './components/AddMatchModal';
+import MatchHistory from './components/MatchHistory';
+import { Team, Player, Match, MatchPlayer, MatchHistoryItem } from './types'; // Import necessary types
 import { supabase } from './lib/supabaseClient';
-import { Dices, Settings, PlusSquare } from 'lucide-react'; // Import PlusSquare icon
+import { Dices, Settings, PlusSquare } from 'lucide-react';
 
 // --- Constants for Session Storage ---
 const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
@@ -50,7 +50,6 @@ const fetchAllPlayers = async (): Promise<Player[]> => {
     return data || [];
 };
 
-
 // Function to get a random team from a filtered list
 const getRandomTeam = (teams: Team[], excludeId?: string): Team | null => {
   if (teams.length === 0) return null;
@@ -79,7 +78,7 @@ const getInitialMatch = (teams: Team[]): [Team, Team] | null => {
 
 function App() {
   const [allTeams, setAllTeams] = useState<Team[]>([]);
-  const [allPlayers, setAllPlayers] = useState<Player[]>([]); // State for players
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [match, setMatch] = useState<[Team, Team] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +96,10 @@ function App() {
   const [isAddMatchModalOpen, setIsAddMatchModalOpen] = useState<boolean>(false);
 
   // Match History State
-  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
+  const [matchesToday, setMatchesToday] = useState<MatchHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0); // Keep trigger for manual refresh
 
 
   // Filtered teams based on rating settings
@@ -105,7 +107,81 @@ function App() {
     return allTeams.filter(team => team.rating >= minRating && team.rating <= maxRating);
   }, [allTeams, minRating, maxRating]);
 
-  // Fetch initial data (teams and players)
+  // Fetch Today's Match History (moved from MatchHistory component)
+  const fetchTodaysMatches = useCallback(async () => {
+    setLoadingHistory(true);
+    setHistoryError(null);
+    console.log("[App] Fetching today's matches...");
+
+    try {
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart);
+      todayEnd.setUTCDate(todayStart.getUTCDate() + 1);
+
+      const { data: matchesData, error: matchesError } = await supabase
+        .from('matches')
+        .select('*')
+        .gte('played_at', todayStart.toISOString())
+        .lt('played_at', todayEnd.toISOString())
+        .order('played_at', { ascending: false });
+
+      if (matchesError) throw matchesError;
+      if (!matchesData) {
+          setMatchesToday([]);
+          setLoadingHistory(false);
+          return;
+      }
+
+      const matchIds = matchesData.map(m => m.id);
+      let matchPlayersData: MatchPlayer[] = [];
+      if (matchIds.length > 0) {
+          const { data: mpData, error: mpError } = await supabase
+              .from('match_players')
+              .select('*')
+              .in('match_id', matchIds);
+          if (mpError) throw mpError;
+          matchPlayersData = mpData || [];
+      }
+
+      const teamMap = new Map(allTeams.map(t => [t.id, t]));
+      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+
+      const combinedMatches: MatchHistoryItem[] = matchesData.map(match => {
+        const team1 = teamMap.get(match.team1_id);
+        const team2 = teamMap.get(match.team2_id);
+        const playersInMatch = matchPlayersData.filter(mp => mp.match_id === match.id);
+
+        return {
+          ...match,
+          team1_name: team1?.name ?? 'Unknown Team',
+          team1_logoUrl: team1?.logoUrl ?? '',
+          team2_name: team2?.name ?? 'Unknown Team',
+          team2_logoUrl: team2?.logoUrl ?? '',
+          team1_players: playersInMatch
+            .filter(mp => mp.team_number === 1)
+            .map(mp => playerMap.get(mp.player_id))
+            .filter((p): p is Player => p !== undefined),
+          team2_players: playersInMatch
+            .filter(mp => mp.team_number === 2)
+            .map(mp => playerMap.get(mp.player_id))
+            .filter((p): p is Player => p !== undefined),
+        };
+      });
+
+      console.log("[App] Today's matches fetched:", combinedMatches);
+      setMatchesToday(combinedMatches);
+
+    } catch (err: any) {
+      console.error('[App] Error fetching match history:', err);
+      setHistoryError('Failed to load match history.');
+      setMatchesToday([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [allTeams, allPlayers]); // Depend on teams and players list being loaded
+
+  // Fetch initial data (teams, players)
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -118,7 +194,7 @@ function App() {
         } else {
           setAllTeams(teamsData);
         }
-        setAllPlayers(playersData); // Store players
+        setAllPlayers(playersData);
       })
       .catch(err => {
         console.error("Failed to fetch initial data:", err);
@@ -132,27 +208,58 @@ function App() {
       });
   }, []);
 
+  // Fetch history once teams/players are loaded, and when triggered
+  useEffect(() => {
+    if (allTeams.length > 0 && allPlayers.length > 0) {
+        fetchTodaysMatches();
+    }
+  }, [allTeams, allPlayers, refreshHistoryTrigger, fetchTodaysMatches]);
+
+
   // Effect to set initial match or update when filters/teams change
   useEffect(() => {
-    if (!loading && allTeams.length > 0) { // Check allTeams before filtering
+    if (!loading && allTeams.length > 0) {
         const currentMatchIsValid = match &&
                                     filteredTeams.some(t => t.id === match[0].id) &&
                                     filteredTeams.some(t => t.id === match[1].id);
 
         if (!currentMatchIsValid) {
-             setMatch(getInitialMatch(filteredTeams));
+             // Generate initial match considering teams that haven't played today
+             const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
+             const availableForInitialMatch = filteredTeams.filter(t => !playedTeamIds.has(t.id));
+             setMatch(getInitialMatch(availableForInitialMatch));
         } else if (filteredTeams.length < 2) {
-             setMatch(null); // Clear match if filters make current one invalid and <2 teams remain
+             setMatch(null);
         }
     } else if (!loading && allTeams.length === 0) {
-        setMatch(null); // No teams loaded
+        setMatch(null);
     }
-  }, [filteredTeams, loading, allTeams, match]); // Add allTeams and match dependencies
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredTeams, loading, allTeams, matchesToday]); // Add matchesToday dependency
 
 
   const handleGenerateNewMatch = () => {
-    if (filteredTeams.length >= 2) {
-      setMatch(getInitialMatch(filteredTeams));
+    // 1. Get IDs of teams that played today
+    const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
+    console.log("[App] Teams played today:", playedTeamIds);
+
+    // 2. Filter available teams (based on rating filter) excluding those that played
+    const availableTeamsForNewMatchup = filteredTeams.filter(team => !playedTeamIds.has(team.id));
+    console.log("[App] Available teams for new matchup (after filtering played):", availableTeamsForNewMatchup.length);
+
+    if (availableTeamsForNewMatchup.length >= 2) {
+      const newMatch = getInitialMatch(availableTeamsForNewMatchup);
+      setMatch(newMatch);
+      if (!newMatch) {
+          setError("Could not generate a new matchup from the available teams.");
+      } else {
+          setError(null); // Clear previous errors if successful
+      }
+    } else {
+      // Not enough teams left that haven't played today within the filter
+      setMatch(null); // Clear the current match display
+      setError(`Not enough teams available for a new matchup within the current filter (${minRating.toFixed(1)}-${maxRating.toFixed(1)} stars) that haven't played today. Only ${availableTeamsForNewMatchup.length} team(s) remaining.`);
+      console.warn("Cannot generate new match: Not enough unplayed teams available in the current filter.");
     }
   };
 
@@ -167,19 +274,33 @@ function App() {
   };
   const handleUpdateTeam = useCallback((newTeam: Team) => {
     if (editingTeamIndex === null || !match) return;
+
+    // Exclude teams played today AND the new team itself when finding a new opponent
+    const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
+    const potentialOpponentPool = filteredTeams.filter(t => !playedTeamIds.has(t.id) && t.id !== newTeam.id);
+
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
     let newOpponent = match[otherTeamIndex];
-    if (newOpponent.id === newTeam.id) {
-      const potentialOpponent = getRandomTeam(filteredTeams, newTeam.id);
-      if (potentialOpponent) newOpponent = potentialOpponent;
-      else console.warn("Could not find a different opponent within the current filter.");
+
+    // If the current opponent is the same as the new team OR has already played today, find a new one
+    if (newOpponent.id === newTeam.id || playedTeamIds.has(newOpponent.id)) {
+      const potentialOpponent = getRandomTeam(potentialOpponentPool); // Already excludes newTeam.id
+      if (potentialOpponent) {
+        newOpponent = potentialOpponent;
+      } else {
+        console.warn("Could not find a different, unplayed opponent within the current filter.");
+        // Keep the original opponent for now, or maybe clear the match?
+        // For now, let's proceed but the opponent might be invalid.
+        // A better approach might be to show an error or prevent the edit if no valid opponent exists.
+      }
     }
+
     const updatedMatch: [Team, Team] = [...match];
     updatedMatch[editingTeamIndex] = newTeam;
     updatedMatch[otherTeamIndex] = newOpponent;
     setMatch(updatedMatch);
     handleCloseEditModal();
-  }, [match, editingTeamIndex, filteredTeams]);
+  }, [match, editingTeamIndex, filteredTeams, matchesToday]);
 
   // --- Settings Modal Handlers ---
   const handleOpenSettingsModal = () => setIsSettingsModalOpen(true);
@@ -193,6 +314,7 @@ function App() {
     } catch (error) {
       console.error("Error saving settings to sessionStorage:", error);
     }
+    setError(null); // Clear errors when settings change
   };
 
   // --- Add Match Modal Handlers ---
@@ -200,6 +322,11 @@ function App() {
   const handleCloseAddMatchModal = () => setIsAddMatchModalOpen(false);
   const handleMatchSaved = () => {
     setRefreshHistoryTrigger(prev => prev + 1); // Increment trigger to refresh history
+  };
+
+  // --- Manual Refresh Handler ---
+  const handleManualRefreshHistory = () => {
+      setRefreshHistoryTrigger(prev => prev + 1);
   };
 
 
@@ -213,19 +340,24 @@ function App() {
   const team1Differences = differences ? { overall: differences.overall, attack: differences.attack, midfield: differences.midfield, defend: differences.defend } : undefined;
   const team2Differences = differences ? { overall: -differences.overall, attack: -differences.attack, midfield: -differences.midfield, defend: -differences.defend } : undefined;
 
+  // Determine if New Matchup button should be disabled
+  const playedTeamIdsToday = useMemo(() => new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id])), [matchesToday]);
+  const availableForNewMatchupCount = useMemo(() => filteredTeams.filter(team => !playedTeamIdsToday.has(team.id)).length, [filteredTeams, playedTeamIdsToday]);
+  const canGenerateNewMatch = availableForNewMatchupCount >= 2;
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4 flex flex-col items-center"> {/* Removed justify-center for scrolling */}
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mt-8 mb-6 text-center"> {/* Adjusted margin */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4 flex flex-col items-center">
+      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mt-8 mb-6 text-center">
         EA FC Random Match Generator
       </h1>
 
       {loading && <p className="text-gray-600">Loading initial data...</p>}
-      {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center mb-4">{error}</p>}
+      {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center mb-4 max-w-xl mx-auto">{error}</p>}
 
       {/* Match Display */}
       {!loading && !error && match && (
-        <div className="w-full max-w-4xl mb-6"> {/* Adjusted margin */}
+        <div className="w-full max-w-4xl mb-6">
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
             <TeamCard
               team={match[0]}
@@ -241,21 +373,26 @@ function App() {
           </div>
         </div>
       )}
+       {!loading && !error && !match && filteredTeams.length >= 2 && !canGenerateNewMatch && (
+         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
+            No valid matchup displayed. All teams within the current filter have played today.
+         </p>
+       )}
+
 
        {/* Buttons Container */}
        {!loading && !error && allTeams.length > 0 && (
-         <div className="flex items-center justify-center space-x-4 mb-6"> {/* Centered buttons, added margin */}
+         <div className="flex items-center justify-center space-x-4 mb-6">
            <button
              onClick={handleGenerateNewMatch}
-             className="flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
-             disabled={filteredTeams.length < 2}
-             title="Generate New Random Matchup"
+             className="flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+             disabled={!canGenerateNewMatch} // Disable if less than 2 unplayed teams available
+             title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
            >
              <Dices className="w-5 h-5 mr-2" />
              New Matchup
            </button>
 
-            {/* Add Match Button */}
            <button
              onClick={handleOpenAddMatchModal}
              className="flex items-center justify-center px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
@@ -281,7 +418,12 @@ function App() {
       {/* Informative messages */}
        {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
          <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
-           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars). Need at least 2 to generate a match. Adjust settings or wait for more teams.
+           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars). Need at least 2 to generate a match. Adjust settings.
+         </p>
+       )}
+        {!loading && !error && allTeams.length > 0 && filteredTeams.length >= 2 && !canGenerateNewMatch && (
+         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
+           All {filteredTeams.length} team(s) matching the filter have already played today. Cannot generate a new matchup.
          </p>
        )}
        {!loading && !error && allTeams.length === 0 && (
@@ -291,9 +433,11 @@ function App() {
        {/* Match History */}
        {!loading && !error && (
            <MatchHistory
-                refreshTrigger={refreshHistoryTrigger}
-                allTeams={allTeams}
-                allPlayers={allPlayers}
+                matchesToday={matchesToday}
+                loading={loadingHistory}
+                error={historyError}
+                onRefresh={handleManualRefreshHistory} // Pass refresh handler
+                allPlayers={allPlayers} // Pass players for score editing logic if needed there
             />
        )}
 
@@ -302,7 +446,8 @@ function App() {
       <EditTeamModal
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
-        allTeams={filteredTeams}
+        // Pass teams filtered by rating *and* excluding those played today for selection
+        allTeams={filteredTeams.filter(team => !playedTeamIdsToday.has(team.id))}
         onTeamSelected={handleUpdateTeam}
         currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined}
       />
@@ -316,7 +461,7 @@ function App() {
        <AddMatchModal
         isOpen={isAddMatchModalOpen}
         onClose={handleCloseAddMatchModal}
-        matchTeams={match} // Pass the current match teams
+        matchTeams={match}
         onMatchSaved={handleMatchSaved}
       />
     </div>

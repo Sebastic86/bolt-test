@@ -1,4 +1,3 @@
-```sql
 /*
   # Update RLS Policies for Public Read Access
 
@@ -48,5 +47,3 @@ CREATE POLICY "Allow public read access to match players"
   FOR SELECT
   TO anon -- Allow anonymous access
   USING (true);
-
-```

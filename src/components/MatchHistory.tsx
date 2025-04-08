@@ -1,102 +1,33 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Match, Player, Team, MatchPlayer, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X } from 'lucide-react'; // Import X icon
+import { Player, MatchHistoryItem } from '../types'; // Removed unused imports
+import { Save, RefreshCw, ChevronDown, ChevronUp, X } from 'lucide-react'; // Added X icon
 
 interface MatchHistoryProps {
-  refreshTrigger: number; // Increment to trigger refresh
-  allTeams: Team[]; // Pass all teams for quick lookup
-  allPlayers: Player[]; // Pass all players for quick lookup
+  matchesToday: MatchHistoryItem[]; // Receive matches from parent
+  loading: boolean; // Receive loading state from parent
+  error: string | null; // Receive error state from parent
+  onRefresh: () => void; // Receive refresh handler from parent
+  allPlayers: Player[]; // Keep for potential future use or context
 }
 
-const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, allPlayers }) => {
-  const [matchesToday, setMatchesToday] = useState<MatchHistoryItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+const MatchHistory: React.FC<MatchHistoryProps> = ({
+  matchesToday,
+  loading,
+  error,
+  onRefresh,
+  allPlayers, // Keep prop, even if not directly used in rendering logic currently
+}) => {
+  // Score editing state remains local to this component
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
   const [score1Input, setScore1Input] = useState<string>('');
   const [score2Input, setScore2Input] = useState<string>('');
+  const [savingScore, setSavingScore] = useState<boolean>(false); // Local saving indicator for score update
+
+  // Player list expansion state remains local
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
 
-  const fetchMatchHistory = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Get start and end of today in UTC
-      const todayStart = new Date();
-      todayStart.setUTCHours(0, 0, 0, 0);
-      const todayEnd = new Date(todayStart);
-      todayEnd.setUTCDate(todayStart.getUTCDate() + 1);
-
-      // 1. Fetch matches played today
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select('*')
-        .gte('played_at', todayStart.toISOString())
-        .lt('played_at', todayEnd.toISOString())
-        .order('played_at', { ascending: false }); // Show newest first
-
-      if (matchesError) throw matchesError;
-      if (!matchesData) {
-          setMatchesToday([]);
-          setLoading(false);
-          return;
-      }
-
-      // 2. Fetch players for these matches
-      const matchIds = matchesData.map(m => m.id);
-      let matchPlayersData: MatchPlayer[] = [];
-      if (matchIds.length > 0) {
-          const { data: mpData, error: mpError } = await supabase
-              .from('match_players')
-              .select('*')
-              .in('match_id', matchIds);
-          if (mpError) throw mpError;
-          matchPlayersData = mpData || [];
-      }
-
-
-      // 3. Combine data
-      const teamMap = new Map(allTeams.map(t => [t.id, t]));
-      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-
-      const combinedMatches: MatchHistoryItem[] = matchesData.map(match => {
-        const team1 = teamMap.get(match.team1_id);
-        const team2 = teamMap.get(match.team2_id);
-        const playersInMatch = matchPlayersData.filter(mp => mp.match_id === match.id);
-
-        return {
-          ...match,
-          team1_name: team1?.name ?? 'Unknown Team',
-          team1_logoUrl: team1?.logoUrl ?? '',
-          team2_name: team2?.name ?? 'Unknown Team',
-          team2_logoUrl: team2?.logoUrl ?? '',
-          team1_players: playersInMatch
-            .filter(mp => mp.team_number === 1)
-            .map(mp => playerMap.get(mp.player_id))
-            .filter((p): p is Player => p !== undefined), // Type guard
-          team2_players: playersInMatch
-            .filter(mp => mp.team_number === 2)
-            .map(mp => playerMap.get(mp.player_id))
-            .filter((p): p is Player => p !== undefined), // Type guard
-        };
-      });
-
-      setMatchesToday(combinedMatches);
-
-    } catch (err: any) {
-      console.error('Error fetching match history:', err);
-      setError('Failed to load match history.');
-      setMatchesToday([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [allTeams, allPlayers]); // Depend on teams and players list
-
-  useEffect(() => {
-    fetchMatchHistory();
-  }, [refreshTrigger, fetchMatchHistory]); // Refetch when trigger changes
+  // Removed internal fetchMatchHistory, useEffect for fetching, loading/error state
 
   const handleEditScoreClick = (match: MatchHistoryItem) => {
     setEditingScoreMatchId(match.id);
@@ -119,7 +50,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
       return;
     }
 
-    setLoading(true); // Indicate saving
+    setSavingScore(true); // Indicate saving score specifically
     try {
       const { error: updateError } = await supabase
         .from('matches')
@@ -128,19 +59,17 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
 
       if (updateError) throw updateError;
 
-      // Update local state immediately for better UX
-      setMatchesToday(prevMatches =>
-        prevMatches.map(m =>
-          m.id === matchId ? { ...m, team1_score: score1, team2_score: score2 } : m
-        )
-      );
+      // No need to update local state directly here.
+      // The parent's refresh mechanism (triggered by onMatchSaved -> refreshHistoryTrigger)
+      // will fetch the updated list.
       setEditingScoreMatchId(null); // Exit edit mode
+      onRefresh(); // Trigger parent refresh to get updated data including score
 
     } catch (err: any) {
       console.error('Error updating score:', err);
-      alert('Failed to save score.');
+      alert('Failed to save score.'); // Keep user alert
     } finally {
-      setLoading(false);
+      setSavingScore(false);
     }
   };
 
@@ -153,16 +82,18 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-semibold text-gray-700">Today's Matches</h2>
         <button
-            onClick={fetchMatchHistory}
+            onClick={onRefresh} // Use the passed handler
             className="p-2 text-gray-500 hover:text-blue-600 disabled:opacity-50"
-            disabled={loading}
+            disabled={loading || savingScore} // Disable during parent loading or local score saving
             aria-label="Refresh match history"
             title="Refresh History"
         >
+            {/* Use parent loading state for spin animation */}
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
+      {/* Use parent loading/error states */}
       {loading && matchesToday.length === 0 && <p className="text-center text-gray-600">Loading history...</p>}
       {error && <p className="text-center text-red-600 bg-red-100 p-3 rounded">{error}</p>}
       {!loading && !error && matchesToday.length === 0 && (
@@ -175,18 +106,18 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
             <li key={match.id} className="bg-white rounded-lg shadow p-4 border border-gray-200">
               <div className="flex flex-col sm:flex-row justify-between items-center mb-2">
                  {/* Teams and Score */}
-                 <div className="flex items-center space-x-2 flex-grow mb-2 sm:mb-0">
-                    <img src={match.team1_logoUrl} alt={match.team1_name} className="w-6 h-6 object-contain"/>
-                    <span className="font-medium truncate w-24 sm:w-auto">{match.team1_name}</span>
+                 <div className="flex items-center space-x-2 flex-grow mb-2 sm:mb-0 min-w-0"> {/* Added min-w-0 */}
+                    <img src={match.team1_logoUrl} alt={match.team1_name} className="w-6 h-6 object-contain flex-shrink-0"/>
+                    <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto">{match.team1_name}</span>
                     {editingScoreMatchId === match.id ? (
-                        <div className="flex items-center space-x-1 mx-2">
+                        <div className="flex items-center space-x-1 mx-2 flex-shrink-0">
                             <input
                                 type="number"
                                 value={score1Input}
                                 onChange={(e) => setScore1Input(e.target.value)}
                                 className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center"
                                 min="0"
-                                disabled={loading}
+                                disabled={savingScore} // Use local saving state
                             />
                             <span>-</span>
                             <input
@@ -195,16 +126,18 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
                                 onChange={(e) => setScore2Input(e.target.value)}
                                 className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center"
                                 min="0"
-                                disabled={loading}
+                                disabled={savingScore} // Use local saving state
                             />
                         </div>
                     ) : (
-                        <span className="text-lg font-bold mx-2">
-                            {match.team1_score !== null ? `${match.team1_score} - ${match.team2_score}` : 'vs'}
+                        <span className="text-lg font-bold mx-2 flex-shrink-0">
+                            {match.team1_score !== null && match.team2_score !== null
+                             ? `${match.team1_score} - ${match.team2_score}`
+                             : 'vs'}
                         </span>
                     )}
-                    <img src={match.team2_logoUrl} alt={match.team2_name} className="w-6 h-6 object-contain"/>
-                    <span className="font-medium truncate w-24 sm:w-auto">{match.team2_name}</span>
+                    <img src={match.team2_logoUrl} alt={match.team2_name} className="w-6 h-6 object-contain flex-shrink-0"/>
+                    <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto">{match.team2_name}</span>
                  </div>
 
                  {/* Action Buttons */}
@@ -214,7 +147,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
                             <button
                                 onClick={() => handleSaveScore(match.id)}
                                 className="p-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
-                                disabled={loading}
+                                disabled={savingScore} // Use local saving state
                                 title="Save Score"
                             >
                                 <Save className="w-4 h-4" />
@@ -222,24 +155,26 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ refreshTrigger, allTeams, a
                             <button
                                 onClick={handleCancelEditScore}
                                 className="p-1 bg-gray-400 text-white rounded hover:bg-gray-500 disabled:opacity-50"
-                                disabled={loading}
+                                disabled={savingScore} // Use local saving state
                                 title="Cancel Edit"
                             >
-                                <X className="w-4 h-4" /> {/* This line caused the error */}
+                                <X className="w-4 h-4" /> {/* Use X icon */}
                             </button>
                         </>
                     ) : (
                         <button
                             onClick={() => handleEditScoreClick(match)}
-                            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
+                            disabled={savingScore || loading} // Disable if saving score or parent is loading
                         >
                             {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                         </button>
                     )}
                      <button
                         onClick={() => toggleExpandMatch(match.id)}
-                        className="p-1 text-gray-500 hover:text-gray-700"
+                        className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
                         title={expandedMatchId === match.id ? "Collapse Players" : "Expand Players"}
+                        disabled={savingScore || loading} // Disable if saving score or parent is loading
                     >
                         {expandedMatchId === match.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
