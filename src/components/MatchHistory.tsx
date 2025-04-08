@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2 } from 'lucide-react'; // Import Trash2
+import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield } from 'lucide-react'; // Import Shield
 
 interface MatchHistoryProps {
   matchesToday: MatchHistoryItem[];
@@ -9,6 +9,11 @@ interface MatchHistoryProps {
   error: string | null;
   onRefresh: () => void;
   allPlayers: Player[];
+}
+
+// State to track logo errors within the history list
+interface LogoErrorState {
+  [logoKey: string]: boolean; // e.g., { 'matchId-team1': true, 'matchId-team2': false }
 }
 
 const MatchHistory: React.FC<MatchHistoryProps> = ({
@@ -23,7 +28,20 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   const [score2Input, setScore2Input] = useState<string>('');
   const [savingScore, setSavingScore] = useState<boolean>(false);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
-  const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null); // State for delete loading
+  const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
+  const [logoErrors, setLogoErrors] = useState<LogoErrorState>({}); // State for logo errors
+
+  // Function to handle logo loading errors
+  const handleLogoError = (matchId: string, teamNumber: 1 | 2) => {
+    const key = `${matchId}-team${teamNumber}`;
+    setLogoErrors(prevErrors => ({ ...prevErrors, [key]: true }));
+  };
+
+  // Reset logo errors when matchesToday changes (e.g., on refresh)
+  React.useEffect(() => {
+    setLogoErrors({});
+  }, [matchesToday]);
+
 
   const highlightedMatchIds = useMemo(() => {
     let maxDiff = -1;
@@ -114,7 +132,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       return;
     }
 
-    setDeletingMatchId(matchId); // Indicate deletion in progress for this match
+    setDeletingMatchId(matchId);
     try {
       const { error: deleteError } = await supabase
         .from('matches')
@@ -124,13 +142,13 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       if (deleteError) throw deleteError;
 
       console.log(`Match ${matchId} deleted successfully.`);
-      onRefresh(); // Refresh the list from the parent
+      onRefresh();
 
     } catch (err: any) {
       console.error('Error deleting match:', err);
-      alert('Failed to delete match.'); // Inform user
+      alert('Failed to delete match.');
     } finally {
-      setDeletingMatchId(null); // Reset deletion state
+      setDeletingMatchId(null);
     }
   };
 
@@ -146,7 +164,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
         <button
             onClick={onRefresh}
             className="p-2 text-gray-500 hover:text-blue-600 disabled:opacity-50"
-            disabled={loading || savingScore || !!deletingMatchId} // Disable refresh if deleting any match
+            disabled={loading || savingScore || !!deletingMatchId}
             aria-label="Refresh match history"
             title="Refresh History"
         >
@@ -165,14 +183,28 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
           {matchesToday.map((match) => {
             const shouldHighlight = highlightedMatchIds.has(match.id);
             const highlightClasses = shouldHighlight ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-gray-200 bg-white';
-            const isDeletingThisMatch = deletingMatchId === match.id; // Check if this specific match is being deleted
+            const isDeletingThisMatch = deletingMatchId === match.id;
+            const logo1Error = logoErrors[`${match.id}-team1`];
+            const logo2Error = logoErrors[`${match.id}-team2`];
 
             return (
               <li key={match.id} className={`rounded-lg shadow p-4 border transition-all duration-200 ${highlightClasses} ${isDeletingThisMatch ? 'opacity-50' : ''}`}>
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-2">
                    {/* Teams and Score */}
                    <div className="flex items-center space-x-2 flex-grow mb-2 sm:mb-0 min-w-0">
-                      <img src={match.team1_logoUrl} alt={match.team1_name} className="w-6 h-6 object-contain flex-shrink-0"/>
+                      {/* Team 1 Logo/Fallback */}
+                      <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-gray-100 rounded overflow-hidden text-gray-400">
+                        {logo1Error ? (
+                          <Shield className="w-5 h-5" aria-label="Team 1 logo fallback" />
+                        ) : (
+                          <img
+                            src={match.team1_logoUrl}
+                            alt={match.team1_name}
+                            className="w-full h-full object-contain"
+                            onError={() => handleLogoError(match.id, 1)}
+                          />
+                        )}
+                      </div>
                       <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto">{match.team1_name}</span>
                       {editingScoreMatchId === match.id ? (
                           <div className="flex items-center space-x-1 mx-2 flex-shrink-0">
@@ -201,7 +233,19 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                                : 'vs'}
                           </span>
                       )}
-                      <img src={match.team2_logoUrl} alt={match.team2_name} className="w-6 h-6 object-contain flex-shrink-0"/>
+                      {/* Team 2 Logo/Fallback */}
+                       <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-gray-100 rounded overflow-hidden text-gray-400">
+                        {logo2Error ? (
+                          <Shield className="w-5 h-5" aria-label="Team 2 logo fallback" />
+                        ) : (
+                          <img
+                            src={match.team2_logoUrl}
+                            alt={match.team2_name}
+                            className="w-full h-full object-contain"
+                            onError={() => handleLogoError(match.id, 2)}
+                          />
+                        )}
+                      </div>
                       <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto">{match.team2_name}</span>
                    </div>
 
@@ -230,7 +274,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           <button
                               onClick={() => handleEditScoreClick(match)}
                               className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
-                              disabled={savingScore || loading || !!deletingMatchId} // Disable if any deletion is happening
+                              disabled={savingScore || loading || !!deletingMatchId}
                               title={match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                           >
                               {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
@@ -240,15 +284,14 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           onClick={() => toggleExpandMatch(match.id)}
                           className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
                           title={expandedMatchId === match.id ? "Collapse Players" : "Expand Players"}
-                          disabled={savingScore || loading || !!deletingMatchId} // Disable if any deletion is happening
+                          disabled={savingScore || loading || !!deletingMatchId}
                       >
                           {expandedMatchId === match.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
-                      {/* Delete Button */}
                       <button
                           onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
                           className={`p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`}
-                          disabled={savingScore || loading || !!deletingMatchId} // Disable if any deletion is happening or saving score
+                          disabled={savingScore || loading || !!deletingMatchId}
                           title="Delete Match"
                       >
                           {isDeletingThisMatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

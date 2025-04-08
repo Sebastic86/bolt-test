@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Team } from '../types';
 import * as LucideIcons from 'lucide-react'; // Keep Star icon import
-import { Pencil } from 'lucide-react'; // Import Pencil icon
+import { Pencil, Shield } from 'lucide-react'; // Import Pencil and Shield icons
 
 interface TeamCardProps {
   team: Team;
@@ -55,6 +55,16 @@ const getDifferenceColor = (diff: number | undefined): string => {
 
 
 const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
+  const [logoError, setLogoError] = useState(false); // State to track logo loading error
+
+  const handleLogoError = () => {
+    setLogoError(true);
+  };
+
+  // Reset error state if the team prop changes (e.g., new match generated)
+  React.useEffect(() => {
+    setLogoError(false);
+  }, [team.logoUrl]);
 
   return (
     <div className="relative bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-gray-200 flex items-center space-x-4">
@@ -69,18 +79,19 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
         </button>
       )}
 
-      {/* Left Side: Logo */}
-      <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded bg-gray-100">
-        <img
-          src={team.logoUrl}
-          alt={`${team.name} logo`}
-          className="w-full h-full object-contain"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = 'https://via.placeholder.com/64.png?text=Error';
-            target.alt = `${team.name} logo (Error loading)`;
-          }}
-        />
+      {/* Left Side: Logo or Fallback Icon */}
+      <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded bg-gray-100 text-gray-400">
+        {logoError ? (
+          // Use Shield as a generic fallback
+          <Shield className="w-10 h-10" aria-label="Team logo fallback" />
+        ) : (
+          <img
+            src={team.logoUrl}
+            alt={`${team.name} logo`}
+            className="w-full h-full object-contain"
+            onError={handleLogoError} // Use the handler
+          />
+        )}
       </div>
 
       {/* Right Side: Details */}

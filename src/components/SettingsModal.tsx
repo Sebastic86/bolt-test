@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, User, Edit3, Check, AlertCircle, RefreshCw } from 'lucide-react'; // Added RefreshCw
+import { X, Save, User, Edit3, Check, AlertCircle, RefreshCw } from 'lucide-react'; // Import RefreshCw
 import { Player } from '../types'; // Import Player type
 
 interface SettingsModalProps {
@@ -159,10 +159,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
      // If successful, maybe flash success briefly?
      if (success) {
         setTimeout(() => {
-            setEditingPlayers(prev => ({
-                ...prev,
-                [playerId]: { ...prev[playerId], success: false },
-            }));
+            setEditingPlayers(prev => {
+                // Check if player still exists in state before updating
+                if (prev[playerId]) {
+                    return {
+                        ...prev,
+                        [playerId]: { ...prev[playerId], success: false },
+                    };
+                }
+                return prev; // Return previous state if player ID no longer exists
+            });
         }, 2000); // Clear success message after 2 seconds
      }
   };
@@ -280,6 +286,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                 disabled={state.isLoading || state.currentName.trim() === originalName || !state.currentName.trim()}
                                                 title="Save Name"
                                             >
+                                                {/* Correctly use RefreshCw here */}
                                                 {state.isLoading ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
                                             </button>
                                             <button
