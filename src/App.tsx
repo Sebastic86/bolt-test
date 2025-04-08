@@ -145,8 +145,12 @@ function App() {
           matchPlayersData = mpData || [];
       }
 
-      const teamMap = new Map(allTeams.map(t => [t.id, t]));
+      // Use the current allPlayers state which might have pending updates
+      // It's generally better to fetch fresh data if consistency is critical,
+      // but for this case, using the state is simpler for immediate feedback.
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+      const teamMap = new Map(allTeams.map(t => [t.id, t]));
+
 
       const combinedMatches: MatchHistoryItem[] = matchesData.map(match => {
         const team1 = teamMap.get(match.team1_id);
@@ -161,11 +165,11 @@ function App() {
           team2_logoUrl: team2?.logoUrl ?? '',
           team1_players: playersInMatch
             .filter(mp => mp.team_number === 1)
-            .map(mp => playerMap.get(mp.player_id))
+            .map(mp => playerMap.get(mp.player_id)) // Use playerMap based on current state
             .filter((p): p is Player => p !== undefined),
           team2_players: playersInMatch
             .filter(mp => mp.team_number === 2)
-            .map(mp => playerMap.get(mp.player_id))
+            .map(mp => playerMap.get(mp.player_id)) // Use playerMap based on current state
             .filter((p): p is Player => p !== undefined),
         };
       });
@@ -180,7 +184,7 @@ function App() {
     } finally {
       setLoadingHistory(false);
     }
-  }, [allTeams, allPlayers]); // Depend on teams and players list being loaded
+  }, [allTeams, allPlayers]); // Depend on allPlayers state now
 
   // Fetch initial data (teams, players)
   useEffect(() => {
@@ -305,26 +309,35 @@ function App() {
   const handleUpdatePlayerName = async (playerId: string, newName: string): Promise<boolean> => {
     console.log(`[App] Attempting to update player ${playerId} to name: ${newName}`);
     try {
+      // Step 1: Update the database
       const { error } = await supabase
         .from('players')
         .update({ name: newName })
-        .eq('id', playerId);
+        .eq('id', playerId)
+        .select() // Optionally select to confirm update, though not strictly needed here
+        .single(); // Use single if you expect exactly one row updated
 
       if (error) {
-        console.error(`[App] Error updating player ${playerId}:`, error);
+        console.error(`[App] Error updating player ${playerId} in DB:`, error);
         throw error; // Re-throw to be caught below
       }
 
-      // Update local state for immediate UI feedback
+      console.log(`[App] Player ${playerId} updated successfully in DB.`);
+
+      // Step 2: Update local state ONLY if DB update was successful
       setAllPlayers(prevPlayers =>
         prevPlayers.map(p => (p.id === playerId ? { ...p, name: newName } : p))
       );
       console.log(`[App] Player ${playerId} updated successfully locally.`);
-      setRefreshHistoryTrigger(prev => prev + 1); // Refresh history/standings as player name changed
+
+      // Step 3: Trigger refresh for components depending on player data (History, Standings)
+      // setRefreshHistoryTrigger(prev => prev + 1); // Already done in SettingsModal, but keep here for clarity if needed elsewhere
+
       return true; // Indicate success
 
     } catch (err) {
       // Error already logged above
+      // Optionally: Show a user-facing error message here or in the modal
       return false; // Indicate failure
     }
   };
