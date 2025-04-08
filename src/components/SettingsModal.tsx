@@ -40,6 +40,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Initialize/Reset editing state when modal opens or players change
   useEffect(() => {
     if (isOpen) {
+      console.log('[SettingsModal] Initializing state:', { initialMinRating, initialMaxRating });
       setMinRating(initialMinRating);
       setMaxRating(initialMaxRating);
       setRatingError(null);
@@ -59,29 +60,47 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
     } else {
       // Clear state on close
+      console.log('[SettingsModal] Closing, clearing state.');
       setEditingPlayers({});
     }
   }, [isOpen, initialMinRating, initialMaxRating, allPlayers]);
 
   const handleSaveRatings = () => {
+    console.log('[SettingsModal] handleSaveRatings called.'); // DEBUG
     const min = Number(minRating);
     const max = Number(maxRating);
+    console.log('[SettingsModal] Parsed ratings:', { min, max }); // DEBUG
 
     if (isNaN(min) || isNaN(max)) {
+        console.log('[SettingsModal] Validation failed: Ratings are not numbers.'); // DEBUG
         setRatingError("Ratings must be numbers.");
         return;
     }
     if (min < 0 || max < 0 || min > 5 || max > 5) {
+      console.log('[SettingsModal] Validation failed: Ratings out of range (0-5).'); // DEBUG
       setRatingError("Ratings must be between 0 and 5.");
       return;
     }
     if (min > max) {
+      console.log('[SettingsModal] Validation failed: Min rating > Max rating.'); // DEBUG
       setRatingError("Minimum rating cannot be greater than maximum rating.");
       return;
     }
+
+    console.log('[SettingsModal] Validation passed.'); // DEBUG
     setRatingError(null);
-    onSave(min, max);
-    // Keep modal open after saving ratings
+
+    try {
+        console.log('[SettingsModal] Calling onSave...'); // DEBUG
+        onSave(min, max);
+        console.log('[SettingsModal] onSave finished.'); // DEBUG
+
+        console.log('[SettingsModal] Calling onClose...'); // DEBUG
+        onClose();
+        console.log('[SettingsModal] onClose finished.'); // DEBUG
+    } catch (e) {
+        console.error('[SettingsModal] Error during onSave or onClose:', e); // DEBUG
+    }
   };
 
   const handlePlayerNameChange = (playerId: string, newName: string) => {
@@ -242,7 +261,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                     <Save className="w-4 h-4 mr-2" />
-                    Save Ratings
+                    Save Ratings & Close
                 </button>
             </div>
         </div>

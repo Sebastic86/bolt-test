@@ -84,8 +84,8 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Settings State
-  const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 0));
+  // Settings State - Updated default minRating to 4
+  const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 4));
   const [maxRating, setMaxRating] = useState<number>(() => getInitialRating(MAX_RATING_STORAGE_KEY, 5));
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
 
@@ -303,6 +303,7 @@ function App() {
       console.error("Error saving settings to sessionStorage:", error);
     }
     setError(null);
+    // Note: Modal closing is now handled within SettingsModal component itself
   };
 
   // --- Player Name Update Handler ---
