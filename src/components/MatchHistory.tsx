@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'; // Removed useEffect, useCallback as they are no longer needed here
+import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
 import { Save, RefreshCw, ChevronDown, ChevronUp, X } from 'lucide-react';
@@ -16,7 +16,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   loading,
   error,
   onRefresh,
-  allPlayers, // Keep prop
+  allPlayers,
 }) => {
   // Score editing state remains local
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
@@ -27,22 +27,54 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   // Player list expansion state remains local
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
 
-  // Calculate the match ID with the highest goal difference
-  const highestGoalDiffMatchId = useMemo(() => {
+  // Calculate the set of match IDs to highlight based on refined rules
+  const highlightedMatchIds = useMemo(() => {
     let maxDiff = -1;
-    let matchIdWithMaxDiff: string | null = null;
+    const completedMatches = matchesToday.filter(
+      match => match.team1_score !== null && match.team2_score !== null
+    );
 
-    matchesToday.forEach(match => {
-      if (match.team1_score !== null && match.team2_score !== null) {
-        const diff = Math.abs(match.team1_score - match.team2_score);
-        if (diff > maxDiff) {
-          maxDiff = diff;
-          matchIdWithMaxDiff = match.id;
-        }
+    if (completedMatches.length === 0) {
+      return new Set<string>(); // No completed matches, nothing to highlight
+    }
+
+    // 1. Find the maximum goal difference
+    completedMatches.forEach(match => {
+      // Scores are guaranteed non-null here by the filter above
+      const diff = Math.abs(match.team1_score! - match.team2_score!);
+      if (diff > maxDiff) {
+        maxDiff = diff;
       }
     });
-    // console.log("[MatchHistory] Highest Goal Diff Match ID:", matchIdWithMaxDiff, "Diff:", maxDiff); // DEBUG
-    return matchIdWithMaxDiff;
+
+    // 2. Find all matches with the maximum goal difference
+    const matchesWithMaxDiff = completedMatches.filter(match => {
+      const diff = Math.abs(match.team1_score! - match.team2_score!);
+      return diff === maxDiff;
+    });
+
+    // 3. Handle ties or single winner
+    if (matchesWithMaxDiff.length <= 1) {
+      // If 0 or 1 match has the max difference, highlight it (or none)
+      return new Set<string>(matchesWithMaxDiff.map(m => m.id));
+    } else {
+      // Tie-breaker: Highest total goals among those tied for max difference
+      let maxTotalGoals = -1;
+      matchesWithMaxDiff.forEach(match => {
+        const totalGoals = match.team1_score! + match.team2_score!;
+        if (totalGoals > maxTotalGoals) {
+          maxTotalGoals = totalGoals;
+        }
+      });
+
+      // 4. Find all matches with max difference AND max total goals
+      const finalMatchesToHighlight = matchesWithMaxDiff.filter(match => {
+        const totalGoals = match.team1_score! + match.team2_score!;
+        return totalGoals === maxTotalGoals;
+      });
+
+      return new Set<string>(finalMatchesToHighlight.map(m => m.id));
+    }
   }, [matchesToday]); // Recalculate only when matchesToday changes
 
   const handleEditScoreClick = (match: MatchHistoryItem) => {
@@ -114,9 +146,9 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       {!loading && !error && matchesToday.length > 0 && (
         <ul className="space-y-4">
           {matchesToday.map((match) => {
-            // Determine if this match should be highlighted
-            const isHighestDiff = match.id === highestGoalDiffMatchId && match.team1_score !== null; // Ensure it's a completed match
-            const highlightClasses = isHighestDiff ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-gray-200 bg-white';
+            // Determine if this match should be highlighted using the calculated set
+            const shouldHighlight = highlightedMatchIds.has(match.id);
+            const highlightClasses = shouldHighlight ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-gray-200 bg-white';
 
             return (
               <li key={match.id} className={`rounded-lg shadow p-4 border transition-all duration-200 ${highlightClasses}`}>
@@ -146,7 +178,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               />
                           </div>
                       ) : (
-                          <span className={`text-lg font-bold mx-2 flex-shrink-0 ${isHighestDiff ? 'text-yellow-700' : ''}`}>
+                          <span className={`text-lg font-bold mx-2 flex-shrink-0 ${shouldHighlight ? 'text-yellow-700' : ''}`}>
                               {match.team1_score !== null && match.team2_score !== null
                                ? `${match.team1_score} - ${match.team2_score}`
                                : 'vs'}
