@@ -375,6 +375,7 @@ function App() {
   const playerStandings = useMemo(() => {
     console.log("[App] Calculating player standings...");
     const standingsMap = new Map<string, PlayerStanding>();
+    const teamMap = new Map(allTeams.map(t => [t.id, t])); // Map teams for quick lookup
 
     allPlayers.forEach(player => {
       standingsMap.set(player.id, {
@@ -384,48 +385,68 @@ function App() {
         goalsFor: 0,
         goalsAgainst: 0,
         goalDifference: 0,
+        totalOverallRating: 0, // Initialize new field
       });
     });
 
     matchesToday.forEach(match => {
-      if (match.team1_score === null || match.team2_score === null) {
-        return;
+      const team1 = teamMap.get(match.team1_id);
+      const team2 = teamMap.get(match.team2_id);
+
+      // Only process matches with scores for points and goals
+      const hasScores = match.team1_score !== null && match.team2_score !== null;
+      let winnerTeamNumber: 1 | 2 | null = null;
+      if (hasScores) {
+        const score1 = match.team1_score!;
+        const score2 = match.team2_score!;
+        if (score1 > score2) winnerTeamNumber = 1;
+        else if (score2 > score1) winnerTeamNumber = 2;
       }
 
-      const score1 = match.team1_score;
-      const score2 = match.team2_score;
-      let winnerTeamNumber: 1 | 2 | null = null;
-      if (score1 > score2) winnerTeamNumber = 1;
-      else if (score2 > score1) winnerTeamNumber = 2;
-
+      // Process Team 1 Players
       match.team1_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          standing.goalsFor += score1;
-          standing.goalsAgainst += score2;
-          if (winnerTeamNumber === 1) {
-            standing.points += 1;
+          if (hasScores) {
+            standing.goalsFor += match.team1_score!;
+            standing.goalsAgainst += match.team2_score!;
+            if (winnerTeamNumber === 1) {
+              standing.points += 1;
+            }
+          }
+          // Add team overall rating regardless of score
+          if (team1) {
+            standing.totalOverallRating += team1.overallRating;
           }
         }
       });
 
+      // Process Team 2 Players
       match.team2_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          standing.goalsFor += score2;
-          standing.goalsAgainst += score1;
-          if (winnerTeamNumber === 2) {
-            standing.points += 1;
+          if (hasScores) {
+            standing.goalsFor += match.team2_score!;
+            standing.goalsAgainst += match.team1_score!;
+            if (winnerTeamNumber === 2) {
+              standing.points += 1;
+            }
+          }
+          // Add team overall rating regardless of score
+          if (team2) {
+            standing.totalOverallRating += team2.overallRating;
           }
         }
       });
     });
 
+    // Calculate goal difference after processing all matches
     const standingsArray = Array.from(standingsMap.values()).map(s => ({
         ...s,
         goalDifference: s.goalsFor - s.goalsAgainst
     }));
 
+    // Sort based on points, then goal difference, then goals for
     standingsArray.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
@@ -435,7 +456,7 @@ function App() {
     console.log("[App] Player standings calculated:", standingsArray);
     return standingsArray;
 
-  }, [matchesToday, allPlayers]); // Depend on allPlayers now
+  }, [matchesToday, allPlayers, allTeams]); // Depend on allTeams now for overall rating
 
 
   return (

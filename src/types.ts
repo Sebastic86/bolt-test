@@ -54,4 +54,5 @@ export interface PlayerStanding {
   goalsFor: number;
   goalsAgainst: number;
   goalDifference: number; // Added for sorting
+  totalOverallRating: number; // Sum of overall ratings of teams played
 }

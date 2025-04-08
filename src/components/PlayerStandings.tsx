@@ -42,6 +42,9 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, e
                  <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                   GD
                 </th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24" title="Sum of Overall Ratings of Teams Played">
+                  OVR Sum
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -63,7 +66,10 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, e
                     {player.goalsAgainst}
                   </td>
                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
-                    {player.goalsFor - player.goalsAgainst}
+                    {player.goalDifference} {/* Display calculated difference */}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
+                    {player.totalOverallRating > 0 ? player.totalOverallRating : '-'} {/* Display total OVR or dash */}
                   </td>
                 </tr>
               ))}
@@ -71,7 +77,7 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, e
           </table>
         </div>
       )}
-       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win), GF: Goals For, GA: Goals Against, GD: Goal Difference. Sorted by Pts, then GD, then GF.</p>
+       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win), GF: Goals For, GA: Goals Against, GD: Goal Difference, OVR Sum: Sum of Overall Ratings of Teams Played. Sorted by Pts, then GD, then GF.</p>
     </div>
   );
 };
