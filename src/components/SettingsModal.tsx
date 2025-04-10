@@ -259,7 +259,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                 />
                 <label htmlFor="exclude-nations" className="ml-2 block text-sm text-gray-900">
-                    Exclude nation teams (league = "No league")
+                    Exclude nation teams
                 </label>
             </div>
 

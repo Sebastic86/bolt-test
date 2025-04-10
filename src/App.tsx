@@ -122,7 +122,7 @@ function App() {
   const filteredTeams = useMemo(() => {
     return allTeams.filter(team => {
         const ratingMatch = team.rating >= minRating && team.rating <= maxRating;
-        const nationMatch = !excludeNations || team.league !== 'No league';
+        const nationMatch = !excludeNations || team.league !== 'Nation';
         return ratingMatch && nationMatch;
     });
   }, [allTeams, minRating, maxRating, excludeNations]); // Add excludeNations dependency
