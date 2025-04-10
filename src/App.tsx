@@ -495,16 +495,34 @@ function App() {
 
        {/* Buttons Container */}
        {!loading && !error && allTeams.length > 0 && (
-         <div className="flex items-center justify-center space-x-4 mb-6">
-           <button onClick={handleGenerateNewMatch} className="flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed" disabled={!canGenerateNewMatch} title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}>
-             <Dices className="w-5 h-5 mr-2" /> New Matchup
-           </button>
-           <button onClick={handleOpenAddMatchModal} className="flex items-center justify-center px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50" disabled={!match} title="Add Current Matchup to History">
-             <PlusSquare className="w-5 h-5 mr-2" /> Add Match
-           </button>
-           <button onClick={handleOpenSettingsModal} className="p-2.5 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition duration-150 ease-in-out" aria-label="Open settings" title="Settings">
-             <Settings className="w-5 h-5" />
-           </button>
+         <div className="flex items-center justify-center mb-6">
+           {/* Gradient Button Group Container */}
+           <div className="inline-flex rounded-lg shadow-md overflow-hidden bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 divide-x divide-white/30">
+             <button
+               onClick={handleGenerateNewMatch}
+               className="flex items-center justify-center px-5 py-2.5 text-white font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-500 focus:ring-white transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
+               disabled={!canGenerateNewMatch}
+               title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
+             >
+               <Dices className="w-5 h-5 mr-2" /> New Matchup
+             </button>
+             <button
+               onClick={handleOpenAddMatchModal}
+               className="flex items-center justify-center px-5 py-2.5 text-white font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-500 focus:ring-white transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
+               disabled={!match}
+               title="Add Current Matchup to History"
+             >
+               <PlusSquare className="w-5 h-5 mr-2" /> Add Match
+             </button>
+             <button
+               onClick={handleOpenSettingsModal}
+               className="p-2.5 text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-500 focus:ring-white transition duration-150 ease-in-out"
+               aria-label="Open settings"
+               title="Settings"
+             >
+               <Settings className="w-5 h-5" />
+             </button>
+           </div>
          </div>
        )}
 
