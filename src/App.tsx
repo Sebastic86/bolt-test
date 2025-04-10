@@ -12,6 +12,7 @@ import { Dices, Settings, PlusSquare } from 'lucide-react';
 // --- Constants for Session Storage ---
 const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
 const MAX_RATING_STORAGE_KEY = 'fcGeneratorMaxRating';
+const EXCLUDE_NATIONS_STORAGE_KEY = 'fcGeneratorExcludeNations'; // New key
 
 // --- Helper Functions for Session Storage ---
 const getInitialRating = (key: string, defaultValue: number): number => {
@@ -28,6 +29,19 @@ const getInitialRating = (key: string, defaultValue: number): number => {
   }
   return defaultValue;
 };
+
+const getInitialBoolean = (key: string, defaultValue: boolean): boolean => {
+  try {
+    const storedValue = sessionStorage.getItem(key);
+    if (storedValue !== null) {
+      return storedValue === 'true'; // Check if the stored string is 'true'
+    }
+  } catch (error) {
+    console.error(`Error reading ${key} from sessionStorage:`, error);
+  }
+  return defaultValue;
+};
+
 
 // Fetch all teams from Supabase
 const fetchAllTeams = async (): Promise<Team[]> => {
@@ -84,9 +98,10 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Settings State - Updated default minRating to 4
+  // Settings State
   const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 4));
   const [maxRating, setMaxRating] = useState<number>(() => getInitialRating(MAX_RATING_STORAGE_KEY, 5));
+  const [excludeNations, setExcludeNations] = useState<boolean>(() => getInitialBoolean(EXCLUDE_NATIONS_STORAGE_KEY, true)); // New state
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
 
   // Edit Modal State
@@ -103,10 +118,14 @@ function App() {
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
 
 
-  // Filtered teams based on rating settings
+  // Filtered teams based on rating and nation settings
   const filteredTeams = useMemo(() => {
-    return allTeams.filter(team => team.rating >= minRating && team.rating <= maxRating);
-  }, [allTeams, minRating, maxRating]);
+    return allTeams.filter(team => {
+        const ratingMatch = team.rating >= minRating && team.rating <= maxRating;
+        const nationMatch = !excludeNations || team.league !== 'No league';
+        return ratingMatch && nationMatch;
+    });
+  }, [allTeams, minRating, maxRating, excludeNations]); // Add excludeNations dependency
 
   // Fetch Today's Match History
   const fetchTodaysMatches = useCallback(async () => {
@@ -145,9 +164,6 @@ function App() {
           matchPlayersData = mpData || [];
       }
 
-      // Use the current allPlayers state which might have pending updates
-      // It's generally better to fetch fresh data if consistency is critical,
-      // but for this case, using the state is simpler for immediate feedback.
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
       const teamMap = new Map(allTeams.map(t => [t.id, t]));
 
@@ -165,11 +181,11 @@ function App() {
           team2_logoUrl: team2?.logoUrl ?? '',
           team1_players: playersInMatch
             .filter(mp => mp.team_number === 1)
-            .map(mp => playerMap.get(mp.player_id)) // Use playerMap based on current state
+            .map(mp => playerMap.get(mp.player_id))
             .filter((p): p is Player => p !== undefined),
           team2_players: playersInMatch
             .filter(mp => mp.team_number === 2)
-            .map(mp => playerMap.get(mp.player_id)) // Use playerMap based on current state
+            .map(mp => playerMap.get(mp.player_id))
             .filter((p): p is Player => p !== undefined),
         };
       });
@@ -184,7 +200,7 @@ function App() {
     } finally {
       setLoadingHistory(false);
     }
-  }, [allTeams, allPlayers]); // Depend on allPlayers state now
+  }, [allTeams, allPlayers]);
 
   // Fetch initial data (teams, players)
   useEffect(() => {
@@ -252,7 +268,8 @@ function App() {
       setError(null);
     } else {
       setMatch(null);
-      setError(`Not enough teams available for a new matchup within the current filter (${minRating.toFixed(1)}-${maxRating.toFixed(1)} stars) that haven't played today. Only ${availableTeamsForNewMatchup.length} team(s) remaining.`);
+      const nationFilterText = excludeNations ? " excluding nations" : "";
+      setError(`Not enough teams available for a new matchup within the current filter (${minRating.toFixed(1)}-${maxRating.toFixed(1)} stars${nationFilterText}) that haven't played today. Only ${availableTeamsForNewMatchup.length} team(s) remaining.`);
     }
   };
 
@@ -269,17 +286,22 @@ function App() {
     if (editingTeamIndex === null || !match) return;
 
     const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
+    // Ensure the potential opponent pool also respects the current filters (rating + nations)
     const potentialOpponentPool = filteredTeams.filter(t => !playedTeamIds.has(t.id) && t.id !== newTeam.id);
 
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
     let newOpponent = match[otherTeamIndex];
 
-    if (newOpponent.id === newTeam.id || playedTeamIds.has(newOpponent.id)) {
+    // Check if the current opponent is invalid (same as new team, already played, or doesn't match filters)
+    const currentOpponentIsValid = filteredTeams.some(t => t.id === newOpponent.id) && !playedTeamIds.has(newOpponent.id);
+
+    if (newOpponent.id === newTeam.id || !currentOpponentIsValid) {
       const potentialOpponent = getRandomTeam(potentialOpponentPool);
       if (potentialOpponent) {
         newOpponent = potentialOpponent;
       } else {
-        console.warn("Could not find a different, unplayed opponent within the current filter.");
+        console.warn("Could not find a different, unplayed, filter-matching opponent.");
+        // Optionally, keep the old opponent if no better one is found, or handle error
       }
     }
 
@@ -293,53 +315,46 @@ function App() {
   // --- Settings Modal Handlers ---
   const handleOpenSettingsModal = () => setIsSettingsModalOpen(true);
   const handleCloseSettingsModal = () => setIsSettingsModalOpen(false);
-  const handleSaveSettings = (newMinRating: number, newMaxRating: number) => {
+  const handleSaveSettings = (newMinRating: number, newMaxRating: number, newExcludeNations: boolean) => {
     setMinRating(newMinRating);
     setMaxRating(newMaxRating);
+    setExcludeNations(newExcludeNations); // Save new setting
     try {
       sessionStorage.setItem(MIN_RATING_STORAGE_KEY, newMinRating.toString());
       sessionStorage.setItem(MAX_RATING_STORAGE_KEY, newMaxRating.toString());
+      sessionStorage.setItem(EXCLUDE_NATIONS_STORAGE_KEY, newExcludeNations.toString()); // Persist new setting
     } catch (error) {
       console.error("Error saving settings to sessionStorage:", error);
     }
     setError(null);
-    // Note: Modal closing is now handled within SettingsModal component itself
+    // Modal closing is handled within SettingsModal component itself
   };
 
   // --- Player Name Update Handler ---
   const handleUpdatePlayerName = async (playerId: string, newName: string): Promise<boolean> => {
     console.log(`[App] Attempting to update player ${playerId} to name: ${newName}`);
     try {
-      // Step 1: Update the database
       const { error } = await supabase
         .from('players')
         .update({ name: newName })
         .eq('id', playerId)
-        .select() // Optionally select to confirm update, though not strictly needed here
-        .single(); // Use single if you expect exactly one row updated
+        .select()
+        .single();
 
       if (error) {
         console.error(`[App] Error updating player ${playerId} in DB:`, error);
-        throw error; // Re-throw to be caught below
+        throw error;
       }
 
       console.log(`[App] Player ${playerId} updated successfully in DB.`);
-
-      // Step 2: Update local state ONLY if DB update was successful
       setAllPlayers(prevPlayers =>
         prevPlayers.map(p => (p.id === playerId ? { ...p, name: newName } : p))
       );
       console.log(`[App] Player ${playerId} updated successfully locally.`);
-
-      // Step 3: Trigger refresh for components depending on player data (History, Standings)
-      // setRefreshHistoryTrigger(prev => prev + 1); // Already done in SettingsModal, but keep here for clarity if needed elsewhere
-
-      return true; // Indicate success
+      return true;
 
     } catch (err) {
-      // Error already logged above
-      // Optionally: Show a user-facing error message here or in the modal
-      return false; // Indicate failure
+      return false;
     }
   };
 
@@ -376,17 +391,17 @@ function App() {
   const playerStandings = useMemo(() => {
     console.log("[App] Calculating player standings...");
     const standingsMap = new Map<string, PlayerStanding>();
-    const teamMap = new Map(allTeams.map(t => [t.id, t])); // Map teams for quick lookup
+    const teamMap = new Map(allTeams.map(t => [t.id, t]));
 
     allPlayers.forEach(player => {
       standingsMap.set(player.id, {
         playerId: player.id,
-        playerName: player.name, // Use updated name from allPlayers state
+        playerName: player.name,
         points: 0,
         goalsFor: 0,
         goalsAgainst: 0,
         goalDifference: 0,
-        totalOverallRating: 0, // Initialize new field
+        totalOverallRating: 0,
       });
     });
 
@@ -394,7 +409,6 @@ function App() {
       const team1 = teamMap.get(match.team1_id);
       const team2 = teamMap.get(match.team2_id);
 
-      // Only process matches with scores for points and goals
       const hasScores = match.team1_score !== null && match.team2_score !== null;
       let winnerTeamNumber: 1 | 2 | null = null;
       if (hasScores) {
@@ -404,7 +418,6 @@ function App() {
         else if (score2 > score1) winnerTeamNumber = 2;
       }
 
-      // Process Team 1 Players
       match.team1_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
@@ -415,14 +428,12 @@ function App() {
               standing.points += 1;
             }
           }
-          // Add team overall rating regardless of score
           if (team1) {
             standing.totalOverallRating += team1.overallRating;
           }
         }
       });
 
-      // Process Team 2 Players
       match.team2_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
@@ -433,7 +444,6 @@ function App() {
               standing.points += 1;
             }
           }
-          // Add team overall rating regardless of score
           if (team2) {
             standing.totalOverallRating += team2.overallRating;
           }
@@ -441,13 +451,11 @@ function App() {
       });
     });
 
-    // Calculate goal difference after processing all matches
     const standingsArray = Array.from(standingsMap.values()).map(s => ({
         ...s,
         goalDifference: s.goalsFor - s.goalsAgainst
     }));
 
-    // Sort based on points, then goal difference, then goals for
     standingsArray.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
@@ -457,7 +465,7 @@ function App() {
     console.log("[App] Player standings calculated:", standingsArray);
     return standingsArray;
 
-  }, [matchesToday, allPlayers, allTeams]); // Depend on allTeams now for overall rating
+  }, [matchesToday, allPlayers, allTeams]);
 
 
   return (
@@ -503,12 +511,12 @@ function App() {
       {/* Informative messages */}
        {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
          <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
-           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars). Need at least 2 to generate a match. Adjust settings.
+           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars{excludeNations ? ', excluding nations' : ''}). Need at least 2 to generate a match. Adjust settings.
          </p>
        )}
         {!loading && !error && allTeams.length > 0 && filteredTeams.length >= 2 && !canGenerateNewMatch && (
          <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
-           All {filteredTeams.length} team(s) matching the filter have already played today. Cannot generate a new matchup.
+           All {filteredTeams.length} team(s) matching the filter{excludeNations ? ' (excluding nations)' : ''} have already played today. Cannot generate a new matchup.
          </p>
        )}
        {!loading && !error && allTeams.length === 0 && (
@@ -533,8 +541,9 @@ function App() {
         onSave={handleSaveSettings}
         initialMinRating={minRating}
         initialMaxRating={maxRating}
-        allPlayers={allPlayers} // Pass players
-        onUpdatePlayerName={handleUpdatePlayerName} // Pass handler
+        initialExcludeNations={excludeNations} // Pass initial state
+        allPlayers={allPlayers}
+        onUpdatePlayerName={handleUpdatePlayerName}
       />
        <AddMatchModal isOpen={isAddMatchModalOpen} onClose={handleCloseAddMatchModal} matchTeams={match} onMatchSaved={handleMatchSaved} />
     </div>
