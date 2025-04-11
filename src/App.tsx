@@ -472,11 +472,11 @@ function App() {
   return (
     <div className="flex flex-col min-h-screen"> {/* Changed to flex-col */}
       <Header /> {/* Add the Header component */}
-      <main className="flex-grow bg-gradient-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
+      <main className="grow bg-linear-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
         {/* Removed the old h1 title */}
 
         {loading && <p className="text-gray-600 mt-8">Loading initial data...</p>}
-        {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center mb-4 max-w-xl mx-auto mt-8">{error}</p>}
+        {error && <p className="text-red-600 bg-red-100 p-3 rounded-sm text-center mb-4 max-w-xl mx-auto mt-8">{error}</p>}
 
         {/* Match Display */}
         {!loading && !error && match && (
@@ -489,7 +489,7 @@ function App() {
           </div>
         )}
          {!loading && !error && !match && filteredTeams.length >= 2 && !canGenerateNewMatch && (
-           <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md mt-8"> {/* Added mt-8 */}
+           <p className="text-yellow-700 bg-yellow-100 p-3 rounded-sm mb-6 text-center max-w-md mt-8"> {/* Added mt-8 */}
               No valid matchup displayed. All teams within the current filter have played today.
            </p>
          )}
@@ -501,7 +501,7 @@ function App() {
              <div className="inline-flex rounded-lg shadow-md overflow-hidden">
                <button
                  onClick={handleGenerateNewMatch}
-                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
+                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
                  disabled={!canGenerateNewMatch}
                  title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
                >
@@ -509,7 +509,7 @@ function App() {
                </button>
                <button
                  onClick={handleOpenAddMatchModal}
-                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
+                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
                  disabled={!match}
                  title="Add Current Matchup to History"
                >
@@ -517,7 +517,7 @@ function App() {
                </button>
                <button
                  onClick={handleOpenSettingsModal}
-                 className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
+                 className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
                  aria-label="Open settings"
                  title="Settings"
                >
@@ -529,12 +529,12 @@ function App() {
 
         {/* Informative messages */}
          {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
-           <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
+           <p className="text-yellow-700 bg-yellow-100 p-3 rounded-sm mb-6 text-center max-w-md">
              Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars{excludeNations ? ', excluding nations' : ''}). Need at least 2 to generate a match. Adjust settings.
            </p>
          )}
           {!loading && !error && allTeams.length > 0 && filteredTeams.length >= 2 && !canGenerateNewMatch && (
-           <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
+           <p className="text-yellow-700 bg-yellow-100 p-3 rounded-sm mb-6 text-center max-w-md">
              All {filteredTeams.length} team(s) matching the filter{excludeNations ? ' (excluding nations)' : ''} have already played today. Cannot generate a new matchup.
            </p>
          )}

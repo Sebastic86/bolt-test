@@ -13,14 +13,14 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, e
       <h2 className="text-2xl font-semibold text-gray-700 mb-4">Player Standings (Today)</h2>
 
       {loading && <p className="text-center text-gray-600">Calculating standings...</p>}
-      {error && <p className="text-center text-red-600 bg-red-100 p-3 rounded">{error}</p>}
+      {error && <p className="text-center text-red-600 bg-red-100 p-3 rounded-sm">{error}</p>}
 
       {!loading && !error && standings.length === 0 && (
         <p className="text-center text-gray-500">No completed matches with players today to calculate standings.</p>
       )}
 
       {!loading && !error && standings.length > 0 && (
-        <div className="overflow-x-auto bg-white rounded-lg shadow border border-brand-light">
+        <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-brand-light">
           <table className="min-w-full divide-y divide-brand-light">
             <thead className="bg-brand-light">
               <tr>

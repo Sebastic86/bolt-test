@@ -219,7 +219,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                     <select
                       value={selectedPlayerId1}
                       onChange={(e) => setSelectedPlayerId1(e.target.value)}
-                      className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm disabled:opacity-50"
+                      className="grow px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium sm:text-sm disabled:opacity-50"
                       disabled={team1Players.length >= MAX_PLAYERS_PER_TEAM || saving || getFilteredAvailablePlayers(1).length === 0}
                     >
                       <option value="">-- Select Player --</option>
@@ -247,7 +247,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                  )}
                 <ul className="space-y-1 text-sm">
                   {team1Players.map(p => (
-                    <li key={p.id} className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
+                    <li key={p.id} className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded-sm">
                       <span>{p.name}</span>
                       <button
                         onClick={() => handleRemovePlayer(1, p.id)}
@@ -270,7 +270,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                     <select
                       value={selectedPlayerId2}
                       onChange={(e) => setSelectedPlayerId2(e.target.value)}
-                      className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm disabled:opacity-50"
+                      className="grow px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium sm:text-sm disabled:opacity-50"
                       disabled={team2Players.length >= MAX_PLAYERS_PER_TEAM || saving || getFilteredAvailablePlayers(2).length === 0}
                     >
                       <option value="">-- Select Player --</option>
@@ -298,7 +298,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                  )}
                 <ul className="space-y-1 text-sm">
                   {team2Players.map(p => (
-                    <li key={p.id} className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded">
+                    <li key={p.id} className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded-sm">
                       <span>{p.name}</span>
                       <button
                         onClick={() => handleRemovePlayer(2, p.id)}
@@ -323,14 +323,14 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
             <div className="flex justify-end space-x-3 border-t pt-4">
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50"
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gray-400 disabled:opacity-50"
                 disabled={saving}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveMatch}
-                className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-brand-medium disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-brand-medium disabled:opacity-50"
                 disabled={saving || (team1Players.length === 0 && team2Players.length === 0)}
               >
                 <Save className="w-4 h-4 mr-2" />

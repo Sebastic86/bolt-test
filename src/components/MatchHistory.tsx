@@ -194,7 +194,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       </div>
 
       {loading && matchesToday.length === 0 && <p className="text-center text-gray-600">Loading history...</p>}
-      {error && <p className="text-center text-red-600 bg-red-100 p-3 rounded">{error}</p>}
+      {error && <p className="text-center text-red-600 bg-red-100 p-3 rounded-sm">{error}</p>}
       {!loading && !error && matchesToday.length === 0 && (
         <p className="text-center text-gray-500">No matches recorded today.</p>
       )}
@@ -210,12 +210,12 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
             const logo2Error = logoErrors[`${match.id}-team2`];
 
             return (
-              <li key={match.id} className={`rounded-lg shadow p-4 border transition-all duration-200 ${highlightClasses} ${isDeletingThisMatch ? 'opacity-50' : ''}`}>
+              <li key={match.id} className={`rounded-lg shadow-sm p-4 border transition-all duration-200 ${highlightClasses} ${isDeletingThisMatch ? 'opacity-50' : ''}`}>
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-2">
                    {/* Teams and Score */}
-                   <div className="flex items-center space-x-2 flex-grow mb-2 sm:mb-0 min-w-0">
+                   <div className="flex items-center space-x-2 grow mb-2 sm:mb-0 min-w-0">
                       {/* Team 1 Logo/Fallback */}
-                      <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-gray-100 rounded overflow-hidden text-gray-400">
+                      <div className="w-6 h-6 flex items-center justify-center shrink-0 bg-gray-100 rounded-sm overflow-hidden text-gray-400">
                         {logo1Error ? (
                           <Shield className="w-5 h-5" aria-label="Team 1 logo fallback" />
                         ) : (
@@ -227,14 +227,14 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           />
                         )}
                       </div>
-                      <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto text-gray-800">{match.team1_name}</span>
+                      <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team1_name}</span>
                       {editingScoreMatchId === match.id ? (
-                          <div className="flex items-center space-x-1 mx-2 flex-shrink-0">
+                          <div className="flex items-center space-x-1 mx-2 shrink-0">
                               <input
                                   type="number"
                                   value={score1Input}
                                   onChange={(e) => setScore1Input(e.target.value)}
-                                  className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center"
+                                  className="w-12 px-1 py-0.5 border border-gray-300 rounded-sm text-center"
                                   min="0"
                                   disabled={savingScore || isDeletingThisMatch}
                               />
@@ -243,20 +243,20 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                                   type="number"
                                   value={score2Input}
                                   onChange={(e) => setScore2Input(e.target.value)}
-                                  className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center"
+                                  className="w-12 px-1 py-0.5 border border-gray-300 rounded-sm text-center"
                                   min="0"
                                   disabled={savingScore || isDeletingThisMatch}
                               />
                           </div>
                       ) : (
-                          <span className={`text-lg font-bold mx-2 flex-shrink-0 ${shouldHighlight ? 'text-yellow-700' : 'text-gray-700'}`}>
+                          <span className={`text-lg font-bold mx-2 shrink-0 ${shouldHighlight ? 'text-yellow-700' : 'text-gray-700'}`}>
                               {match.team1_score !== null && match.team2_score !== null
                                ? `${match.team1_score} - ${match.team2_score}`
                                : 'vs'}
                           </span>
                       )}
                       {/* Team 2 Logo/Fallback */}
-                       <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-gray-100 rounded overflow-hidden text-gray-400">
+                       <div className="w-6 h-6 flex items-center justify-center shrink-0 bg-gray-100 rounded-sm overflow-hidden text-gray-400">
                         {logo2Error ? (
                           <Shield className="w-5 h-5" aria-label="Team 2 logo fallback" />
                         ) : (
@@ -268,16 +268,16 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           />
                         )}
                       </div>
-                      <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto text-gray-800">{match.team2_name}</span>
+                      <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team2_name}</span>
                    </div>
 
                    {/* Action Buttons */}
-                   <div className="flex items-center space-x-2 flex-shrink-0">
+                   <div className="flex items-center space-x-2 shrink-0">
                       {editingScoreMatchId === match.id ? (
                           <>
                               <button
                                   onClick={() => handleSaveScore(match.id)}
-                                  className="p-1 bg-brand-medium text-white rounded hover:bg-brand-dark disabled:opacity-50"
+                                  className="p-1 bg-brand-medium text-white rounded-sm hover:bg-brand-dark disabled:opacity-50"
                                   disabled={savingScore || isDeletingThisMatch}
                                   title="Save Score"
                               >
@@ -285,7 +285,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               </button>
                               <button
                                   onClick={handleCancelEditScore}
-                                  className="p-1 bg-gray-400 text-white rounded hover:bg-gray-500 disabled:opacity-50"
+                                  className="p-1 bg-gray-400 text-white rounded-sm hover:bg-gray-500 disabled:opacity-50"
                                   disabled={savingScore || isDeletingThisMatch}
                                   title="Cancel Edit"
                               >
@@ -295,7 +295,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       ) : (
                           <button
                               onClick={() => handleEditScoreClick(match)}
-                              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50" // Kept blue for edit/add score for now
+                              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50" // Kept blue for edit/add score for now
                               disabled={savingScore || loading || !!deletingMatchId}
                               title={match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                           >
@@ -312,7 +312,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       </button>
                       <button
                           onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
-                          className={`p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`} // Kept red for delete
+                          className={`p-1 text-red-500 hover:text-red-700 rounded-sm hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`} // Kept red for delete
                           disabled={savingScore || loading || !!deletingMatchId}
                           title="Delete Match"
                       >

@@ -80,7 +80,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
       )}
 
       {/* Left Side: Logo or Fallback Icon */}
-      <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded bg-gray-100 text-gray-400">
+      <div className="shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded-sm bg-gray-100 text-gray-400">
         {logoError ? (
           // Use Shield as a generic fallback
           <Shield className="w-10 h-10" aria-label="Team logo fallback" />
@@ -95,7 +95,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
       </div>
 
       {/* Right Side: Details */}
-      <div className="flex-grow min-w-0">
+      <div className="grow min-w-0">
         <h3 className="text-lg font-semibold mb-0.5 truncate text-gray-800 pr-8">{team.name}</h3> {/* Added padding-right */}
         <p className="text-sm text-gray-500 mb-1 truncate">{team.league}</p>
 
@@ -105,7 +105,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
             <LucideIcons.Star className="w-4 h-4 mr-1" fill="currentColor" />
             <span className="text-sm font-medium">{team.rating.toFixed(1)}</span>
           </div>
-          <div className="text-sm text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded flex items-center space-x-1">
+          <div className="text-sm text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded-sm flex items-center space-x-1">
             <span className="font-semibold">OVR:</span>
             <span>{team.overallRating}</span>
             {differences?.overall !== undefined && (
@@ -119,7 +119,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
         {/* Attack, Midfield, Defend Ratings */}
         <div className="grid grid-cols-3 gap-2 text-xs text-center">
           {/* Attack Rating */}
-          <div className={`${getRatingClasses(team.attackRating)} p-1 rounded flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
+          <div className={`${getRatingClasses(team.attackRating)} p-1 rounded-sm flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
             <div>
               <span className="font-semibold">ATT:</span> {team.attackRating}
             </div>
@@ -130,7 +130,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
             )}
           </div>
           {/* Midfield Rating */}
-          <div className={`${getRatingClasses(team.midfieldRating)} p-1 rounded flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
+          <div className={`${getRatingClasses(team.midfieldRating)} p-1 rounded-sm flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
              <div>
                <span className="font-semibold">MID:</span> {team.midfieldRating}
              </div>
@@ -141,7 +141,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
             )}
           </div>
           {/* Defend Rating */}
-          <div className={`${getRatingClasses(team.defendRating)} p-1 rounded flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
+          <div className={`${getRatingClasses(team.defendRating)} p-1 rounded-sm flex flex-col sm:flex-row sm:items-center sm:justify-center sm:space-x-1`}>
             <div>
               <span className="font-semibold">DEF:</span> {team.defendRating}
             </div>

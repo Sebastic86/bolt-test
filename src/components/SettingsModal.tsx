@@ -224,7 +224,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             min="0"
                             max="5"
                             step="0.5"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
                         />
                     </div>
                     <div className="flex-1">
@@ -239,7 +239,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             min="0"
                             max="5"
                             step="0.5"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
                         />
                     </div>
                 </div>
@@ -256,7 +256,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="checkbox"
                     checked={excludeNations}
                     onChange={(e) => setExcludeNations(e.target.checked)}
-                    className="h-4 w-4 text-brand-dark focus:ring-brand-medium border-gray-300 rounded"
+                    className="h-4 w-4 text-brand-dark focus:ring-brand-medium border-gray-300 rounded-sm"
                 />
                 <label htmlFor="exclude-nations" className="ml-2 block text-sm text-gray-900">
                     Exclude nation teams
@@ -267,7 +267,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex justify-end mt-4">
                  <button
                     onClick={handleSaveSettings} // Changed from handleSaveRatings
-                    className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-brand-medium"
+                    className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-brand-medium"
                 >
                     <Save className="w-4 h-4 mr-2" />
                     Save Filters & Close
@@ -289,14 +289,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
                         return (
                             <li key={player.id} className="flex items-center space-x-3 p-2 border rounded-md">
-                                <User className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                                <div className="flex-grow min-w-0">
+                                <User className="w-5 h-5 text-gray-500 shrink-0" />
+                                <div className="grow min-w-0">
                                     {state.isEditing ? (
                                         <input
                                             type="text"
                                             value={state.currentName}
                                             onChange={(e) => handlePlayerNameChange(player.id, e.target.value)}
-                                            className={`w-full px-2 py-1 border rounded-md text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-1 focus:ring-brand-medium`}
+                                            className={`w-full px-2 py-1 border rounded-md text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-hidden focus:ring-1 focus:ring-brand-medium`}
                                             disabled={state.isLoading}
                                         />
                                     ) : (
@@ -305,7 +305,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                      {state.error && <p className="text-xs text-red-600 mt-1">{state.error}</p>}
                                      {state.success && <p className="text-xs text-green-600 mt-1 flex items-center"><Check className="w-3 h-3 mr-1"/> Saved!</p>}
                                 </div>
-                                <div className="flex-shrink-0 flex items-center space-x-1">
+                                <div className="shrink-0 flex items-center space-x-1">
                                     {state.isEditing ? (
                                         <>
                                             <button
@@ -347,7 +347,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex justify-end space-x-3 border-t pt-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gray-400"
           >
             Close
           </button>
