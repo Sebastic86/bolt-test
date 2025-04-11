@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import Header from './components/Header'; // Import the new Header component
 import TeamCard from './components/TeamCard';
 import EditTeamModal from './components/EditTeamModal';
 import SettingsModal from './components/SettingsModal';
@@ -469,87 +470,88 @@ function App() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mt-8 mb-6 text-center">
-        EA FC Random Match Generator
-      </h1>
+    <div className="flex flex-col min-h-screen"> {/* Changed to flex-col */}
+      <Header /> {/* Add the Header component */}
+      <main className="flex-grow bg-gradient-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
+        {/* Removed the old h1 title */}
 
-      {loading && <p className="text-gray-600">Loading initial data...</p>}
-      {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center mb-4 max-w-xl mx-auto">{error}</p>}
+        {loading && <p className="text-gray-600 mt-8">Loading initial data...</p>}
+        {error && <p className="text-red-600 bg-red-100 p-3 rounded text-center mb-4 max-w-xl mx-auto mt-8">{error}</p>}
 
-      {/* Match Display */}
-      {!loading && !error && match && (
-        <div className="w-full max-w-4xl mb-6">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-            <TeamCard team={match[0]} differences={team1Differences} onEdit={() => handleOpenEditModal(0)} />
-            <div className="text-2xl font-bold text-gray-700 my-2 md:my-0">VS</div>
-            <TeamCard team={match[1]} differences={team2Differences} onEdit={() => handleOpenEditModal(1)} />
+        {/* Match Display */}
+        {!loading && !error && match && (
+          <div className="w-full max-w-4xl mb-6 mt-8"> {/* Added mt-8 */}
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
+              <TeamCard team={match[0]} differences={team1Differences} onEdit={() => handleOpenEditModal(0)} />
+              <div className="text-2xl font-bold text-gray-700 my-2 md:my-0">VS</div>
+              <TeamCard team={match[1]} differences={team2Differences} onEdit={() => handleOpenEditModal(1)} />
+            </div>
           </div>
-        </div>
-      )}
-       {!loading && !error && !match && filteredTeams.length >= 2 && !canGenerateNewMatch && (
-         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
-            No valid matchup displayed. All teams within the current filter have played today.
-         </p>
-       )}
+        )}
+         {!loading && !error && !match && filteredTeams.length >= 2 && !canGenerateNewMatch && (
+           <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md mt-8"> {/* Added mt-8 */}
+              No valid matchup displayed. All teams within the current filter have played today.
+           </p>
+         )}
 
-       {/* Buttons Container */}
-       {!loading && !error && allTeams.length > 0 && (
-         <div className="flex items-center justify-center mb-6">
-           {/* Button Group Container - Removed gradient, added shadow */}
-           <div className="inline-flex rounded-lg shadow-md overflow-hidden">
-             <button
-               onClick={handleGenerateNewMatch}
-               className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
-               disabled={!canGenerateNewMatch}
-               title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
-             >
-               <Dices className="w-5 h-5 mr-2" /> New Matchup
-             </button>
-             <button
-               onClick={handleOpenAddMatchModal}
-               className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
-               disabled={!match}
-               title="Add Current Matchup to History"
-             >
-               <PlusSquare className="w-5 h-5 mr-2" /> Add Match
-             </button>
-             <button
-               onClick={handleOpenSettingsModal}
-               className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
-               aria-label="Open settings"
-               title="Settings"
-             >
-               <Settings className="w-5 h-5" />
-             </button>
+         {/* Buttons Container */}
+         {!loading && !error && allTeams.length > 0 && (
+           <div className="flex items-center justify-center mb-6">
+             {/* Button Group Container - Removed gradient, added shadow */}
+             <div className="inline-flex rounded-lg shadow-md overflow-hidden">
+               <button
+                 onClick={handleGenerateNewMatch}
+                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
+                 disabled={!canGenerateNewMatch}
+                 title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
+               >
+                 <Dices className="w-5 h-5 mr-2" /> New Matchup
+               </button>
+               <button
+                 onClick={handleOpenAddMatchModal}
+                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
+                 disabled={!match}
+                 title="Add Current Matchup to History"
+               >
+                 <PlusSquare className="w-5 h-5 mr-2" /> Add Match
+               </button>
+               <button
+                 onClick={handleOpenSettingsModal}
+                 className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
+                 aria-label="Open settings"
+                 title="Settings"
+               >
+                 <Settings className="w-5 h-5" />
+               </button>
+             </div>
            </div>
-         </div>
-       )}
+         )}
 
-      {/* Informative messages */}
-       {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
-         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
-           Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars{excludeNations ? ', excluding nations' : ''}). Need at least 2 to generate a match. Adjust settings.
-         </p>
-       )}
-        {!loading && !error && allTeams.length > 0 && filteredTeams.length >= 2 && !canGenerateNewMatch && (
-         <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
-           All {filteredTeams.length} team(s) matching the filter{excludeNations ? ' (excluding nations)' : ''} have already played today. Cannot generate a new matchup.
-         </p>
-       )}
-       {!loading && !error && allTeams.length === 0 && (
-         <p className="text-gray-600 mb-6 text-center">No teams available to display.</p>
-       )}
+        {/* Informative messages */}
+         {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
+           <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
+             Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars{excludeNations ? ', excluding nations' : ''}). Need at least 2 to generate a match. Adjust settings.
+           </p>
+         )}
+          {!loading && !error && allTeams.length > 0 && filteredTeams.length >= 2 && !canGenerateNewMatch && (
+           <p className="text-yellow-700 bg-yellow-100 p-3 rounded mb-6 text-center max-w-md">
+             All {filteredTeams.length} team(s) matching the filter{excludeNations ? ' (excluding nations)' : ''} have already played today. Cannot generate a new matchup.
+           </p>
+         )}
+         {!loading && !error && allTeams.length === 0 && (
+           <p className="text-gray-600 mb-6 text-center mt-8">No teams available to display.</p> 
+         )}
 
-       {/* Match History */}
-       {!loading && !error && (
-           <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} />
-       )}
+         {/* Match History */}
+         {!loading && !error && (
+             <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} />
+         )}
 
-       {/* Player Standings */}
-       {!loading && !error && (
-            <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} />
-       )}
+         {/* Player Standings */}
+         {!loading && !error && (
+              <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} />
+         )}
+      </main>
 
       {/* Modals */}
       <EditTeamModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} allTeams={filteredTeams.filter(team => !playedTeamIdsToday.has(team.id))} onTeamSelected={handleUpdateTeam} currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined} />
