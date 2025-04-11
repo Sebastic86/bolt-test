@@ -219,7 +219,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                     <select
                       value={selectedPlayerId1}
                       onChange={(e) => setSelectedPlayerId1(e.target.value)}
-                      className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:opacity-50"
+                      className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm disabled:opacity-50"
                       disabled={team1Players.length >= MAX_PLAYERS_PER_TEAM || saving || getFilteredAvailablePlayers(1).length === 0}
                     >
                       <option value="">-- Select Player --</option>
@@ -230,7 +230,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                     </select>
                     <button
                       onClick={() => handleAddPlayer(1)}
-                      className="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                      className="p-2 bg-brand-medium text-white rounded-md hover:bg-brand-dark disabled:opacity-50"
                       disabled={!selectedPlayerId1 || team1Players.length >= MAX_PLAYERS_PER_TEAM || saving}
                       aria-label="Add player to team 1"
                     >
@@ -251,7 +251,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                       <span>{p.name}</span>
                       <button
                         onClick={() => handleRemovePlayer(1, p.id)}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                        className="text-red-500 hover:text-red-700 disabled:opacity-50" // Keep remove red
                         disabled={saving}
                         aria-label={`Remove ${p.name} from team 1`}
                       >
@@ -270,7 +270,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                     <select
                       value={selectedPlayerId2}
                       onChange={(e) => setSelectedPlayerId2(e.target.value)}
-                      className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:opacity-50"
+                      className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm disabled:opacity-50"
                       disabled={team2Players.length >= MAX_PLAYERS_PER_TEAM || saving || getFilteredAvailablePlayers(2).length === 0}
                     >
                       <option value="">-- Select Player --</option>
@@ -281,7 +281,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                     </select>
                     <button
                       onClick={() => handleAddPlayer(2)}
-                      className="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                      className="p-2 bg-brand-medium text-white rounded-md hover:bg-brand-dark disabled:opacity-50"
                       disabled={!selectedPlayerId2 || team2Players.length >= MAX_PLAYERS_PER_TEAM || saving}
                        aria-label="Add player to team 2"
                     >
@@ -302,7 +302,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                       <span>{p.name}</span>
                       <button
                         onClick={() => handleRemovePlayer(2, p.id)}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                        className="text-red-500 hover:text-red-700 disabled:opacity-50" // Keep remove red
                         disabled={saving}
                         aria-label={`Remove ${p.name} from team 2`}
                       >
@@ -330,7 +330,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
               </button>
               <button
                 onClick={handleSaveMatch}
-                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-brand-medium disabled:opacity-50"
                 disabled={saving || (team1Players.length === 0 && team2Players.length === 0)}
               >
                 <Save className="w-4 h-4 mr-2" />

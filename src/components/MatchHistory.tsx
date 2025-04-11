@@ -184,7 +184,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
         <h2 className="text-2xl font-semibold text-gray-700">Today's Matches</h2>
         <button
             onClick={onRefresh}
-            className="p-2 text-gray-500 hover:text-blue-600 disabled:opacity-50"
+            className="p-2 text-gray-500 hover:text-brand-dark disabled:opacity-50"
             disabled={loading || savingScore || !!deletingMatchId}
             aria-label="Refresh match history"
             title="Refresh History"
@@ -203,7 +203,8 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
         <ul className="space-y-4">
           {matchesToday.map((match) => {
             const shouldHighlight = highlightedMatchIds.has(match.id);
-            const highlightClasses = shouldHighlight ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-gray-200 bg-white';
+            // Use brand colors for background, keep yellow highlight distinct
+            const highlightClasses = shouldHighlight ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-brand-light bg-brand-lighter';
             const isDeletingThisMatch = deletingMatchId === match.id;
             const logo1Error = logoErrors[`${match.id}-team1`];
             const logo2Error = logoErrors[`${match.id}-team2`];
@@ -226,7 +227,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           />
                         )}
                       </div>
-                      <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto">{match.team1_name}</span>
+                      <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto text-gray-800">{match.team1_name}</span>
                       {editingScoreMatchId === match.id ? (
                           <div className="flex items-center space-x-1 mx-2 flex-shrink-0">
                               <input
@@ -248,7 +249,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               />
                           </div>
                       ) : (
-                          <span className={`text-lg font-bold mx-2 flex-shrink-0 ${shouldHighlight ? 'text-yellow-700' : ''}`}>
+                          <span className={`text-lg font-bold mx-2 flex-shrink-0 ${shouldHighlight ? 'text-yellow-700' : 'text-gray-700'}`}>
                               {match.team1_score !== null && match.team2_score !== null
                                ? `${match.team1_score} - ${match.team2_score}`
                                : 'vs'}
@@ -267,7 +268,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           />
                         )}
                       </div>
-                      <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto">{match.team2_name}</span>
+                      <span className="font-medium truncate flex-shrink-0 w-24 sm:w-auto text-gray-800">{match.team2_name}</span>
                    </div>
 
                    {/* Action Buttons */}
@@ -276,7 +277,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           <>
                               <button
                                   onClick={() => handleSaveScore(match.id)}
-                                  className="p-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                                  className="p-1 bg-brand-medium text-white rounded hover:bg-brand-dark disabled:opacity-50"
                                   disabled={savingScore || isDeletingThisMatch}
                                   title="Save Score"
                               >
@@ -294,7 +295,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       ) : (
                           <button
                               onClick={() => handleEditScoreClick(match)}
-                              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
+                              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50" // Kept blue for edit/add score for now
                               disabled={savingScore || loading || !!deletingMatchId}
                               title={match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                           >
@@ -303,7 +304,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       )}
                        <button
                           onClick={() => toggleExpandMatch(match.id)}
-                          className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                          className="p-1 text-gray-500 hover:text-brand-dark disabled:opacity-50"
                           title={expandedMatchId === match.id ? "Collapse Players" : "Expand Players"}
                           disabled={savingScore || loading || !!deletingMatchId}
                       >
@@ -311,7 +312,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       </button>
                       <button
                           onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
-                          className={`p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`}
+                          className={`p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`} // Kept red for delete
                           disabled={savingScore || loading || !!deletingMatchId}
                           title="Delete Match"
                       >
@@ -322,9 +323,9 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
 
                 {/* Expanded Player List */}
                 {expandedMatchId === match.id && (
-                  <div className="mt-3 pt-3 border-t text-xs text-gray-600 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="mt-3 pt-3 border-t border-brand-light text-xs text-gray-600 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                       <div>
-                          <strong className="block mb-1">{match.team1_name} Players:</strong>
+                          <strong className="block mb-1 text-gray-700">{match.team1_name} Players:</strong>
                           {match.team1_players.length > 0 ? (
                               <ul className="list-disc list-inside">
                                   {match.team1_players.map(p => <li key={p.id}>{p.name}</li>)}
@@ -332,7 +333,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           ) : <span className="italic">No players recorded</span>}
                       </div>
                        <div>
-                          <strong className="block mb-1">{match.team2_name} Players:</strong>
+                          <strong className="block mb-1 text-gray-700">{match.team2_name} Players:</strong>
                           {match.team2_players.length > 0 ? (
                               <ul className="list-disc list-inside">
                                   {match.team2_players.map(p => <li key={p.id}>{p.name}</li>)}

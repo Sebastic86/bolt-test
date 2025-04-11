@@ -14,7 +14,7 @@ interface TeamCardProps {
   onEdit?: () => void; // Add onEdit prop
 }
 
-// Helper function to get rating color classes
+// Helper function to get rating color classes (Kept semantic colors)
 const getRatingClasses = (rating: number): string => {
   if (rating > 85) {
     return 'bg-emerald-100 text-emerald-800'; // Very High
@@ -41,7 +41,7 @@ const formatDifference = (diff: number | undefined): string => {
   }
 };
 
-// Helper function to get color class for difference
+// Helper function to get color class for difference (Kept semantic colors)
 const getDifferenceColor = (diff: number | undefined): string => {
   if (diff === undefined) return '';
   if (diff > 0) {
@@ -67,12 +67,12 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
   }, [team.logoUrl]);
 
   return (
-    <div className="relative bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-gray-200 flex items-center space-x-4">
+    <div className="relative bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-brand-light flex items-center space-x-4">
       {/* Edit Button */}
       {onEdit && (
         <button
           onClick={onEdit}
-          className="absolute top-2 right-2 p-1 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100 transition-colors duration-150"
+          className="absolute top-2 right-2 p-1 text-gray-400 hover:text-brand-dark rounded-full hover:bg-gray-100 transition-colors duration-150"
           aria-label="Edit team"
         >
           <Pencil className="w-4 h-4" />

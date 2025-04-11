@@ -469,7 +469,7 @@ function App() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4 flex flex-col items-center">
+    <div className="min-h-screen bg-gradient-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
       <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mt-8 mb-6 text-center">
         EA FC Random Match Generator
       </h1>
@@ -496,11 +496,11 @@ function App() {
        {/* Buttons Container */}
        {!loading && !error && allTeams.length > 0 && (
          <div className="flex items-center justify-center mb-6">
-           {/* Gradient Button Group Container */}
-           <div className="inline-flex rounded-lg shadow-md overflow-hidden bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 divide-x divide-white/30">
+           {/* Button Group Container - Removed gradient, added shadow */}
+           <div className="inline-flex rounded-lg shadow-md overflow-hidden">
              <button
                onClick={handleGenerateNewMatch}
-               className="flex items-center justify-center px-5 py-2.5 text-white font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-500 focus:ring-white transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
+               className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
                disabled={!canGenerateNewMatch}
                title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
              >
@@ -508,7 +508,7 @@ function App() {
              </button>
              <button
                onClick={handleOpenAddMatchModal}
-               className="flex items-center justify-center px-5 py-2.5 text-white font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-500 focus:ring-white transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
+               className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
                disabled={!match}
                title="Add Current Matchup to History"
              >
@@ -516,7 +516,7 @@ function App() {
              </button>
              <button
                onClick={handleOpenSettingsModal}
-               className="p-2.5 text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-500 focus:ring-white transition duration-150 ease-in-out"
+               className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
                aria-label="Open settings"
                title="Settings"
              >

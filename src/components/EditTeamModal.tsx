@@ -107,7 +107,7 @@ const EditTeamModal: React.FC<EditTeamModalProps> = ({
 
         <button
           onClick={handleRandomize}
-          className="w-full flex items-center justify-center px-4 py-2 mb-4 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 transition duration-150 ease-in-out"
+          className="w-full flex items-center justify-center px-4 py-2 mb-4 bg-brand-medium text-white font-semibold rounded-lg shadow-md hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-medium focus:ring-opacity-50 transition duration-150 ease-in-out"
           disabled={allTeams.length === 0}
         >
           <Dices className="w-5 h-5 mr-2" />
@@ -124,7 +124,7 @@ const EditTeamModal: React.FC<EditTeamModalProps> = ({
             id="league-select"
             value={selectedLeague || ''}
             onChange={handleLeagueChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
             disabled={leagues.length === 0}
           >
             <option value="">-- Select a League --</option>
@@ -147,7 +147,7 @@ const EditTeamModal: React.FC<EditTeamModalProps> = ({
             id="team-select"
             value={selectedTeamId || ''}
             onChange={handleTeamChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
             disabled={!selectedLeague || teamsInSelectedLeague.length === 0}
           >
             <option value="">-- Select a Team --</option>
@@ -174,7 +174,7 @@ const EditTeamModal: React.FC<EditTeamModalProps> = ({
           </button>
           <button
             onClick={handleSelectTeam}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-brand-medium disabled:opacity-50"
             disabled={!selectedTeamId}
           >
             Select Team

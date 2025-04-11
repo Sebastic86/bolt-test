@@ -224,7 +224,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             min="0"
                             max="5"
                             step="0.5"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
                         />
                     </div>
                     <div className="flex-1">
@@ -239,7 +239,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             min="0"
                             max="5"
                             step="0.5"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
                         />
                     </div>
                 </div>
@@ -256,7 +256,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="checkbox"
                     checked={excludeNations}
                     onChange={(e) => setExcludeNations(e.target.checked)}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-brand-dark focus:ring-brand-medium border-gray-300 rounded"
                 />
                 <label htmlFor="exclude-nations" className="ml-2 block text-sm text-gray-900">
                     Exclude nation teams
@@ -267,7 +267,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex justify-end mt-4">
                  <button
                     onClick={handleSaveSettings} // Changed from handleSaveRatings
-                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-none focus:ring-2 focus:ring-brand-medium"
                 >
                     <Save className="w-4 h-4 mr-2" />
                     Save Filters & Close
@@ -296,7 +296,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             type="text"
                                             value={state.currentName}
                                             onChange={(e) => handlePlayerNameChange(player.id, e.target.value)}
-                                            className={`w-full px-2 py-1 border rounded-md text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                                            className={`w-full px-2 py-1 border rounded-md text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-1 focus:ring-brand-medium`}
                                             disabled={state.isLoading}
                                         />
                                     ) : (
@@ -310,7 +310,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <>
                                             <button
                                                 onClick={() => handleSavePlayerName(player.id)}
-                                                className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
+                                                className="p-1 text-brand-dark hover:text-brand-medium disabled:opacity-50"
                                                 disabled={state.isLoading || state.currentName.trim() === originalName || !state.currentName.trim()}
                                                 title="Save Name"
                                             >
@@ -328,7 +328,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     ) : (
                                         <button
                                             onClick={() => toggleEditPlayer(player.id)}
-                                            className="p-1 text-blue-600 hover:text-blue-800"
+                                            className="p-1 text-blue-600 hover:text-blue-800" // Keep edit icon blue for distinction
                                             title="Edit Name"
                                         >
                                             <Edit3 className="w-4 h-4" />
