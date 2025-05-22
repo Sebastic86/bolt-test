@@ -23,6 +23,7 @@ export interface Match {
   team2_id: string;
   team1_score: number | null;
   team2_score: number | null;
+  penalties_winner: 1 | 2 | null; // 1 for team1, 2 for team2, null if no penalties
   played_at: string;
   created_at: string;
 }

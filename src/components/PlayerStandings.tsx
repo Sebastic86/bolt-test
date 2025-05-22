@@ -77,7 +77,7 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, e
           </table>
         </div>
       )}
-       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win), GF: Goals For, GA: Goals Against, GD: Goal Difference, OVR Sum: Sum of Overall Ratings of Teams Played. Sorted by Pts, then GD, then GF.</p>
+       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win, including penalties wins), GF: Goals For, GA: Goals Against, GD: Goal Difference, OVR Sum: Sum of Overall Ratings of Teams Played. Sorted by Pts, then GD, then GF.</p>
     </div>
   );
 };

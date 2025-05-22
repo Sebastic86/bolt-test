@@ -417,6 +417,10 @@ function App() {
         const score2 = match.team2_score!;
         if (score1 > score2) winnerTeamNumber = 1;
         else if (score2 > score1) winnerTeamNumber = 2;
+        // Check for penalties winner if scores are equal
+        else if (score1 === score2 && match.penalties_winner) {
+          winnerTeamNumber = match.penalties_winner;
+        }
       }
 
       match.team1_players.forEach(player => {

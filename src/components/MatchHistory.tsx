@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield } from 'lucide-react'; // Import Shield
+import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award } from 'lucide-react'; // Import Shield and Award
 
 interface MatchHistoryProps {
   matchesToday: MatchHistoryItem[];
@@ -47,6 +47,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
   const [score1Input, setScore1Input] = useState<string>('');
   const [score2Input, setScore2Input] = useState<string>('');
+  const [penaltiesWinner, setPenaltiesWinner] = useState<1 | 2 | null>(null);
   const [savingScore, setSavingScore] = useState<boolean>(false);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
@@ -110,12 +111,14 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
     setEditingScoreMatchId(match.id);
     setScore1Input(match.team1_score?.toString() ?? '');
     setScore2Input(match.team2_score?.toString() ?? '');
+    setPenaltiesWinner(match.penalties_winner);
   };
 
   const handleCancelEditScore = () => {
     setEditingScoreMatchId(null);
     setScore1Input('');
     setScore2Input('');
+    setPenaltiesWinner(null);
   };
 
   const handleSaveScore = async (matchId: string) => {
@@ -127,16 +130,30 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
       return;
     }
 
+    // If scores are equal, ensure a penalties winner is selected
+    if (score1 === score2 && penaltiesWinner === null) {
+      alert('For a draw, please select which team won on penalties.');
+      return;
+    }
+
+    // If scores are not equal, reset penalties winner
+    const finalPenaltiesWinner = score1 === score2 ? penaltiesWinner : null;
+
     setSavingScore(true);
     try {
       const { error: updateError } = await supabase
         .from('matches')
-        .update({ team1_score: score1, team2_score: score2 })
+        .update({ 
+          team1_score: score1, 
+          team2_score: score2,
+          penalties_winner: finalPenaltiesWinner
+        })
         .eq('id', matchId);
 
       if (updateError) throw updateError;
 
       setEditingScoreMatchId(null);
+      setPenaltiesWinner(null);
       onRefresh();
 
     } catch (err: any) {
@@ -229,30 +246,66 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       </div>
                       <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team1_name}</span>
                       {editingScoreMatchId === match.id ? (
-                          <div className="flex items-center space-x-1 mx-2 shrink-0">
-                              <input
-                                  type="number"
-                                  value={score1Input}
-                                  onChange={(e) => setScore1Input(e.target.value)}
-                                  className="w-12 px-1 py-0.5 border border-gray-300 rounded-sm text-center"
-                                  min="0"
-                                  disabled={savingScore || isDeletingThisMatch}
-                              />
-                              <span>-</span>
-                              <input
-                                  type="number"
-                                  value={score2Input}
-                                  onChange={(e) => setScore2Input(e.target.value)}
-                                  className="w-12 px-1 py-0.5 border border-gray-300 rounded-sm text-center"
-                                  min="0"
-                                  disabled={savingScore || isDeletingThisMatch}
-                              />
+                          <div className="flex flex-col items-center mx-2 shrink-0">
+                              <div className="flex items-center space-x-1">
+                                  <input
+                                      type="number"
+                                      value={score1Input}
+                                      onChange={(e) => setScore1Input(e.target.value)}
+                                      className="w-12 px-1 py-0.5 border border-gray-300 rounded-sm text-center"
+                                      min="0"
+                                      disabled={savingScore || isDeletingThisMatch}
+                                  />
+                                  <span>-</span>
+                                  <input
+                                      type="number"
+                                      value={score2Input}
+                                      onChange={(e) => setScore2Input(e.target.value)}
+                                      className="w-12 px-1 py-0.5 border border-gray-300 rounded-sm text-center"
+                                      min="0"
+                                      disabled={savingScore || isDeletingThisMatch}
+                                  />
+                              </div>
+
+                              {/* Penalties winner selection - only shown when scores are equal */}
+                              {score1Input && score2Input && parseInt(score1Input) === parseInt(score2Input) && (
+                                  <div className="mt-2 text-xs">
+                                      <p className="font-medium mb-1 text-gray-600">Penalties winner:</p>
+                                      <div className="flex space-x-2">
+                                          <button
+                                              onClick={() => setPenaltiesWinner(1)}
+                                              className={`px-2 py-1 rounded-sm text-xs ${penaltiesWinner === 1 
+                                                  ? 'bg-brand-medium text-white' 
+                                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                              disabled={savingScore || isDeletingThisMatch}
+                                          >
+                                              {match.team1_name}
+                                          </button>
+                                          <button
+                                              onClick={() => setPenaltiesWinner(2)}
+                                              className={`px-2 py-1 rounded-sm text-xs ${penaltiesWinner === 2 
+                                                  ? 'bg-brand-medium text-white' 
+                                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                              disabled={savingScore || isDeletingThisMatch}
+                                          >
+                                              {match.team2_name}
+                                          </button>
+                                      </div>
+                                  </div>
+                              )}
                           </div>
                       ) : (
                           <span className={`text-lg font-bold mx-2 shrink-0 ${shouldHighlight ? 'text-yellow-700' : 'text-gray-700'}`}>
-                              {match.team1_score !== null && match.team2_score !== null
-                               ? `${match.team1_score} - ${match.team2_score}`
-                               : 'vs'}
+                              {match.team1_score !== null && match.team2_score !== null ? (
+                                  <>
+                                      {`${match.team1_score} - ${match.team2_score}`}
+                                      {match.team1_score === match.team2_score && match.penalties_winner && (
+                                          <span className="ml-1 text-xs text-gray-500">
+                                              (Pen: {match.penalties_winner === 1 ? match.team1_name : match.team2_name})
+                                          </span>
+                                      )}
+                                  </>
+                              ) : 'vs'}
                           </span>
                       )}
                       {/* Team 2 Logo/Fallback */}
