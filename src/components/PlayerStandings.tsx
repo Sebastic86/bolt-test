@@ -5,12 +5,13 @@ interface PlayerStandingsProps {
   standings: PlayerStanding[];
   loading: boolean; // Pass loading state if calculation depends on async data
   error: string | null; // Pass error state
+  title?: string; // Optional title prop
 }
 
-const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, error }) => {
+const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, error, title = "Player Standings" }) => {
   return (
     <div className="w-full max-w-4xl mt-8">
-      <h2 className="text-2xl font-semibold text-gray-700 mb-4">Player Standings (Today)</h2>
+      <h2 className="text-2xl font-semibold text-gray-700 mb-4">{title}</h2>
 
       {loading && <p className="text-center text-gray-600">Calculating standings...</p>}
       {error && <p className="text-center text-red-600 bg-red-100 p-3 rounded-sm">{error}</p>}
