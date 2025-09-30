@@ -864,7 +864,16 @@ function App() {
 
              {/* Overall Player Standings */}
              {!loading && !error && (
-                  <PlayerStandings standings={overallPlayerStandings} loading={loadingAllMatches} error={allMatchesError} title="Player Standings (Overall)" matches={allMatches} />
+                  <PlayerStandings 
+                    standings={overallPlayerStandings} 
+                    loading={loadingAllMatches} 
+                    error={allMatchesError} 
+                    title="Player Standings (Overall)" 
+                    matches={allMatches} 
+                    allPlayers={allPlayers}
+                    allTeams={allTeams}
+                    enableVersionFilter={true}
+                  />
              )}
 
              {/* Top Win Percentage Teams */}
