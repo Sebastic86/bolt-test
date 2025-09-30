@@ -220,8 +220,10 @@ function App() {
           ...match,
           team1_name: team1?.name ?? 'Unknown Team',
           team1_logoUrl: team1?.logoUrl ?? '',
+          team1_version: team1?.version ?? '',
           team2_name: team2?.name ?? 'Unknown Team',
           team2_logoUrl: team2?.logoUrl ?? '',
+          team2_version: team2?.version ?? '',
           team1_players: playersInMatch
             .filter(mp => mp.team_number === 1)
             .map(mp => playerMap.get(mp.player_id))
@@ -287,8 +289,10 @@ function App() {
           ...match,
           team1_name: team1?.name ?? 'Unknown Team',
           team1_logoUrl: team1?.logoUrl ?? '',
+          team1_version: team1?.version ?? '',
           team2_name: team2?.name ?? 'Unknown Team',
           team2_logoUrl: team2?.logoUrl ?? '',
+          team2_version: team2?.version ?? '',
           team1_players: playersInMatch
             .filter(mp => mp.team_number === 1)
             .map(mp => playerMap.get(mp.player_id))
