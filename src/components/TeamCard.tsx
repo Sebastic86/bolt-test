@@ -96,7 +96,9 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
 
       {/* Right Side: Details */}
       <div className="grow min-w-0">
-        <h3 className="text-lg font-semibold mb-0.5 truncate text-gray-800 pr-8">{team.name}</h3> {/* Added padding-right */}
+        <h3 className="text-lg font-semibold mb-0.5 truncate text-gray-800 pr-8">
+          {team.name} <span className="text-sm font-normal text-gray-500">({team.version})</span>
+        </h3> {/* Added version display */}
         <p className="text-sm text-gray-500 mb-1 truncate">{team.league}</p>
 
         {/* Star Rating & Overall */}

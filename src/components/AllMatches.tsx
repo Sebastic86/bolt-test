@@ -326,7 +326,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                           />
                         )}
                       </div>
-                      <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team1_name}</span>
+                      <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team1_name} ({match.team1_version || 'FC25'})</span>
                       {editingScoreMatchId === match.id ? (
                           <div className="flex flex-col items-center mx-2 shrink-0">
                               <div className="flex items-center space-x-1">
@@ -361,7 +361,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                                                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                                               disabled={savingScore || isDeletingThisMatch}
                                           >
-                                              {match.team1_name}
+                                              {match.team1_name} ({match.team1_version || 'FC25'})
                                           </button>
                                           <button
                                               onClick={() => setPenaltiesWinner(2)}
@@ -370,7 +370,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                                                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                                               disabled={savingScore || isDeletingThisMatch}
                                           >
-                                              {match.team2_name}
+                                              {match.team2_name} ({match.team2_version || 'FC25'})
                                           </button>
                                       </div>
                                   </div>
@@ -383,7 +383,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                                       {`${match.team1_score} - ${match.team2_score}`}
                                       {match.team1_score === match.team2_score && match.penalties_winner && (
                                           <span className="ml-1 text-xs text-gray-500">
-                                              (Pen: {match.penalties_winner === 1 ? match.team1_name : match.team2_name})
+                                              (Pen: {match.penalties_winner === 1 ? `${match.team1_name} (${match.team1_version || 'FC25'})` : `${match.team2_name} (${match.team2_version || 'FC25'})`})
                                           </span>
                                       )}
                                   </>
@@ -403,7 +403,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                           />
                         )}
                       </div>
-                      <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team2_name}</span>
+                      <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team2_name} ({match.team2_version || 'FC25'})</span>
                    </div>
 
                    {/* Action Buttons */}
@@ -492,7 +492,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                 {expandedMatchId === match.id && (
                   <div className="mt-3 pt-3 border-t border-brand-light text-xs text-gray-600 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                       <div>
-                          <strong className="block mb-1 text-gray-700">{match.team1_name} Players:</strong>
+                          <strong className="block mb-1 text-gray-700">{match.team1_name} ({match.team1_version || 'FC25'}) Players:</strong>
                           {match.team1_players.length > 0 ? (
                               <ul className="space-y-1">
                                   {match.team1_players.map(p => (
@@ -503,7 +503,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                                                   onClick={() => handleMovePlayerToTeam(p.id, match.id, 2)}
                                                   className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50"
                                                   disabled={savingPlayers}
-                                                  title={`Move to ${match.team2_name}`}
+                                                  title={`Move to ${match.team2_name} (${match.team2_version || 'FC25'})`}
                                               >
                                                   →
                                               </button>
@@ -514,7 +514,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                           ) : <span className="italic">No players recorded</span>}
                       </div>
                        <div>
-                          <strong className="block mb-1 text-gray-700">{match.team2_name} Players:</strong>
+                          <strong className="block mb-1 text-gray-700">{match.team2_name} ({match.team2_version || 'FC25'}) Players:</strong>
                           {match.team2_players.length > 0 ? (
                               <ul className="space-y-1">
                                   {match.team2_players.map(p => (
@@ -525,7 +525,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                                                   onClick={() => handleMovePlayerToTeam(p.id, match.id, 1)}
                                                   className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50"
                                                   disabled={savingPlayers}
-                                                  title={`Move to ${match.team1_name}`}
+                                                  title={`Move to ${match.team1_name} (${match.team1_version || 'FC25'})`}
                                               >
                                                   ←
                                               </button>
@@ -556,19 +556,19 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                                           onClick={() => handleAddPlayerToTeam(match.id, 1)}
                                           className="flex items-center text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-sm hover:bg-purple-200 disabled:opacity-50"
                                           disabled={!selectedPlayerId || savingPlayers}
-                                          title={`Add to ${match.team1_name}`}
+                                          title={`Add to ${match.team1_name} (${match.team1_version || 'FC25'})`}
                                       >
                                           <Plus className="w-3 h-3 mr-1" />
-                                          Add to {match.team1_name}
+                                          Add to {match.team1_name} ({match.team1_version || 'FC25'})
                                       </button>
                                       <button
                                           onClick={() => handleAddPlayerToTeam(match.id, 2)}
                                           className="flex items-center text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-sm hover:bg-purple-200 disabled:opacity-50"
                                           disabled={!selectedPlayerId || savingPlayers}
-                                          title={`Add to ${match.team2_name}`}
+                                          title={`Add to ${match.team2_name} (${match.team2_version || 'FC25'})`}
                                       >
                                           <Plus className="w-3 h-3 mr-1" />
-                                          Add to {match.team2_name}
+                                          Add to {match.team2_name} ({match.team2_version || 'FC25'})
                                       </button>
                                   </div>
                               </div>

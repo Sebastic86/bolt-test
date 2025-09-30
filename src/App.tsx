@@ -17,6 +17,7 @@ import { Dices, Settings, PlusSquare, List, ArrowLeft } from 'lucide-react';
 const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
 const MAX_RATING_STORAGE_KEY = 'fcGeneratorMaxRating';
 const EXCLUDE_NATIONS_STORAGE_KEY = 'fcGeneratorExcludeNations'; // New key
+const SELECTED_VERSION_STORAGE_KEY = 'fcGeneratorSelectedVersion'; // New key for version
 
 // --- Helper Functions for Session Storage ---
 const getInitialRating = (key: string, defaultValue: number): number => {
@@ -46,6 +47,18 @@ const getInitialBoolean = (key: string, defaultValue: boolean): boolean => {
   return defaultValue;
 };
 
+const getInitialString = (key: string, defaultValue: string): string => {
+  try {
+    const storedValue = sessionStorage.getItem(key);
+    if (storedValue !== null) {
+      return storedValue;
+    }
+  } catch (error) {
+    console.error(`Error reading ${key} from sessionStorage:`, error);
+  }
+  return defaultValue;
+};
+
 
 // Fetch all teams from Supabase
 const fetchAllTeams = async (): Promise<Team[]> => {
@@ -67,6 +80,24 @@ const fetchAllPlayers = async (): Promise<Player[]> => {
         throw new Error(`Failed to fetch players: ${error.message}`);
     }
     return data || [];
+};
+
+// Fetch available versions from teams table
+const fetchAvailableVersions = async (): Promise<string[]> => {
+    console.log("Fetching available versions...");
+    const { data, error } = await supabase
+        .from('teams')
+        .select('version')
+        .order('version');
+    
+    if (error) {
+        console.error("Error fetching versions:", error);
+        throw new Error(`Failed to fetch versions: ${error.message}`);
+    }
+    
+    // Extract unique versions
+    const versions = Array.from(new Set(data?.map(item => item.version) || []));
+    return versions;
 };
 
 // Function to get a random team from a filtered list
@@ -106,6 +137,7 @@ function App() {
   const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 4));
   const [maxRating, setMaxRating] = useState<number>(() => getInitialRating(MAX_RATING_STORAGE_KEY, 5));
   const [excludeNations, setExcludeNations] = useState<boolean>(() => getInitialBoolean(EXCLUDE_NATIONS_STORAGE_KEY, true)); // New state
+  const [selectedVersion, setSelectedVersion] = useState<string>(() => getInitialString(SELECTED_VERSION_STORAGE_KEY, 'FC25')); // New state for version
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
 
   // Edit Modal State
@@ -128,14 +160,15 @@ function App() {
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
 
 
-  // Filtered teams based on rating and nation settings
+  // Filtered teams based on rating, nation, and version settings
   const filteredTeams = useMemo(() => {
     return allTeams.filter(team => {
         const ratingMatch = team.rating >= minRating && team.rating <= maxRating;
         const nationMatch = !excludeNations || team.league !== 'Nation';
-        return ratingMatch && nationMatch;
+        const versionMatch = team.version === selectedVersion;
+        return ratingMatch && nationMatch && versionMatch;
     });
-  }, [allTeams, minRating, maxRating, excludeNations]); // Add excludeNations dependency
+  }, [allTeams, minRating, maxRating, excludeNations, selectedVersion]); // Add selectedVersion dependency
 
   // Fetch Today's Match History
   const fetchTodaysMatches = useCallback(async () => {
@@ -393,14 +426,16 @@ function App() {
   // --- Settings Modal Handlers ---
   const handleOpenSettingsModal = () => setIsSettingsModalOpen(true);
   const handleCloseSettingsModal = () => setIsSettingsModalOpen(false);
-  const handleSaveSettings = (newMinRating: number, newMaxRating: number, newExcludeNations: boolean) => {
+  const handleSaveSettings = (newMinRating: number, newMaxRating: number, newExcludeNations: boolean, newSelectedVersion: string) => {
     setMinRating(newMinRating);
     setMaxRating(newMaxRating);
     setExcludeNations(newExcludeNations); // Save new setting
+    setSelectedVersion(newSelectedVersion); // Save new version setting
     try {
       sessionStorage.setItem(MIN_RATING_STORAGE_KEY, newMinRating.toString());
       sessionStorage.setItem(MAX_RATING_STORAGE_KEY, newMaxRating.toString());
       sessionStorage.setItem(EXCLUDE_NATIONS_STORAGE_KEY, newExcludeNations.toString()); // Persist new setting
+      sessionStorage.setItem(SELECTED_VERSION_STORAGE_KEY, newSelectedVersion); // Persist new version setting
     } catch (error) {
       console.error("Error saving settings to sessionStorage:", error);
     }
@@ -865,6 +900,7 @@ function App() {
         initialMinRating={minRating}
         initialMaxRating={maxRating}
         initialExcludeNations={excludeNations} // Pass initial state
+        initialSelectedVersion={selectedVersion} // Pass initial version state
         allPlayers={allPlayers}
         onUpdatePlayerName={handleUpdatePlayerName}
       />

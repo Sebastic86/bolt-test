@@ -8,6 +8,7 @@ export interface Team {
   attackRating: number; // e.g., 88, 92
   midfieldRating: number; // e.g., 82, 87
   defendRating: number; // e.g., 80, 85
+  version: string; // Version identifier (e.g., 'FC25')
 }
 
 export interface Player {
@@ -41,8 +42,10 @@ export interface MatchPlayer {
 export interface MatchHistoryItem extends Match {
     team1_name: string;
     team1_logoUrl: string;
+    team1_version: string;
     team2_name: string;
     team2_logoUrl: string;
+    team2_version: string;
     team1_players: Player[];
     team2_players: Player[];
 }

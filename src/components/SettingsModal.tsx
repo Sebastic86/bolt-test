@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User, Edit3, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import { Player } from '../types';
+import { supabase } from '../lib/supabaseClient';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (minRating: number, maxRating: number, excludeNations: boolean) => void; // Updated signature
+  onSave: (minRating: number, maxRating: number, excludeNations: boolean, selectedVersion: string) => void; // Updated signature
   initialMinRating: number;
   initialMaxRating: number;
   initialExcludeNations: boolean; // New prop
+  initialSelectedVersion: string; // New prop for version
   allPlayers: Player[];
   onUpdatePlayerName: (playerId: string, newName: string) => Promise<boolean>;
 }
@@ -30,22 +32,58 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialMinRating,
   initialMaxRating,
   initialExcludeNations, // Use new prop
+  initialSelectedVersion, // Use new version prop
   allPlayers,
   onUpdatePlayerName,
 }) => {
   const [minRating, setMinRating] = useState<number>(initialMinRating);
   const [maxRating, setMaxRating] = useState<number>(initialMaxRating);
   const [excludeNations, setExcludeNations] = useState<boolean>(initialExcludeNations); // State for checkbox
+  const [selectedVersion, setSelectedVersion] = useState<string>(initialSelectedVersion); // State for version
+  const [availableVersions, setAvailableVersions] = useState<string[]>([]); // State for available versions
+  const [versionsLoading, setVersionsLoading] = useState<boolean>(false); // Loading state for versions
+  const [versionsError, setVersionsError] = useState<string | null>(null); // Error state for versions
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [editingPlayers, setEditingPlayers] = useState<EditingPlayerState>({});
+
+  // Function to fetch available versions from database
+  const fetchAvailableVersions = async () => {
+    setVersionsLoading(true);
+    setVersionsError(null);
+    try {
+      console.log('[SettingsModal] Fetching available versions...');
+      const { data, error } = await supabase
+        .from('teams')
+        .select('version')
+        .order('version');
+      
+      if (error) {
+        console.error('[SettingsModal] Error fetching versions:', error);
+        throw new Error(`Failed to fetch versions: ${error.message}`);
+      }
+      
+      // Extract unique versions
+      const versions = Array.from(new Set(data?.map(item => item.version) || []));
+      console.log('[SettingsModal] Available versions:', versions);
+      setAvailableVersions(versions);
+    } catch (error) {
+      console.error('[SettingsModal] Error in fetchAvailableVersions:', error);
+      setVersionsError(error instanceof Error ? error.message : 'Failed to fetch versions');
+      // Fallback to default versions if fetch fails
+      setAvailableVersions(['FC25', 'FC24', 'FIFA23', 'FIFA22']);
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
 
   // Initialize/Reset editing state when modal opens or players change
   useEffect(() => {
     if (isOpen) {
-      console.log('[SettingsModal] Initializing state:', { initialMinRating, initialMaxRating, initialExcludeNations });
+      console.log('[SettingsModal] Initializing state:', { initialMinRating, initialMaxRating, initialExcludeNations, initialSelectedVersion });
       setMinRating(initialMinRating);
       setMaxRating(initialMaxRating);
       setExcludeNations(initialExcludeNations); // Initialize checkbox state
+      setSelectedVersion(initialSelectedVersion); // Initialize version state
       setRatingError(null);
 
       const initialEditingState: EditingPlayerState = {};
@@ -60,11 +98,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       });
       setEditingPlayers(initialEditingState);
 
+      // Fetch available versions when modal opens
+      fetchAvailableVersions();
+
     } else {
       console.log('[SettingsModal] Closing, clearing state.');
       setEditingPlayers({});
     }
-  }, [isOpen, initialMinRating, initialMaxRating, initialExcludeNations, allPlayers]); // Add initialExcludeNations dependency
+  }, [isOpen, initialMinRating, initialMaxRating, initialExcludeNations, initialSelectedVersion, allPlayers]); // Add initialSelectedVersion dependency
 
   const handleSaveSettings = () => {
     console.log('[SettingsModal] handleSaveSettings called.');
@@ -92,8 +133,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setRatingError(null);
 
     try {
-        console.log('[SettingsModal] Calling onSave with excludeNations:', excludeNations); // Log new value
-        onSave(min, max, excludeNations); // Pass excludeNations state
+        console.log('[SettingsModal] Calling onSave with excludeNations and selectedVersion:', excludeNations, selectedVersion); // Log new values
+        onSave(min, max, excludeNations, selectedVersion); // Pass excludeNations and selectedVersion state
         console.log('[SettingsModal] onSave finished.');
 
         console.log('[SettingsModal] Calling onClose...');
@@ -245,6 +286,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 {ratingError && (
                     <p className="text-xs text-red-600 mt-2">{ratingError}</p>
+                )}
+            </div>
+
+            {/* Version Selection Dropdown */}
+            <div className="mb-4">
+                <label htmlFor="version-select" className="block text-sm font-medium text-gray-700 mb-2">
+                    Game Version
+                </label>
+                <select
+                    id="version-select"
+                    value={selectedVersion}
+                    onChange={(e) => setSelectedVersion(e.target.value)}
+                    disabled={versionsLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {versionsLoading ? (
+                        <option value="">Loading versions...</option>
+                    ) : availableVersions.length > 0 ? (
+                        availableVersions.map(version => (
+                            <option key={version} value={version}>{version}</option>
+                        ))
+                    ) : (
+                        <option value="">No versions available</option>
+                    )}
+                </select>
+                {versionsError && (
+                    <p className="text-xs text-red-600 mt-2">
+                        Error loading versions: {versionsError}. Using fallback options.
+                    </p>
                 )}
             </div>
 
