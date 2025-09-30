@@ -5,12 +5,13 @@ import EditTeamModal from './components/EditTeamModal';
 import SettingsModal from './components/SettingsModal';
 import AddMatchModal from './components/AddMatchModal';
 import MatchHistory from './components/MatchHistory';
+import AllMatches from './components/AllMatches';
 import PlayerStandings from './components/PlayerStandings';
 import TopWinPercentageTeams from './components/TopWinPercentageTeams';
 import TopLossPercentageTeams from './components/TopLossPercentageTeams';
 import { Team, Player, Match, MatchPlayer, MatchHistoryItem, PlayerStanding, TeamStanding } from './types';
 import { supabase } from './lib/supabaseClient';
-import { Dices, Settings, PlusSquare } from 'lucide-react';
+import { Dices, Settings, PlusSquare, List, ArrowLeft } from 'lucide-react';
 
 // --- Constants for Session Storage ---
 const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
@@ -113,6 +114,9 @@ function App() {
 
   // Add Match Modal State
   const [isAddMatchModalOpen, setIsAddMatchModalOpen] = useState<boolean>(false);
+
+  // Page Navigation State
+  const [currentPage, setCurrentPage] = useState<'main' | 'allMatches'>('main');
 
   // Match History State
   const [matchesToday, setMatchesToday] = useState<MatchHistoryItem[]>([]);
@@ -442,7 +446,21 @@ function App() {
 
   // --- Manual Refresh Handler ---
   const handleManualRefreshHistory = () => {
-      setRefreshHistoryTrigger(prev => prev + 1);
+    setRefreshHistoryTrigger(prev => prev + 1);
+  };
+
+  // Page Navigation Handlers
+  const handleNavigateToAllMatches = () => {
+    setCurrentPage('allMatches');
+  };
+
+  const handleNavigateToMain = () => {
+    setCurrentPage('main');
+  };
+
+  // Refresh handler for AllMatches page
+  const handleRefreshAllMatches = () => {
+    fetchAllMatches();
   };
 
 
@@ -729,7 +747,7 @@ function App() {
          )}
 
          {/* Buttons Container */}
-         {!loading && !error && allTeams.length > 0 && (
+         {!loading && !error && allTeams.length > 0 && currentPage === 'main' && (
            <div className="flex items-center justify-center mb-6">
              {/* Button Group Container - Removed gradient, added shadow */}
              <div className="inline-flex rounded-lg shadow-md overflow-hidden">
@@ -750,6 +768,13 @@ function App() {
                  <PlusSquare className="w-5 h-5 mr-2" /> Add Match
                </button>
                <button
+                 onClick={handleNavigateToAllMatches}
+                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out border-r border-white/20"
+                 title="View and Edit All Matches"
+               >
+                 <List className="w-5 h-5 mr-2" /> All Matches
+               </button>
+               <button
                  onClick={handleOpenSettingsModal}
                  className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
                  aria-label="Open settings"
@@ -758,6 +783,19 @@ function App() {
                  <Settings className="w-5 h-5" />
                </button>
              </div>
+           </div>
+         )}
+
+         {/* All Matches Page Back Button */}
+         {currentPage === 'allMatches' && (
+           <div className="flex items-center justify-center mb-6">
+             <button
+               onClick={handleNavigateToMain}
+               className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out rounded-lg shadow-md"
+               title="Back to Main Page"
+             >
+               <ArrowLeft className="w-5 h-5 mr-2" /> Back to Main
+             </button>
            </div>
          )}
 
@@ -776,29 +814,45 @@ function App() {
            <p className="text-gray-600 mb-6 text-center mt-8">No teams available to display.</p> 
          )}
 
-         {/* Match History */}
-         {!loading && !error && (
-             <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} />
+         {/* Main Page Content */}
+         {currentPage === 'main' && (
+           <>
+             {/* Match History */}
+             {!loading && !error && (
+                 <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} />
+             )}
+
+             {/* Player Standings */}
+             {!loading && !error && (
+                  <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} title="Player Standings (Today)" matches={matchesToday} />
+             )}
+
+             {/* Overall Player Standings */}
+             {!loading && !error && (
+                  <PlayerStandings standings={overallPlayerStandings} loading={loadingAllMatches} error={allMatchesError} title="Player Standings (Overall)" matches={allMatches} />
+             )}
+
+             {/* Top Win Percentage Teams */}
+             {!loading && !error && (
+                  <TopWinPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
+             )}
+
+             {/* Top Loss Percentage Teams */}
+             {!loading && !error && (
+                  <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
+             )}
+           </>
          )}
 
-         {/* Player Standings */}
-         {!loading && !error && (
-              <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} title="Player Standings (Today)" matches={matchesToday} />
-         )}
-
-         {/* Overall Player Standings */}
-         {!loading && !error && (
-              <PlayerStandings standings={overallPlayerStandings} loading={loadingAllMatches} error={allMatchesError} title="Player Standings (Overall)" matches={allMatches} />
-         )}
-
-         {/* Top Win Percentage Teams */}
-         {!loading && !error && (
-              <TopWinPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
-         )}
-
-         {/* Top Loss Percentage Teams */}
-         {!loading && !error && (
-              <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
+         {/* All Matches Page Content */}
+         {currentPage === 'allMatches' && (
+             <AllMatches 
+               allMatches={allMatches} 
+               loading={loadingAllMatches} 
+               error={allMatchesError} 
+               onRefresh={handleRefreshAllMatches} 
+               allPlayers={allPlayers} 
+             />
          )}
       </main>
 
