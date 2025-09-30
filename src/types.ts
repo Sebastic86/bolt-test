@@ -58,3 +58,15 @@ export interface PlayerStanding {
   totalOverallRating: number; // Sum of overall ratings of teams played
   matchesPlayed: number; // Total number of matches played
 }
+
+// Type for team standings data
+export interface TeamStanding {
+  teamId: string;
+  teamName: string;
+  logoUrl: string;
+  totalMatches: number;
+  totalWins: number;
+  totalLosses: number;
+  winPercentage: number;
+  lossPercentage: number;
+}
