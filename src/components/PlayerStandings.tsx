@@ -1,14 +1,18 @@
-import React from 'react';
-import { PlayerStanding } from '../types'; // Assuming PlayerStanding type is defined in types.ts
+import React, { useState } from 'react';
+import { PlayerStanding, MatchHistoryItem } from '../types';
+import PlayerMatchDetails from './PlayerMatchDetails';
 
 interface PlayerStandingsProps {
   standings: PlayerStanding[];
   loading: boolean; // Pass loading state if calculation depends on async data
   error: string | null; // Pass error state
   title?: string; // Optional title prop
+  matches: MatchHistoryItem[]; // Matches data to show when clicking on a player
 }
 
-const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, error, title = "Player Standings" }) => {
+const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, error, title = "Player Standings", matches }) => {
+  const [selectedPlayer, setSelectedPlayer] = useState<{ id: string; name: string } | null>(null);
+  
   return (
     <div className="w-full max-w-4xl mt-8">
       <h2 className="text-2xl font-semibold text-gray-700 mb-4">{title}</h2>
@@ -53,7 +57,11 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, e
             </thead>
             <tbody className="bg-white divide-y divide-brand-light">
               {standings.map((player, index) => (
-                <tr key={player.playerId} className={index % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'}>
+                <tr 
+                  key={player.playerId} 
+                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'} hover:bg-blue-50 cursor-pointer transition-colors duration-150`}
+                  onClick={() => setSelectedPlayer({ id: player.playerId, name: player.playerName })}
+                >
                   <td className="px-1 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
                     {index + 1}
                   </td>
@@ -84,7 +92,17 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({ standings, loading, e
           </table>
         </div>
       )}
-       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win, including penalties wins), GF: Goals For, GA: Goals Against, GD: Goal Difference, Matches: Total matches played, Avg OVR: Average Overall Rating of Teams Played. Sorted by Pts, then GD, then GF.</p>
+       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win, including penalties wins), GF: Goals For, GA: Goals Against, GD: Goal Difference, Matches: Total matches played, Avg OVR: Average Overall Rating of Teams Played. Sorted by Pts, then GD, then GF. Click on a player to see all their matches.</p>
+      
+      {/* Player Match Details Modal */}
+      {selectedPlayer && (
+        <PlayerMatchDetails
+          playerId={selectedPlayer.id}
+          playerName={selectedPlayer.name}
+          matches={matches}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 };

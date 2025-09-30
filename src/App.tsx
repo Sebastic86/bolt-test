@@ -783,12 +783,12 @@ function App() {
 
          {/* Player Standings */}
          {!loading && !error && (
-              <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} title="Player Standings (Today)" />
+              <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} title="Player Standings (Today)" matches={matchesToday} />
          )}
 
          {/* Overall Player Standings */}
          {!loading && !error && (
-              <PlayerStandings standings={overallPlayerStandings} loading={loadingAllMatches} error={allMatchesError} title="Player Standings (Overall)" />
+              <PlayerStandings standings={overallPlayerStandings} loading={loadingAllMatches} error={allMatchesError} title="Player Standings (Overall)" matches={allMatches} />
          )}
 
          {/* Top Win Percentage Teams */}
