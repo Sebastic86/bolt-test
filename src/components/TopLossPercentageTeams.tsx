@@ -1,19 +1,23 @@
-import React from 'react';
-import { TeamStanding } from '../types';
+import React, { useState } from 'react';
+import { TeamStanding, MatchHistoryItem } from '../types';
+import TeamMatchDetails from './TeamMatchDetails';
 
 interface TopLossPercentageTeamsProps {
   teamStandings: TeamStanding[];
   loading: boolean;
   error: string | null;
   title?: string;
+  allMatches: MatchHistoryItem[];
 }
 
 const TopLossPercentageTeams: React.FC<TopLossPercentageTeamsProps> = ({ 
   teamStandings, 
   loading, 
   error, 
-  title = "Top 5 Teams with Highest Loss Percentage"
+  title = "Top 5 Teams with Highest Loss Percentage",
+  allMatches
 }) => {
+  const [selectedTeam, setSelectedTeam] = useState<{ id: string; name: string } | null>(null);
   const topLossTeams = teamStandings
     .filter(team => team.totalMatches > 0) // Only include teams that have played matches
     .sort((a, b) => {
@@ -63,7 +67,11 @@ const TopLossPercentageTeams: React.FC<TopLossPercentageTeamsProps> = ({
             </thead>
             <tbody className="bg-white divide-y divide-brand-light">
               {topLossTeams.map((team, index) => (
-                <tr key={team.teamId} className={index % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'}>
+                <tr 
+                  key={team.teamId} 
+                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'} hover:bg-blue-50 cursor-pointer transition-colors duration-150`}
+                  onClick={() => setSelectedTeam({ id: team.teamId, name: team.teamName })}
+                >
                   <td className="px-1 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
                     {index + 1}
                   </td>
@@ -97,8 +105,18 @@ const TopLossPercentageTeams: React.FC<TopLossPercentageTeamsProps> = ({
         </div>
       )}
       <p className="text-xs text-gray-500 mt-2 text-center">
-        Teams ranked by loss percentage. Only teams with at least one match played are included.
+        Teams ranked by loss percentage. Only teams with at least one match played are included. Click on a team to see all their matches and players.
       </p>
+      
+      {/* Team Match Details Modal */}
+      {selectedTeam && (
+        <TeamMatchDetails
+          teamId={selectedTeam.id}
+          teamName={selectedTeam.name}
+          matches={allMatches}
+          onClose={() => setSelectedTeam(null)}
+        />
+      )}
     </div>
   );
 };

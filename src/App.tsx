@@ -793,12 +793,12 @@ function App() {
 
          {/* Top Win Percentage Teams */}
          {!loading && !error && (
-              <TopWinPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} />
+              <TopWinPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
          )}
 
          {/* Top Loss Percentage Teams */}
          {!loading && !error && (
-              <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} />
+              <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
          )}
       </main>
 
