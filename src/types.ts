@@ -56,4 +56,5 @@ export interface PlayerStanding {
   goalsAgainst: number;
   goalDifference: number; // Added for sorting
   totalOverallRating: number; // Sum of overall ratings of teams played
+  matchesPlayed: number; // Total number of matches played
 }
