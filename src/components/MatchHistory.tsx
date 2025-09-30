@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award } from 'lucide-react'; // Import Shield and Award
+import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award, Plus } from 'lucide-react'; // Import Shield and Award
 
 interface MatchHistoryProps {
   matchesToday: MatchHistoryItem[];
@@ -52,6 +52,14 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
   const [logoErrors, setLogoErrors] = useState<LogoErrorState>({}); // State for logo errors
+  
+  // Player editing state
+  const [editingPlayersMatchId, setEditingPlayersMatchId] = useState<string | null>(null);
+  const [savingPlayers, setSavingPlayers] = useState<boolean>(false);
+  
+  // Add player state
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
+  const [addingToTeam, setAddingToTeam] = useState<1 | 2 | null>(null);
 
   // Function to handle logo loading errors
   const handleLogoError = (matchId: string, teamNumber: 1 | 2) => {
@@ -193,6 +201,83 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
 
   const toggleExpandMatch = (matchId: string) => {
     setExpandedMatchId(prevId => (prevId === matchId ? null : matchId));
+  };
+
+  // Player editing handlers
+  const handleEditPlayersClick = (matchId: string) => {
+    setEditingPlayersMatchId(matchId);
+  };
+
+  const handleCancelEditPlayers = () => {
+    setEditingPlayersMatchId(null);
+  };
+
+  const handleMovePlayerToTeam = async (playerId: string, matchId: string, newTeamNumber: 1 | 2) => {
+    setSavingPlayers(true);
+    try {
+      const { error } = await supabase
+        .from('match_players')
+        .update({ team_number: newTeamNumber })
+        .eq('match_id', matchId)
+        .eq('player_id', playerId);
+
+      if (error) throw error;
+
+      // Refresh the data to show updated player assignments
+      onRefresh();
+    } catch (err: any) {
+      console.error('Error moving player:', err);
+      alert('Failed to move player to team.');
+    } finally {
+      setSavingPlayers(false);
+    }
+  };
+
+  const handleSavePlayers = () => {
+    setEditingPlayersMatchId(null);
+    setSelectedPlayerId('');
+    setAddingToTeam(null);
+  };
+
+  const handleAddPlayerToTeam = async (matchId: string, teamNumber: 1 | 2) => {
+    if (!selectedPlayerId) {
+      alert('Please select a player to add.');
+      return;
+    }
+
+    setSavingPlayers(true);
+    try {
+      const { error } = await supabase
+        .from('match_players')
+        .insert({
+          match_id: matchId,
+          player_id: selectedPlayerId,
+          team_number: teamNumber
+        });
+
+      if (error) throw error;
+
+      // Reset the selection
+      setSelectedPlayerId('');
+      setAddingToTeam(null);
+      
+      // Refresh the data to show the newly added player
+      onRefresh();
+    } catch (err: any) {
+      console.error('Error adding player to team:', err);
+      alert('Failed to add player to team.');
+    } finally {
+      setSavingPlayers(false);
+    }
+  };
+
+  // Helper function to get available players for a match (excluding those already in the match)
+  const getAvailablePlayersForMatch = (match: MatchHistoryItem) => {
+    const playersInMatch = new Set([
+      ...match.team1_players.map(p => p.id),
+      ...match.team2_players.map(p => p.id)
+    ]);
+    return allPlayers.filter(player => !playersInMatch.has(player.id));
   };
 
   return (
@@ -355,11 +440,43 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                           </button>
                       )}
+                      {/* Edit Players Button - only shown when match is expanded */}
+                      {expandedMatchId === match.id && editingPlayersMatchId !== match.id && (
+                          <button
+                              onClick={() => handleEditPlayersClick(match.id)}
+                              className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-sm hover:bg-green-200 disabled:opacity-50"
+                              disabled={savingScore || savingPlayers || loading || !!deletingMatchId}
+                              title="Edit Player Teams"
+                          >
+                              Edit Players
+                          </button>
+                      )}
+                      {/* Save/Cancel Players Buttons - shown when editing players */}
+                      {editingPlayersMatchId === match.id && (
+                          <>
+                              <button
+                                  onClick={handleSavePlayers}
+                                  className="p-1 bg-brand-medium text-white rounded-sm hover:bg-brand-dark disabled:opacity-50"
+                                  disabled={savingPlayers}
+                                  title="Done Editing Players"
+                              >
+                                  <Save className="w-4 h-4" />
+                              </button>
+                              <button
+                                  onClick={handleCancelEditPlayers}
+                                  className="p-1 bg-gray-400 text-white rounded-sm hover:bg-gray-500 disabled:opacity-50"
+                                  disabled={savingPlayers}
+                                  title="Cancel Edit Players"
+                              >
+                                  <X className="w-4 h-4" />
+                              </button>
+                          </>
+                      )}
                        <button
                           onClick={() => toggleExpandMatch(match.id)}
                           className="p-1 text-gray-500 hover:text-brand-dark disabled:opacity-50"
                           title={expandedMatchId === match.id ? "Collapse Players" : "Expand Players"}
-                          disabled={savingScore || loading || !!deletingMatchId}
+                          disabled={savingScore || savingPlayers || loading || !!deletingMatchId}
                       >
                           {expandedMatchId === match.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
@@ -380,19 +497,89 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       <div>
                           <strong className="block mb-1 text-gray-700">{match.team1_name} Players:</strong>
                           {match.team1_players.length > 0 ? (
-                              <ul className="list-disc list-inside">
-                                  {match.team1_players.map(p => <li key={p.id}>{p.name}</li>)}
+                              <ul className="space-y-1">
+                                  {match.team1_players.map(p => (
+                                      <li key={p.id} className="flex items-center justify-between">
+                                          <span>{p.name}</span>
+                                          {editingPlayersMatchId === match.id && (
+                                              <button
+                                                  onClick={() => handleMovePlayerToTeam(p.id, match.id, 2)}
+                                                  className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50"
+                                                  disabled={savingPlayers}
+                                                  title={`Move to ${match.team2_name}`}
+                                              >
+                                                  →
+                                              </button>
+                                          )}
+                                      </li>
+                                  ))}
                               </ul>
                           ) : <span className="italic">No players recorded</span>}
                       </div>
                        <div>
                           <strong className="block mb-1 text-gray-700">{match.team2_name} Players:</strong>
                           {match.team2_players.length > 0 ? (
-                              <ul className="list-disc list-inside">
-                                  {match.team2_players.map(p => <li key={p.id}>{p.name}</li>)}
+                              <ul className="space-y-1">
+                                  {match.team2_players.map(p => (
+                                      <li key={p.id} className="flex items-center justify-between">
+                                          <span>{p.name}</span>
+                                          {editingPlayersMatchId === match.id && (
+                                              <button
+                                                  onClick={() => handleMovePlayerToTeam(p.id, match.id, 1)}
+                                                  className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50"
+                                                  disabled={savingPlayers}
+                                                  title={`Move to ${match.team1_name}`}
+                                              >
+                                                  ←
+                                              </button>
+                                          )}
+                                      </li>
+                                  ))}
                               </ul>
                           ) : <span className="italic">No players recorded</span>}
                       </div>
+                      
+                      {/* Add Player Section - only shown when editing players */}
+                      {editingPlayersMatchId === match.id && (
+                          <div className="col-span-1 sm:col-span-2 mt-3 pt-3 border-t border-gray-200">
+                              <div className="flex flex-col sm:flex-row items-center gap-2 mb-2">
+                                  <select
+                                      value={selectedPlayerId}
+                                      onChange={(e) => setSelectedPlayerId(e.target.value)}
+                                      className="text-xs border border-gray-300 rounded-sm px-2 py-1 bg-white"
+                                      disabled={savingPlayers}
+                                  >
+                                      <option value="">Select a player to add...</option>
+                                      {getAvailablePlayersForMatch(match).map(player => (
+                                          <option key={player.id} value={player.id}>{player.name}</option>
+                                      ))}
+                                  </select>
+                                  <div className="flex gap-2">
+                                      <button
+                                          onClick={() => handleAddPlayerToTeam(match.id, 1)}
+                                          className="flex items-center text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-sm hover:bg-purple-200 disabled:opacity-50"
+                                          disabled={!selectedPlayerId || savingPlayers}
+                                          title={`Add to ${match.team1_name}`}
+                                      >
+                                          <Plus className="w-3 h-3 mr-1" />
+                                          Add to {match.team1_name}
+                                      </button>
+                                      <button
+                                          onClick={() => handleAddPlayerToTeam(match.id, 2)}
+                                          className="flex items-center text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-sm hover:bg-purple-200 disabled:opacity-50"
+                                          disabled={!selectedPlayerId || savingPlayers}
+                                          title={`Add to ${match.team2_name}`}
+                                      >
+                                          <Plus className="w-3 h-3 mr-1" />
+                                          Add to {match.team2_name}
+                                      </button>
+                                  </div>
+                              </div>
+                              {getAvailablePlayersForMatch(match).length === 0 && (
+                                  <p className="text-xs text-gray-500 italic">All players are already in this match</p>
+                              )}
+                          </div>
+                      )}
                   </div>
                 )}
                  <div className="text-right text-xs text-gray-400 mt-1">
