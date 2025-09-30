@@ -12,12 +12,18 @@ const TopLossPercentageTeams: React.FC<TopLossPercentageTeamsProps> = ({
   teamStandings, 
   loading, 
   error, 
-  title = "Teams with Highest Loss Percentage" 
+  title = "Top 5 Teams with Highest Loss Percentage"
 }) => {
   const topLossTeams = teamStandings
     .filter(team => team.totalMatches > 0) // Only include teams that have played matches
-    .sort((a, b) => b.lossPercentage - a.lossPercentage) // Sort by loss percentage descending
-    .slice(0, 10); // Show more teams since this might be more relevant for analysis
+    .sort((a, b) => {
+      // Sort by loss percentage first (descending), then by number of matches (descending)
+      if (b.lossPercentage !== a.lossPercentage) {
+        return b.lossPercentage - a.lossPercentage;
+      }
+      return b.totalMatches - a.totalMatches;
+    })
+    .slice(0, 5); // Top 5 teams
 
   return (
     <div className="w-full max-w-4xl mt-8">

@@ -16,7 +16,13 @@ const TopWinPercentageTeams: React.FC<TopWinPercentageTeamsProps> = ({
 }) => {
   const topTeams = teamStandings
     .filter(team => team.totalMatches > 0) // Only include teams that have played matches
-    .sort((a, b) => b.winPercentage - a.winPercentage) // Sort by win percentage descending
+    .sort((a, b) => {
+      // Sort by win percentage first (descending), then by number of matches (descending)
+      if (b.winPercentage !== a.winPercentage) {
+        return b.winPercentage - a.winPercentage;
+      }
+      return b.totalMatches - a.totalMatches;
+    })
     .slice(0, 5); // Take top 5
 
   return (
