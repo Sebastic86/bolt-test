@@ -474,6 +474,7 @@ function App() {
         goalsAgainst: 0,
         goalDifference: 0,
         totalOverallRating: 0,
+        matchesPlayed: 0,
       });
     });
 
@@ -506,6 +507,7 @@ function App() {
           }
           if (team1) {
             standing.totalOverallRating += team1.overallRating;
+            standing.matchesPlayed += 1;
           }
         }
       });
@@ -522,6 +524,7 @@ function App() {
           }
           if (team2) {
             standing.totalOverallRating += team2.overallRating;
+            standing.matchesPlayed += 1;
           }
         }
       });
@@ -558,6 +561,7 @@ function App() {
         goalsAgainst: 0,
         goalDifference: 0,
         totalOverallRating: 0,
+        matchesPlayed: 0,
       });
     });
 
@@ -590,6 +594,7 @@ function App() {
           }
           if (team1) {
             standing.totalOverallRating += team1.overallRating;
+            standing.matchesPlayed += 1;
           }
         }
       });
@@ -606,6 +611,7 @@ function App() {
           }
           if (team2) {
             standing.totalOverallRating += team2.overallRating;
+            standing.matchesPlayed += 1;
           }
         }
       });
