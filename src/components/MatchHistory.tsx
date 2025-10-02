@@ -495,7 +495,6 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                             {isDeletingThisMatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                         </button>
                       </AdminOnly>
-                      </button>
                    </div>
                 </div>
 
