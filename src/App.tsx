@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from './components/Header'; // Import the new Header component
+import AuthWrapper from './components/AuthWrapper';
+import { AdminOnly, ConditionalButton } from './components/RoleBasedComponents';
+import UserManagement from './components/UserManagement';
 import TeamCard from './components/TeamCard';
 import EditTeamModal from './components/EditTeamModal';
 import SettingsModal from './components/SettingsModal';
@@ -763,7 +766,8 @@ function App() {
   return (
     <div className="flex flex-col min-h-screen"> {/* Changed to flex-col */}
       <Header /> {/* Add the Header component */}
-      <main className="grow bg-linear-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
+      <AuthWrapper>
+        <main className="grow bg-linear-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
         {/* Removed the old h1 title */}
 
         {loading && <p className="text-gray-600 mt-8">Loading initial data...</p>}
@@ -798,14 +802,16 @@ function App() {
                >
                  <Dices className="w-5 h-5 mr-2" /> New Matchup
                </button>
-               <button
-                 onClick={handleOpenAddMatchModal}
-                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
-                 disabled={!match}
-                 title="Add Current Matchup to History"
-               >
-                 <PlusSquare className="w-5 h-5 mr-2" /> Add Match
-               </button>
+               <AdminOnly>
+                 <button
+                   onClick={handleOpenAddMatchModal}
+                   className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
+                   disabled={!match}
+                   title="Add Current Matchup to History"
+                 >
+                   <PlusSquare className="w-5 h-5 mr-2" /> Add Match
+                 </button>
+               </AdminOnly>
                <button
                  onClick={handleNavigateToAllMatches}
                  className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out border-r border-white/20"
@@ -889,6 +895,13 @@ function App() {
              {!loading && !error && (
                   <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
              )}
+
+             {/* User Management - Admin Only */}
+             <AdminOnly>
+               {!loading && !error && (
+                 <UserManagement />
+               )}
+             </AdminOnly>
            </>
          )}
 
@@ -918,6 +931,7 @@ function App() {
         onUpdatePlayerName={handleUpdatePlayerName}
       />
        <AddMatchModal isOpen={isAddMatchModalOpen} onClose={handleCloseAddMatchModal} matchTeams={match} onMatchSaved={handleMatchSaved} />
+      </AuthWrapper>
     </div>
   );
 }

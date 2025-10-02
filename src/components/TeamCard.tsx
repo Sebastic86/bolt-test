@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Team } from '../types';
 import * as LucideIcons from 'lucide-react'; // Keep Star icon import
 import { Pencil, Shield } from 'lucide-react'; // Import Pencil and Shield icons
+import { AdminOnly } from './RoleBasedComponents';
 
 interface TeamCardProps {
   team: Team;
@@ -69,15 +70,17 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
   return (
     <div className="relative bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-brand-light flex items-center space-x-4">
       {/* Edit Button */}
-      {onEdit && (
-        <button
-          onClick={onEdit}
-          className="absolute top-2 right-2 p-1 text-gray-400 hover:text-brand-dark rounded-full hover:bg-gray-100 transition-colors duration-150"
-          aria-label="Edit team"
-        >
-          <Pencil className="w-4 h-4" />
-        </button>
-      )}
+      <AdminOnly>
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-brand-dark rounded-full hover:bg-gray-100 transition-colors duration-150"
+            aria-label="Edit team"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
+      </AdminOnly>
 
       {/* Left Side: Logo or Fallback Icon */}
       <div className="shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded-sm bg-gray-100 text-gray-400">

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { Team, Player, Match, MatchPlayer } from '../types'; // Import new types
+import { Team, Player, Match, MatchPlayer, UserProfile } from '../types'; // Import new types
 
 // Ensure environment variables are loaded
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -32,6 +32,11 @@ interface Database {
         Row: MatchPlayer;
         Insert: Omit<MatchPlayer, 'id' | 'created_at'>; // match_id, player_id, team_number required
         Update: never; // Updates disallowed by policy
+      }
+      user_profiles: { // Add user_profiles table
+        Row: UserProfile;
+        Insert: Omit<UserProfile, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Pick<UserProfile, 'role' | 'updated_at'>>;
       }
     }
     Views: {

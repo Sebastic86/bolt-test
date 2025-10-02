@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award, Plus } from 'lucide-react'; // Import Shield and Award
+import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award, Plus } from 'lucide-react';
+import { AdminOnly } from './RoleBasedComponents'; // Import Shield and Award
 
 interface MatchHistoryProps {
   matchesToday: MatchHistoryItem[];
@@ -431,26 +432,30 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               </button>
                           </>
                       ) : (
-                          <button
-                              onClick={() => handleEditScoreClick(match)}
-                              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50" // Kept blue for edit/add score for now
-                              disabled={savingScore || loading || !!deletingMatchId}
-                              title={match.team1_score !== null ? 'Edit Score' : 'Add Score'}
-                          >
-                              {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
-                          </button>
+                          <AdminOnly>
+                            <button
+                                onClick={() => handleEditScoreClick(match)}
+                                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50" // Kept blue for edit/add score for now
+                                disabled={savingScore || loading || !!deletingMatchId}
+                                title={match.team1_score !== null ? 'Edit Score' : 'Add Score'}
+                            >
+                                {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
+                            </button>
+                          </AdminOnly>
                       )}
                       {/* Edit Players Button - only shown when match is expanded */}
-                      {expandedMatchId === match.id && editingPlayersMatchId !== match.id && (
-                          <button
-                              onClick={() => handleEditPlayersClick(match.id)}
-                              className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-sm hover:bg-green-200 disabled:opacity-50"
-                              disabled={savingScore || savingPlayers || loading || !!deletingMatchId}
-                              title="Edit Player Teams"
-                          >
-                              Edit Players
-                          </button>
-                      )}
+                      <AdminOnly>
+                        {expandedMatchId === match.id && editingPlayersMatchId !== match.id && (
+                            <button
+                                onClick={() => handleEditPlayersClick(match.id)}
+                                className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-sm hover:bg-green-200 disabled:opacity-50"
+                                disabled={savingScore || savingPlayers || loading || !!deletingMatchId}
+                                title="Edit Player Teams"
+                            >
+                                Edit Players
+                            </button>
+                        )}
+                      </AdminOnly>
                       {/* Save/Cancel Players Buttons - shown when editing players */}
                       {editingPlayersMatchId === match.id && (
                           <>
@@ -480,13 +485,16 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                       >
                           {expandedMatchId === match.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
-                      <button
-                          onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
-                          className={`p-1 text-red-500 hover:text-red-700 rounded-sm hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`} // Kept red for delete
-                          disabled={savingScore || loading || !!deletingMatchId}
-                          title="Delete Match"
-                      >
-                          {isDeletingThisMatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      <AdminOnly>
+                        <button
+                            onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
+                            className={`p-1 text-red-500 hover:text-red-700 rounded-sm hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`} // Kept red for delete
+                            disabled={savingScore || loading || !!deletingMatchId}
+                            title="Delete Match"
+                        >
+                            {isDeletingThisMatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      </AdminOnly>
                       </button>
                    </div>
                 </div>

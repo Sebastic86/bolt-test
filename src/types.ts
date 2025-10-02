@@ -73,3 +73,29 @@ export interface TeamStanding {
   winPercentage: number;
   lossPercentage: number;
 }
+
+// Authentication types
+export interface UserProfile {
+  id: string;
+  role: 'admin' | 'normal';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email?: string;
+  profile?: UserProfile;
+}
+
+export interface AuthContextType {
+  user: AuthUser | null;
+  userProfile: UserProfile | null;
+  isLoading: boolean;
+  isAdmin: boolean;
+  isNormalUser: boolean;
+  isAuthenticated: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+}
