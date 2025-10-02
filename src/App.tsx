@@ -897,11 +897,11 @@ function App() {
              )}
 
              {/* User Management - Admin Only */}
-             <AdminOnly>
-               {!loading && !error && (
-                 <UserManagement />
-               )}
-             </AdminOnly>
+             {/*<AdminOnly>*/}
+             {/*  {!loading && !error && (*/}
+             {/*    <UserManagement />*/}
+             {/*  )}*/}
+             {/*</AdminOnly>*/}
            </>
          )}
 

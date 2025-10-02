@@ -11,7 +11,7 @@ interface AuthWrapperProps {
 
 const AuthWrapper: React.FC<AuthWrapperProps> = ({ 
   children, 
-  requireAuth = false, 
+  requireAuth = true,
   requireAdmin = false,
   fallback 
 }) => {

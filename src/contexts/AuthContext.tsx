@@ -52,6 +52,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: supabaseUser.email,
         profile: profile || undefined,
       };
+      console.log('User data:', authUser);
       setUser(authUser);
       setUserProfile(profile);
     } else {

@@ -31,6 +31,17 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 -- Enable RLS on user_profiles
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
+-- Create a security definer function to check if user is admin (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.user_profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Create policies for user_profiles table
 -- Allow users to read their own profile
 CREATE POLICY "Users can view own profile"
@@ -44,48 +55,28 @@ CREATE POLICY "Admins can view all profiles"
   ON public.user_profiles
   FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING (public.is_admin());
 
 -- Allow admins to insert new profiles
 CREATE POLICY "Admins can create profiles"
   ON public.user_profiles
   FOR INSERT
   TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  WITH CHECK (public.is_admin());
 
 -- Allow admins to update profiles
 CREATE POLICY "Admins can update profiles"
   ON public.user_profiles
   FOR UPDATE
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING (public.is_admin());
 
 -- Allow admins to delete profiles
 CREATE POLICY "Admins can delete profiles"
   ON public.user_profiles
   FOR DELETE
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING (public.is_admin());
 
 -- Update existing table policies to support role-based access
 
@@ -99,23 +90,13 @@ CREATE POLICY "Admins can insert players"
   ON public.players
   FOR INSERT
   TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  WITH CHECK (public.is_admin());
 
 CREATE POLICY "Admins can update players"
   ON public.players
   FOR UPDATE
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING (public.is_admin());
 
 -- Update matches table policies
 -- Keep public read access
@@ -127,23 +108,13 @@ CREATE POLICY "Admins can insert matches"
   ON public.matches
   FOR INSERT
   TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  WITH CHECK (public.is_admin());
 
 CREATE POLICY "Admins can update matches"
   ON public.matches
   FOR UPDATE
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING (public.is_admin());
 
 -- Update match_players table policies
 -- Keep public read access
@@ -154,12 +125,7 @@ CREATE POLICY "Admins can insert match players"
   ON public.match_players
   FOR INSERT
   TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  WITH CHECK (public.is_admin());
 
 -- Update teams table policies (if they exist)
 -- Keep public read access for teams
@@ -170,12 +136,7 @@ CREATE POLICY "Admins can update teams"
   ON public.teams
   FOR UPDATE
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING (public.is_admin());
 
 -- Create function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
