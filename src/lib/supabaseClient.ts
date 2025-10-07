@@ -43,7 +43,15 @@ interface Database {
       [_ in never]: never;
     }
     Functions: {
-      [_ in never]: never;
+      admin_list_users: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          email: string;
+          created_at: string;
+          last_sign_in_at: string;
+        }[];
+      };
     }
     Enums: {
       [_ in never]: never;

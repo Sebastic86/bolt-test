@@ -38,8 +38,8 @@ const UserManagement: React.FC = () => {
     setError(null);
     
     try {
-      // Fetch all users from auth.users (this requires admin privileges)
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      // Fetch all users using the admin_list_users function
+      const { data: authUsers, error: authError } = await supabase.rpc('admin_list_users');
       
       if (authError) {
         throw new Error('Unable to fetch users. Make sure you have admin privileges.');
@@ -55,7 +55,7 @@ const UserManagement: React.FC = () => {
       }
 
       // Combine auth users with their profiles
-      const usersWithProfiles: UserWithProfile[] = authUsers.users.map(user => ({
+      const usersWithProfiles: UserWithProfile[] = (authUsers || []).map(user => ({
         id: user.id,
         email: user.email || 'No email',
         profile: profiles?.find(p => p.id === user.id) || null,

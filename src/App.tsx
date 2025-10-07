@@ -896,12 +896,12 @@ function App() {
                   <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
              )}
 
-             {/* User Management - Admin Only */}
-             {/*<AdminOnly>*/}
-             {/*  {!loading && !error && (*/}
-             {/*    <UserManagement />*/}
-             {/*  )}*/}
-             {/*</AdminOnly>*/}
+              User Management - Admin Only
+             <AdminOnly>
+               {!loading && !error && (
+                 <UserManagement />
+               )}
+             </AdminOnly>
            </>
          )}
 
