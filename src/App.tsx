@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from './components/Header'; // Import the new Header component
 import AuthWrapper from './components/AuthWrapper';
-import { AdminOnly, ConditionalButton } from './components/RoleBasedComponents';
+import { AdminOnly } from './components/RoleBasedComponents';
 import UserManagement from './components/UserManagement';
 import TeamCard from './components/TeamCard';
 import EditTeamModal from './components/EditTeamModal';
@@ -12,7 +12,7 @@ import AllMatches from './components/AllMatches';
 import PlayerStandings from './components/PlayerStandings';
 import TopWinPercentageTeams from './components/TopWinPercentageTeams';
 import TopLossPercentageTeams from './components/TopLossPercentageTeams';
-import { Team, Player, Match, MatchPlayer, MatchHistoryItem, PlayerStanding, TeamStanding } from './types';
+import { Team, Player, MatchPlayer, MatchHistoryItem, PlayerStanding, TeamStanding } from './types';
 import { supabase } from './lib/supabaseClient';
 import { Dices, Settings, PlusSquare, List, ArrowLeft } from 'lucide-react';
 
@@ -83,24 +83,6 @@ const fetchAllPlayers = async (): Promise<Player[]> => {
         throw new Error(`Failed to fetch players: ${error.message}`);
     }
     return data || [];
-};
-
-// Fetch available versions from teams table
-const fetchAvailableVersions = async (): Promise<string[]> => {
-    console.log("Fetching available versions...");
-    const { data, error } = await supabase
-        .from('teams')
-        .select('version')
-        .order('version');
-    
-    if (error) {
-        console.error("Error fetching versions:", error);
-        throw new Error(`Failed to fetch versions: ${error.message}`);
-    }
-    
-    // Extract unique versions
-    const versions = Array.from(new Set(data?.map(item => item.version) || []));
-    return versions;
 };
 
 // Function to get a random team from a filtered list
@@ -241,7 +223,7 @@ function App() {
       console.log("[App] Today's matches fetched:", combinedMatches);
       setMatchesToday(combinedMatches);
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('[App] Error fetching match history:', err);
       setHistoryError('Failed to load match history.');
       setMatchesToday([]);
@@ -310,7 +292,7 @@ function App() {
       console.log("[App] All matches fetched:", combinedMatches);
       setAllMatches(combinedMatches);
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('[App] Error fetching all matches:', err);
       setAllMatchesError('Failed to load all match history.');
       setAllMatches([]);
@@ -474,6 +456,7 @@ function App() {
       return true;
 
     } catch (err) {
+        console.error(`[App] Error updating player ${playerId} in DB:`, err);
       return false;
     }
   };
