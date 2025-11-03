@@ -123,6 +123,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       setIsLoading(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
