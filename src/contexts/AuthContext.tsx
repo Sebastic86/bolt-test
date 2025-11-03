@@ -43,18 +43,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Set user and profile data
-  const setUserData = useCallback(async (supabaseUser: User | null) => {
+  // Set user and profile data (set user immediately, fetch profile in background)
+  const setUserData = useCallback((supabaseUser: User | null) => {
     if (supabaseUser) {
-      const profile = await fetchUserProfile(supabaseUser.id);
       const authUser: AuthUser = {
         id: supabaseUser.id,
         email: supabaseUser.email,
-        profile: profile || undefined,
+        profile: undefined,
       };
-      console.log('User data:', authUser);
+      console.log('User data (initial):', authUser);
       setUser(authUser);
-      setUserProfile(profile);
+
+      // Fetch profile asynchronously without blocking auth loading state
+      fetchUserProfile(supabaseUser.id)
+        .then((profile) => {
+          setUserProfile(profile);
+          setUser(prev => (prev ? { ...prev, profile: profile || undefined } : null));
+        })
+        .catch((error) => {
+          console.error('Error fetching user profile:', error);
+        });
     } else {
       setUser(null);
       setUserProfile(null);
@@ -75,7 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         if (mounted) {
-          await setUserData(session?.user || null);
+          setUserData(session?.user || null);
           setIsLoading(false);
         }
       } catch (error) {
@@ -94,7 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Auth state changed:', event, session?.user?.email);
         
         if (mounted) {
-          await setUserData(session?.user || null);
+          setUserData(session?.user || null);
           setIsLoading(false);
         }
       }
