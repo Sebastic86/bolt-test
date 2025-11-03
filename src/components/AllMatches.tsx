@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award, Plus } from 'lucide-react';
+import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Plus } from 'lucide-react';
 import { AdminOnly } from './RoleBasedComponents';
 
 interface AllMatchesProps {
@@ -59,7 +59,6 @@ const AllMatches: React.FC<AllMatchesProps> = ({
   
   // Add player state
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-  const [addingToTeam, setAddingToTeam] = useState<1 | 2 | null>(null);
 
   // Function to handle logo loading errors
   const handleLogoError = (matchId: string, teamNumber: 1 | 2) => {
@@ -163,7 +162,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
       setPenaltiesWinner(null);
       onRefresh();
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error updating score:', err);
       alert('Failed to save score.');
     } finally {
@@ -189,7 +188,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
       console.log(`Match ${matchId} deleted successfully.`);
       onRefresh();
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error deleting match:', err);
       alert('Failed to delete match.');
     } finally {
@@ -223,7 +222,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
 
       // Refresh the data to show updated player assignments
       onRefresh();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error moving player:', err);
       alert('Failed to move player to team.');
     } finally {
@@ -234,7 +233,6 @@ const AllMatches: React.FC<AllMatchesProps> = ({
   const handleSavePlayers = () => {
     setEditingPlayersMatchId(null);
     setSelectedPlayerId('');
-    setAddingToTeam(null);
   };
 
   const handleAddPlayerToTeam = async (matchId: string, teamNumber: 1 | 2) => {
@@ -257,11 +255,10 @@ const AllMatches: React.FC<AllMatchesProps> = ({
 
       // Reset the selection
       setSelectedPlayerId('');
-      setAddingToTeam(null);
       
       // Refresh the data to show the newly added player
       onRefresh();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error adding player to team:', err);
       alert('Failed to add player to team.');
     } finally {

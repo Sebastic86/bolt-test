@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, User, Edit3, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { X, Save, User, Edit3, Check, RefreshCw } from 'lucide-react';
 import { Player } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
@@ -70,7 +70,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       console.error('[SettingsModal] Error in fetchAvailableVersions:', error);
       setVersionsError(error instanceof Error ? error.message : 'Failed to fetch versions');
       // Fallback to default versions if fetch fails
-      setAvailableVersions(['FC25', 'FC24', 'FIFA23', 'FIFA22']);
+      setAvailableVersions(['FC26']);
     } finally {
       setVersionsLoading(false);
     }

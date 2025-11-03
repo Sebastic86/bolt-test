@@ -52,7 +52,7 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
         } catch (error) {
           console.error('[PlayerStandings] Error in fetchVersions:', error);
           // Fallback to default versions if fetch fails
-          setAvailableVersions(['FC25', 'FC24']);
+          setAvailableVersions(['FC25', 'FC26']);
         } finally {
           setVersionsLoading(false);
         }
