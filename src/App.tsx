@@ -23,6 +23,7 @@ const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
 const MAX_RATING_STORAGE_KEY = 'fcGeneratorMaxRating';
 const EXCLUDE_NATIONS_STORAGE_KEY = 'fcGeneratorExcludeNations'; // New key
 const SELECTED_VERSION_STORAGE_KEY = 'fcGeneratorSelectedVersion'; // New key for version
+const MAX_OVR_DIFF_STORAGE_KEY = 'fcGeneratorMaxOvrDiff'; // New key for max OVR difference
 
 // --- Helper Functions for Session Storage ---
 const getInitialRating = (key: string, defaultValue: number): number => {
@@ -88,7 +89,7 @@ const fetchAllPlayers = async (): Promise<Player[]> => {
 };
 
 // Function to get a random team from a filtered list
-const getRandomTeam = (teams: Team[], excludeId?: string): Team | null => {
+const getRandomTeam = (teams: Team[], excludeId?: string, referenceOvr?: number, maxOvrDiff?: number): Team | null => {
   if (teams.length === 0) return null;
   if (teams.length === 1 && teams[0].id === excludeId) return null;
 
@@ -98,16 +99,22 @@ const getRandomTeam = (teams: Team[], excludeId?: string): Team | null => {
     if (availableTeams.length === 0) return null;
   }
 
+  // Filter by OVR difference if specified
+  if (referenceOvr !== undefined && maxOvrDiff !== undefined) {
+    availableTeams = availableTeams.filter(team => Math.abs(team.overallRating - referenceOvr) <= maxOvrDiff);
+    if (availableTeams.length === 0) return null;
+  }
+
   const randomIndex = Math.floor(Math.random() * availableTeams.length);
   return availableTeams[randomIndex];
 };
 
 // Function to get an initial match from a filtered list
-const getInitialMatch = (teams: Team[]): [Team, Team] | null => {
+const getInitialMatch = (teams: Team[], maxOvrDiff?: number): [Team, Team] | null => {
   if (teams.length < 2) return null;
   const team1 = getRandomTeam(teams);
   if (!team1) return null;
-  const team2 = getRandomTeam(teams, team1.id);
+  const team2 = getRandomTeam(teams, team1.id, team1.overallRating, maxOvrDiff);
   if (!team2) return null;
   return [team1, team2];
 };
@@ -124,7 +131,21 @@ function App() {
   const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 4));
   const [maxRating, setMaxRating] = useState<number>(() => getInitialRating(MAX_RATING_STORAGE_KEY, 5));
   const [excludeNations, setExcludeNations] = useState<boolean>(() => getInitialBoolean(EXCLUDE_NATIONS_STORAGE_KEY, true)); // New state
-  const [selectedVersion, setSelectedVersion] = useState<string>(() => getInitialString(SELECTED_VERSION_STORAGE_KEY, 'FC25')); // New state for version
+  const [selectedVersion, setSelectedVersion] = useState<string>(() => getInitialString(SELECTED_VERSION_STORAGE_KEY, 'FC26')); // New state for version
+  const [maxOvrDiff, setMaxOvrDiff] = useState<number>(() => {
+    try {
+      const storedValue = sessionStorage.getItem(MAX_OVR_DIFF_STORAGE_KEY);
+      if (storedValue !== null) {
+        const parsedValue = parseInt(storedValue);
+        if (!isNaN(parsedValue) && parsedValue >= 0) {
+          return parsedValue;
+        }
+      }
+    } catch (error) {
+      console.error(`Error reading ${MAX_OVR_DIFF_STORAGE_KEY} from sessionStorage:`, error);
+    }
+    return 5;
+  }); // New state for max OVR difference
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
 
   // Edit Modal State
@@ -349,7 +370,7 @@ function App() {
         if (!currentMatchIsValid) {
              const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
              const availableForInitialMatch = filteredTeams.filter(t => !playedTeamIds.has(t.id));
-             setMatch(getInitialMatch(availableForInitialMatch));
+             setMatch(getInitialMatch(availableForInitialMatch, maxOvrDiff));
         } else if (filteredTeams.length < 2) {
              setMatch(null);
         }
@@ -357,7 +378,7 @@ function App() {
         setMatch(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredTeams, loading, allTeams, matchesToday]);
+  }, [filteredTeams, loading, allTeams, matchesToday, maxOvrDiff]);
 
 
   const handleGenerateNewMatch = () => {
@@ -365,9 +386,15 @@ function App() {
     const availableTeamsForNewMatchup = filteredTeams.filter(team => !playedTeamIds.has(team.id));
 
     if (availableTeamsForNewMatchup.length >= 2) {
-      const newMatch = getInitialMatch(availableTeamsForNewMatchup);
-      setMatch(newMatch);
-      setError(null);
+      const newMatch = getInitialMatch(availableTeamsForNewMatchup, maxOvrDiff);
+      if (newMatch) {
+        setMatch(newMatch);
+        setError(null);
+      } else {
+        setMatch(null);
+        const nationFilterText = excludeNations ? " excluding nations" : "";
+        setError(`Not enough teams available for a new matchup within the current filter (${minRating.toFixed(1)}-${maxRating.toFixed(1)} stars${nationFilterText}, max OVR diff ${maxOvrDiff}) that haven't played today. Only ${availableTeamsForNewMatchup.length} team(s) remaining.`);
+      }
     } else {
       setMatch(null);
       const nationFilterText = excludeNations ? " excluding nations" : "";
@@ -394,15 +421,17 @@ function App() {
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
     let newOpponent = match[otherTeamIndex];
 
-    // Check if the current opponent is invalid (same as new team, already played, or doesn't match filters)
-    const currentOpponentIsValid = filteredTeams.some(t => t.id === newOpponent.id) && !playedTeamIds.has(newOpponent.id);
+    // Check if the current opponent is invalid (same as new team, already played, doesn't match filters, or OVR diff too large)
+    const currentOpponentIsValid = filteredTeams.some(t => t.id === newOpponent.id) &&
+                                    !playedTeamIds.has(newOpponent.id) &&
+                                    Math.abs(newOpponent.overallRating - newTeam.overallRating) <= maxOvrDiff;
 
     if (newOpponent.id === newTeam.id || !currentOpponentIsValid) {
-      const potentialOpponent = getRandomTeam(potentialOpponentPool);
+      const potentialOpponent = getRandomTeam(potentialOpponentPool, undefined, newTeam.overallRating, maxOvrDiff);
       if (potentialOpponent) {
         newOpponent = potentialOpponent;
       } else {
-        console.warn("Could not find a different, unplayed, filter-matching opponent.");
+        console.warn("Could not find a different, unplayed, filter-matching opponent with acceptable OVR difference.");
         // Optionally, keep the old opponent if no better one is found, or handle error
       }
     }
@@ -412,21 +441,23 @@ function App() {
     updatedMatch[otherTeamIndex] = newOpponent;
     setMatch(updatedMatch);
     handleCloseEditModal();
-  }, [match, editingTeamIndex, filteredTeams, matchesToday]);
+  }, [match, editingTeamIndex, filteredTeams, matchesToday, maxOvrDiff]);
 
   // --- Settings Modal Handlers ---
   const handleOpenSettingsModal = () => setIsSettingsModalOpen(true);
   const handleCloseSettingsModal = () => setIsSettingsModalOpen(false);
-  const handleSaveSettings = (newMinRating: number, newMaxRating: number, newExcludeNations: boolean, newSelectedVersion: string) => {
+  const handleSaveSettings = (newMinRating: number, newMaxRating: number, newExcludeNations: boolean, newSelectedVersion: string, newMaxOvrDiff: number) => {
     setMinRating(newMinRating);
     setMaxRating(newMaxRating);
     setExcludeNations(newExcludeNations); // Save new setting
     setSelectedVersion(newSelectedVersion); // Save new version setting
+    setMaxOvrDiff(newMaxOvrDiff); // Save new max OVR diff setting
     try {
       sessionStorage.setItem(MIN_RATING_STORAGE_KEY, newMinRating.toString());
       sessionStorage.setItem(MAX_RATING_STORAGE_KEY, newMaxRating.toString());
       sessionStorage.setItem(EXCLUDE_NATIONS_STORAGE_KEY, newExcludeNations.toString()); // Persist new setting
       sessionStorage.setItem(SELECTED_VERSION_STORAGE_KEY, newSelectedVersion); // Persist new version setting
+      sessionStorage.setItem(MAX_OVR_DIFF_STORAGE_KEY, newMaxOvrDiff.toString()); // Persist new max OVR diff setting
     } catch (error) {
       console.error("Error saving settings to sessionStorage:", error);
     }
@@ -928,6 +959,7 @@ function App() {
         initialMaxRating={maxRating}
         initialExcludeNations={excludeNations} // Pass initial state
         initialSelectedVersion={selectedVersion} // Pass initial version state
+        initialMaxOvrDiff={maxOvrDiff} // Pass initial max OVR diff state
         allPlayers={allPlayers}
         onUpdatePlayerName={handleUpdatePlayerName}
       />

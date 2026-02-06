@@ -6,11 +6,12 @@ import { supabase } from '../lib/supabaseClient';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (minRating: number, maxRating: number, excludeNations: boolean, selectedVersion: string) => void; // Updated signature
+  onSave: (minRating: number, maxRating: number, excludeNations: boolean, selectedVersion: string, maxOvrDiff: number) => void; // Updated signature
   initialMinRating: number;
   initialMaxRating: number;
   initialExcludeNations: boolean; // New prop
   initialSelectedVersion: string; // New prop for version
+  initialMaxOvrDiff: number; // New prop for max OVR difference
   allPlayers: Player[];
   onUpdatePlayerName: (playerId: string, newName: string) => Promise<boolean>;
 }
@@ -33,6 +34,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialMaxRating,
   initialExcludeNations, // Use new prop
   initialSelectedVersion, // Use new version prop
+  initialMaxOvrDiff, // Use new max OVR diff prop
   allPlayers,
   onUpdatePlayerName,
 }) => {
@@ -40,6 +42,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [maxRating, setMaxRating] = useState<number>(initialMaxRating);
   const [excludeNations, setExcludeNations] = useState<boolean>(initialExcludeNations); // State for checkbox
   const [selectedVersion, setSelectedVersion] = useState<string>(initialSelectedVersion); // State for version
+  const [maxOvrDiff, setMaxOvrDiff] = useState<number>(initialMaxOvrDiff); // State for max OVR difference
   const [availableVersions, setAvailableVersions] = useState<string[]>([]); // State for available versions
   const [versionsLoading, setVersionsLoading] = useState<boolean>(false); // Loading state for versions
   const [versionsError, setVersionsError] = useState<string | null>(null); // Error state for versions
@@ -79,11 +82,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Initialize/Reset editing state when modal opens or players change
   useEffect(() => {
     if (isOpen) {
-      console.log('[SettingsModal] Initializing state:', { initialMinRating, initialMaxRating, initialExcludeNations, initialSelectedVersion });
+      console.log('[SettingsModal] Initializing state:', { initialMinRating, initialMaxRating, initialExcludeNations, initialSelectedVersion, initialMaxOvrDiff });
       setMinRating(initialMinRating);
       setMaxRating(initialMaxRating);
       setExcludeNations(initialExcludeNations); // Initialize checkbox state
       setSelectedVersion(initialSelectedVersion); // Initialize version state
+      setMaxOvrDiff(initialMaxOvrDiff); // Initialize max OVR diff state
       setRatingError(null);
 
       const initialEditingState: EditingPlayerState = {};
@@ -105,7 +109,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       console.log('[SettingsModal] Closing, clearing state.');
       setEditingPlayers({});
     }
-  }, [isOpen, initialMinRating, initialMaxRating, initialExcludeNations, initialSelectedVersion, allPlayers]); // Add initialSelectedVersion dependency
+  }, [isOpen, initialMinRating, initialMaxRating, initialExcludeNations, initialSelectedVersion, initialMaxOvrDiff, allPlayers]); // Add initialMaxOvrDiff dependency
 
   const handleSaveSettings = () => {
     console.log('[SettingsModal] handleSaveSettings called.');
@@ -133,8 +137,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setRatingError(null);
 
     try {
-        console.log('[SettingsModal] Calling onSave with excludeNations and selectedVersion:', excludeNations, selectedVersion); // Log new values
-        onSave(min, max, excludeNations, selectedVersion); // Pass excludeNations and selectedVersion state
+        console.log('[SettingsModal] Calling onSave with excludeNations, selectedVersion, and maxOvrDiff:', excludeNations, selectedVersion, maxOvrDiff); // Log new values
+        onSave(min, max, excludeNations, selectedVersion, maxOvrDiff); // Pass excludeNations, selectedVersion, and maxOvrDiff state
         console.log('[SettingsModal] onSave finished.');
 
         console.log('[SettingsModal] Calling onClose...');
@@ -316,6 +320,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         Error loading versions: {versionsError}. Using fallback options.
                     </p>
                 )}
+            </div>
+
+            {/* Max OVR Difference */}
+            <div className="mb-4">
+                <label htmlFor="max-ovr-diff" className="block text-sm font-medium text-gray-700 mb-2">
+                    Max OVR Diff
+                </label>
+                <input
+                    type="number"
+                    id="max-ovr-diff"
+                    value={maxOvrDiff}
+                    onChange={(e) => setMaxOvrDiff(parseInt(e.target.value) || 0)}
+                    min="0"
+                    max="99"
+                    step="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium sm:text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                    Maximum allowed OVR difference between teams when generating random matches
+                </p>
             </div>
 
             {/* Exclude Nations Checkbox */}
