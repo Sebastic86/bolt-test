@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
 import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award, Plus } from 'lucide-react';
 import { AdminOnly } from './RoleBasedComponents'; // Import Shield and Award
+import { getLogoPath } from '../utils/logoUtils';
 
 interface MatchHistoryProps {
   matchesToday: MatchHistoryItem[];
@@ -323,7 +324,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           <Shield className="w-5 h-5" aria-label="Team 1 logo fallback" />
                         ) : (
                           <img
-                            src={match.team1_logoUrl}
+                            src={getLogoPath(match.team1_logoUrl)}
                             alt={match.team1_name}
                             className="w-full h-full object-contain"
                             onError={() => handleLogoError(match.id, 1)}
@@ -400,7 +401,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                           <Shield className="w-5 h-5" aria-label="Team 2 logo fallback" />
                         ) : (
                           <img
-                            src={match.team2_logoUrl}
+                            src={getLogoPath(match.team2_logoUrl)}
                             alt={match.team2_name}
                             className="w-full h-full object-contain"
                             onError={() => handleLogoError(match.id, 2)}

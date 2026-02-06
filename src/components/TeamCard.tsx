@@ -3,6 +3,7 @@ import { Team } from '../types';
 import * as LucideIcons from 'lucide-react'; // Keep Star icon import
 import { Pencil, Shield } from 'lucide-react'; // Import Pencil and Shield icons
 import { AdminOnly } from './RoleBasedComponents';
+import { getLogoPath } from '../utils/logoUtils';
 
 interface TeamCardProps {
   team: Team;
@@ -89,7 +90,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
           <Shield className="w-10 h-10" aria-label="Team logo fallback" />
         ) : (
           <img
-            src={team.logoUrl}
+            src={getLogoPath(team.logoUrl)}
             alt={`${team.name} logo`}
             className="w-full h-full object-contain"
             onError={handleLogoError} // Use the handler

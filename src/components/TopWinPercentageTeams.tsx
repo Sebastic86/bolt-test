@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { TeamStanding, MatchHistoryItem } from '../types';
 import TeamMatchDetails from './TeamMatchDetails';
+import { getLogoPath } from '../utils/logoUtils';
 
 interface TopWinPercentageTeamsProps {
   teamStandings: TeamStanding[];
@@ -202,8 +203,8 @@ const TopWinPercentageTeams: React.FC<TopWinPercentageTeamsProps> = ({
                     {index + 1}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <img 
-                      src={team.logoUrl} 
+                    <img
+                      src={getLogoPath(team.logoUrl)}
                       alt={`${team.teamName} logo`}
                       className="h-8 w-8 object-contain"
                       onError={(e) => {
