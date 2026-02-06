@@ -89,7 +89,7 @@ const fetchAllPlayers = async (): Promise<Player[]> => {
 };
 
 // Function to get a random team from a filtered list
-const getRandomTeam = (teams: Team[], excludeId?: string, referenceOvr?: number, maxOvrDiff?: number): Team | null => {
+const getRandomTeam = (teams: Team[], excludeId?: string, referenceOvr?: number, maxOvrDiff?: number, referenceLeague?: string): Team | null => {
   if (teams.length === 0) return null;
   if (teams.length === 1 && teams[0].id === excludeId) return null;
 
@@ -105,6 +105,12 @@ const getRandomTeam = (teams: Team[], excludeId?: string, referenceOvr?: number,
     if (availableTeams.length === 0) return null;
   }
 
+  // Filter by league if reference team is a Nation
+  if (referenceLeague === 'Nation') {
+    availableTeams = availableTeams.filter(team => team.league === 'Nation');
+    if (availableTeams.length === 0) return null;
+  }
+
   const randomIndex = Math.floor(Math.random() * availableTeams.length);
   return availableTeams[randomIndex];
 };
@@ -114,7 +120,7 @@ const getInitialMatch = (teams: Team[], maxOvrDiff?: number): [Team, Team] | nul
   if (teams.length < 2) return null;
   const team1 = getRandomTeam(teams);
   if (!team1) return null;
-  const team2 = getRandomTeam(teams, team1.id, team1.overallRating, maxOvrDiff);
+  const team2 = getRandomTeam(teams, team1.id, team1.overallRating, maxOvrDiff, team1.league);
   if (!team2) return null;
   return [team1, team2];
 };
@@ -130,7 +136,7 @@ function App() {
   // Settings State
   const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 4));
   const [maxRating, setMaxRating] = useState<number>(() => getInitialRating(MAX_RATING_STORAGE_KEY, 5));
-  const [excludeNations, setExcludeNations] = useState<boolean>(() => getInitialBoolean(EXCLUDE_NATIONS_STORAGE_KEY, true)); // New state
+  const [excludeNations, setExcludeNations] = useState<boolean>(() => getInitialBoolean(EXCLUDE_NATIONS_STORAGE_KEY, false)); // New state
   const [selectedVersion, setSelectedVersion] = useState<string>(() => getInitialString(SELECTED_VERSION_STORAGE_KEY, 'FC26')); // New state for version
   const [maxOvrDiff, setMaxOvrDiff] = useState<number>(() => {
     try {
@@ -421,17 +427,19 @@ function App() {
     const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
     let newOpponent = match[otherTeamIndex];
 
-    // Check if the current opponent is invalid (same as new team, already played, doesn't match filters, or OVR diff too large)
+    // Check if the current opponent is invalid (same as new team, already played, doesn't match filters, OVR diff too large, or league mismatch)
+    const leagueMatch = newTeam.league === 'Nation' ? newOpponent.league === 'Nation' : true;
     const currentOpponentIsValid = filteredTeams.some(t => t.id === newOpponent.id) &&
                                     !playedTeamIds.has(newOpponent.id) &&
-                                    Math.abs(newOpponent.overallRating - newTeam.overallRating) <= maxOvrDiff;
+                                    Math.abs(newOpponent.overallRating - newTeam.overallRating) <= maxOvrDiff &&
+                                    leagueMatch;
 
     if (newOpponent.id === newTeam.id || !currentOpponentIsValid) {
-      const potentialOpponent = getRandomTeam(potentialOpponentPool, undefined, newTeam.overallRating, maxOvrDiff);
+      const potentialOpponent = getRandomTeam(potentialOpponentPool, undefined, newTeam.overallRating, maxOvrDiff, newTeam.league);
       if (potentialOpponent) {
         newOpponent = potentialOpponent;
       } else {
-        console.warn("Could not find a different, unplayed, filter-matching opponent with acceptable OVR difference.");
+        console.warn("Could not find a different, unplayed, filter-matching opponent with acceptable OVR difference and league constraint.");
         // Optionally, keep the old opponent if no better one is found, or handle error
       }
     }
