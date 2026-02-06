@@ -218,6 +218,9 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
                 <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
                   Pts
                 </th>
+                <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20" title="Win Rate">
+                  Win %
+                </th>
                 <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
                   GF
                 </th>
@@ -252,6 +255,9 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
                     {player.points}
                   </td>
                   <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
+                    {player.matchesPlayed > 0 ? `${((player.points / player.matchesPlayed) * 100).toFixed(1)}%` : '-'}
+                  </td>
+                  <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
                     {player.goalsFor}
                   </td>
                   <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
@@ -272,7 +278,7 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
           </table>
         </div>
       )}
-       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win, including penalties wins), GF: Goals For, GA: Goals Against, GD: Goal Difference, Matches: Total matches played, Avg OVR: Average Overall Rating of Teams Played. Sorted by Pts, then GD, then GF. Click on a player to see all their matches.</p>
+       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win, including penalties wins), Win %: Win Rate percentage, GF: Goals For, GA: Goals Against, GD: Goal Difference, Matches: Total matches played, Avg OVR: Average Overall Rating of Teams Played. Sorted by Pts, then GD, then GF. Click on a player to see all their matches.</p>
       
       {/* Player Match Details Modal */}
       {selectedPlayer && (

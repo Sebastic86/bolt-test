@@ -12,6 +12,7 @@ import AllMatches from './components/AllMatches';
 import PlayerStandings from './components/PlayerStandings';
 import TopWinPercentageTeams from './components/TopWinPercentageTeams';
 import TopLossPercentageTeams from './components/TopLossPercentageTeams';
+import PlayerWinMatrix from './components/PlayerWinMatrix';
 import { Team, Player, MatchPlayer, MatchHistoryItem, PlayerStanding, TeamStanding } from './types';
 import { supabase } from './lib/supabaseClient';
 import { Dices, Settings, PlusSquare, List, ArrowLeft } from 'lucide-react';
@@ -877,6 +878,11 @@ function App() {
              {/* Top Loss Percentage Teams */}
              {!loading && !error && (
                   <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
+             )}
+
+             {/* Player Win Percentage Matrix */}
+             {!loading && !error && (
+                  <PlayerWinMatrix allPlayers={allPlayers} allMatches={allMatches} loading={loadingAllMatches} error={allMatchesError} />
              )}
 
               User Management - Admin Only
