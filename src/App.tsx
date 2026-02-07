@@ -249,6 +249,12 @@ function App() {
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [match, setMatch] = useState<[Team, Team] | null>(null);
+  const [lastMatchPlayers, setLastMatchPlayers] = useState<{
+    team1Id: string;
+    team2Id: string;
+    team1Players: Player[];
+    team2Players: Player[];
+  } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -507,8 +513,11 @@ function App() {
   }, [filteredTeams, loading, allTeams, matchesToday, maxOvrDiff, matchupStats]);
 
 
-  const handleGenerateNewMatch = () => {
+  const handleGenerateNewMatch = (extraExcludedTeamIds?: Set<string>) => {
     const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
+    if (extraExcludedTeamIds) {
+      extraExcludedTeamIds.forEach(teamId => playedTeamIds.add(teamId));
+    }
     const availableTeamsForNewMatchup = filteredTeams.filter(team => !playedTeamIds.has(team.id));
 
     if (availableTeamsForNewMatchup.length >= 2) {
@@ -637,8 +646,24 @@ function App() {
   // --- Add Match Modal Handlers ---
   const handleOpenAddMatchModal = () => setIsAddMatchModalOpen(true);
   const handleCloseAddMatchModal = () => setIsAddMatchModalOpen(false);
-  const handleMatchSaved = () => {
+  const handleMatchSaved = (payload: {
+    team1Id: string;
+    team2Id: string;
+    team1Players: Player[];
+    team2Players: Player[];
+    action: 'next' | 'rematch';
+  }) => {
     setRefreshHistoryTrigger(prev => prev + 1);
+    setLastMatchPlayers({
+      team1Id: payload.team1Id,
+      team2Id: payload.team2Id,
+      team1Players: payload.team1Players,
+      team2Players: payload.team2Players,
+    });
+
+    if (payload.action === 'next') {
+      handleGenerateNewMatch(new Set([payload.team1Id, payload.team2Id]));
+    }
   };
 
   // --- Manual Refresh Handler ---
@@ -675,6 +700,14 @@ function App() {
   const playedTeamIdsToday = useMemo(() => new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id])), [matchesToday]);
   const availableForNewMatchupCount = useMemo(() => filteredTeams.filter(team => !playedTeamIdsToday.has(team.id)).length, [filteredTeams, playedTeamIdsToday]);
   const canGenerateNewMatch = availableForNewMatchupCount >= 2;
+  const initialMatchPlayers = useMemo(() => {
+    if (!match || !lastMatchPlayers) return null;
+    if (lastMatchPlayers.team1Id !== match[0].id || lastMatchPlayers.team2Id !== match[1].id) return null;
+    return {
+      team1Players: lastMatchPlayers.team1Players,
+      team2Players: lastMatchPlayers.team2Players,
+    };
+  }, [match, lastMatchPlayers]);
 
   // Calculate Player Standings
   const playerStandings = useMemo(() => {
@@ -942,7 +975,7 @@ function App() {
              {/* Button Group Container - Removed gradient, added shadow */}
              <div className="inline-flex rounded-lg shadow-md overflow-hidden">
                <button
-                 onClick={handleGenerateNewMatch}
+                 onClick={() => handleGenerateNewMatch()}
                  className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
                  disabled={!canGenerateNewMatch}
                  title={canGenerateNewMatch ? "Generate New Random Matchup (excluding teams played today)" : "Not enough unplayed teams available in filter"}
@@ -1094,7 +1127,14 @@ function App() {
         allPlayers={allPlayers}
         onUpdatePlayerName={handleUpdatePlayerName}
       />
-       <AddMatchModal isOpen={isAddMatchModalOpen} onClose={handleCloseAddMatchModal} matchTeams={match} onMatchSaved={handleMatchSaved} />
+       <AddMatchModal
+         isOpen={isAddMatchModalOpen}
+         onClose={handleCloseAddMatchModal}
+         matchTeams={match}
+         onMatchSaved={handleMatchSaved}
+         initialTeam1Players={initialMatchPlayers?.team1Players}
+         initialTeam2Players={initialMatchPlayers?.team2Players}
+       />
       </AuthWrapper>
     </div>
   );
