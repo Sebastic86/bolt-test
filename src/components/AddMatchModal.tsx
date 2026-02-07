@@ -118,6 +118,8 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
     setError(null);
     console.log('[AddMatchModal] Saving match...'); // DEBUG
 
+    let newMatchId: string | null = null;
+
     try {
       const { data: matchData, error: matchError } = await supabase
         .from('matches')
@@ -133,7 +135,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
         throw new Error('Failed to save match details.');
       }
 
-      const newMatchId = matchData.id;
+      newMatchId = matchData.id;
       console.log(`[AddMatchModal] Match inserted with ID: ${newMatchId}`); // DEBUG
 
       const playersToInsert = [
@@ -158,6 +160,17 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
       onClose();
 
     } catch (err: any) {
+      if (newMatchId) {
+        const { error: cleanupError } = await supabase
+          .from('matches')
+          .delete()
+          .eq('id', newMatchId);
+
+        if (cleanupError) {
+          console.error('[AddMatchModal] Cleanup failed for match:', cleanupError);
+        }
+      }
+
       setError(err.message || 'An unexpected error occurred while saving.');
       console.error('[AddMatchModal] Save match error:', err); // DEBUG
     } finally {

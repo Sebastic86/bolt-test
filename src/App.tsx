@@ -16,6 +16,7 @@ import PlayerWinMatrix from './components/PlayerWinMatrix';
 import PlayerTopTeams from './components/PlayerTopTeams';
 import { Team, Player, MatchPlayer, MatchHistoryItem, PlayerStanding, TeamStanding } from './types';
 import { supabase } from './lib/supabaseClient';
+import { useAuth } from './contexts/AuthContext';
 import { Dices, Settings, PlusSquare, List, ArrowLeft } from 'lucide-react';
 
 // --- Constants for Session Storage ---
@@ -65,6 +66,160 @@ const getInitialString = (key: string, defaultValue: string): string => {
   return defaultValue;
 };
 
+// --- Matchup Weighting Helpers ---
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_RECENCY_DAYS = 30;
+
+type MatchupStats = {
+  teamCounts: Map<string, number>;
+  lastPlayed: Map<string, number>;
+  pairCounts: Map<string, number>;
+  pairLastPlayed: Map<string, number>;
+  maxTeamCount: number;
+};
+
+const getPairKey = (team1Id: string, team2Id: string): string => {
+  return team1Id < team2Id ? `${team1Id}|${team2Id}` : `${team2Id}|${team1Id}`;
+};
+
+const buildMatchupStats = (matches: MatchHistoryItem[]): MatchupStats => {
+  const teamCounts = new Map<string, number>();
+  const lastPlayed = new Map<string, number>();
+  const pairCounts = new Map<string, number>();
+  const pairLastPlayed = new Map<string, number>();
+  let maxTeamCount = 0;
+
+  matches.forEach(match => {
+    const playedAt = Date.parse(match.played_at);
+    const teamIds = [match.team1_id, match.team2_id];
+
+    teamIds.forEach(teamId => {
+      const nextCount = (teamCounts.get(teamId) ?? 0) + 1;
+      teamCounts.set(teamId, nextCount);
+      if (nextCount > maxTeamCount) {
+        maxTeamCount = nextCount;
+      }
+
+      if (!Number.isNaN(playedAt)) {
+        const previousPlayed = lastPlayed.get(teamId) ?? 0;
+        if (playedAt > previousPlayed) {
+          lastPlayed.set(teamId, playedAt);
+        }
+      }
+    });
+
+    const pairKey = getPairKey(match.team1_id, match.team2_id);
+    pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1);
+
+    if (!Number.isNaN(playedAt)) {
+      const previousPairPlayed = pairLastPlayed.get(pairKey) ?? 0;
+      if (playedAt > previousPairPlayed) {
+        pairLastPlayed.set(pairKey, playedAt);
+      }
+    }
+  });
+
+  return { teamCounts, lastPlayed, pairCounts, pairLastPlayed, maxTeamCount };
+};
+
+function getWeightedRandom<T>(items: T[], getWeight: (item: T) => number): T | null {
+  if (items.length === 0) return null;
+
+  const weights = items.map(item => Math.max(0, getWeight(item)));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+
+  if (totalWeight <= 0) {
+    return items[Math.floor(Math.random() * items.length)];
+  }
+
+  let threshold = Math.random() * totalWeight;
+  for (let i = 0; i < items.length; i++) {
+    threshold -= weights[i];
+    if (threshold <= 0) {
+      return items[i];
+    }
+  }
+
+  return items[items.length - 1];
+}
+
+const getTeamWeight = (teamId: string, stats: MatchupStats, now: number): number => {
+  const count = stats.teamCounts.get(teamId) ?? 0;
+  const usageWeight = Math.max(1, stats.maxTeamCount - count + 1);
+  const lastPlayed = stats.lastPlayed.get(teamId);
+  const daysSincePlayed = lastPlayed !== undefined
+    ? Math.floor(Math.max(0, now - lastPlayed) / DAY_MS)
+    : MAX_RECENCY_DAYS;
+  const recencyWeight = Math.min(MAX_RECENCY_DAYS, daysSincePlayed) + 1;
+
+  return usageWeight * recencyWeight;
+};
+
+const getPairWeight = (pairKey: string, stats: MatchupStats, now: number): number => {
+  const pairCount = stats.pairCounts.get(pairKey) ?? 0;
+  const lastPlayed = stats.pairLastPlayed.get(pairKey);
+  const daysSincePlayed = lastPlayed !== undefined
+    ? Math.floor(Math.max(0, now - lastPlayed) / DAY_MS)
+    : MAX_RECENCY_DAYS;
+  const recencyWeight = Math.min(MAX_RECENCY_DAYS, daysSincePlayed) + 1;
+  const frequencyWeight = 1 / (1 + pairCount);
+
+  return recencyWeight * frequencyWeight;
+};
+
+const getSmartTeam = (teams: Team[], stats: MatchupStats, now: number): Team | null => {
+  return getWeightedRandom(teams, team => getTeamWeight(team.id, stats, now));
+};
+
+const getSmartOpponent = (
+  teams: Team[],
+  referenceTeam: Team,
+  stats: MatchupStats,
+  now: number,
+  maxOvrDiff?: number,
+  referenceLeague?: string
+): Team | null => {
+  if (teams.length === 0) return null;
+
+  let availableTeams = teams.filter(team => team.id !== referenceTeam.id);
+
+  if (referenceLeague === 'Nation') {
+    availableTeams = availableTeams.filter(team => team.league === 'Nation');
+  }
+
+  if (maxOvrDiff !== undefined) {
+    availableTeams = availableTeams.filter(
+      team => Math.abs(team.overallRating - referenceTeam.overallRating) <= maxOvrDiff
+    );
+  }
+
+  if (availableTeams.length === 0) return null;
+
+  return getWeightedRandom(availableTeams, team => {
+    const pairKey = getPairKey(referenceTeam.id, team.id);
+    const pairWeight = getPairWeight(pairKey, stats, now);
+    const teamWeight = getTeamWeight(team.id, stats, now);
+    const diff = Math.abs(team.overallRating - referenceTeam.overallRating);
+    const ovrWeight = maxOvrDiff !== undefined ? Math.max(1, maxOvrDiff - diff + 1) : 1;
+
+    return teamWeight * pairWeight * ovrWeight;
+  });
+};
+
+const getSmartMatch = (
+  teams: Team[],
+  stats: MatchupStats,
+  now: number,
+  maxOvrDiff?: number
+): [Team, Team] | null => {
+  if (teams.length < 2) return null;
+  const team1 = getSmartTeam(teams, stats, now);
+  if (!team1) return null;
+  const team2 = getSmartOpponent(teams, team1, stats, now, maxOvrDiff, team1.league);
+  if (!team2) return null;
+  return [team1, team2];
+};
+
 
 // Fetch all teams from Supabase
 const fetchAllTeams = async (): Promise<Team[]> => {
@@ -88,45 +243,9 @@ const fetchAllPlayers = async (): Promise<Player[]> => {
     return data || [];
 };
 
-// Function to get a random team from a filtered list
-const getRandomTeam = (teams: Team[], excludeId?: string, referenceOvr?: number, maxOvrDiff?: number, referenceLeague?: string): Team | null => {
-  if (teams.length === 0) return null;
-  if (teams.length === 1 && teams[0].id === excludeId) return null;
-
-  let availableTeams = teams;
-  if (excludeId) {
-    availableTeams = teams.filter(team => team.id !== excludeId);
-    if (availableTeams.length === 0) return null;
-  }
-
-  // Filter by OVR difference if specified
-  if (referenceOvr !== undefined && maxOvrDiff !== undefined) {
-    availableTeams = availableTeams.filter(team => Math.abs(team.overallRating - referenceOvr) <= maxOvrDiff);
-    if (availableTeams.length === 0) return null;
-  }
-
-  // Filter by league if reference team is a Nation
-  if (referenceLeague === 'Nation') {
-    availableTeams = availableTeams.filter(team => team.league === 'Nation');
-    if (availableTeams.length === 0) return null;
-  }
-
-  const randomIndex = Math.floor(Math.random() * availableTeams.length);
-  return availableTeams[randomIndex];
-};
-
-// Function to get an initial match from a filtered list
-const getInitialMatch = (teams: Team[], maxOvrDiff?: number): [Team, Team] | null => {
-  if (teams.length < 2) return null;
-  const team1 = getRandomTeam(teams);
-  if (!team1) return null;
-  const team2 = getRandomTeam(teams, team1.id, team1.overallRating, maxOvrDiff, team1.league);
-  if (!team2) return null;
-  return [team1, team2];
-};
-
 
 function App() {
+  const { isAdmin } = useAuth();
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [match, setMatch] = useState<[Team, Team] | null>(null);
@@ -173,6 +292,7 @@ function App() {
   const [allMatchesError, setAllMatchesError] = useState<string | null>(null);
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
 
+  const matchupStats = useMemo(() => buildMatchupStats(allMatches), [allMatches]);
 
   // Filtered teams based on rating, nation, and version settings
   const filteredTeams = useMemo(() => {
@@ -192,9 +312,9 @@ function App() {
 
     try {
       const todayStart = new Date();
-      todayStart.setUTCHours(0, 0, 0, 0);
+      todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date(todayStart);
-      todayEnd.setUTCDate(todayStart.getUTCDate() + 1);
+      todayEnd.setDate(todayStart.getDate() + 1);
 
       const { data: matchesData, error: matchesError } = await supabase
         .from('matches')
@@ -376,7 +496,7 @@ function App() {
         if (!currentMatchIsValid) {
              const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
              const availableForInitialMatch = filteredTeams.filter(t => !playedTeamIds.has(t.id));
-             setMatch(getInitialMatch(availableForInitialMatch, maxOvrDiff));
+             setMatch(getSmartMatch(availableForInitialMatch, matchupStats, Date.now(), maxOvrDiff));
         } else if (filteredTeams.length < 2) {
              setMatch(null);
         }
@@ -384,7 +504,7 @@ function App() {
         setMatch(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredTeams, loading, allTeams, matchesToday, maxOvrDiff]);
+  }, [filteredTeams, loading, allTeams, matchesToday, maxOvrDiff, matchupStats]);
 
 
   const handleGenerateNewMatch = () => {
@@ -392,7 +512,7 @@ function App() {
     const availableTeamsForNewMatchup = filteredTeams.filter(team => !playedTeamIds.has(team.id));
 
     if (availableTeamsForNewMatchup.length >= 2) {
-      const newMatch = getInitialMatch(availableTeamsForNewMatchup, maxOvrDiff);
+      const newMatch = getSmartMatch(availableTeamsForNewMatchup, matchupStats, Date.now(), maxOvrDiff);
       if (newMatch) {
         setMatch(newMatch);
         setError(null);
@@ -435,7 +555,14 @@ function App() {
                                     leagueMatch;
 
     if (newOpponent.id === newTeam.id || !currentOpponentIsValid) {
-      const potentialOpponent = getRandomTeam(potentialOpponentPool, undefined, newTeam.overallRating, maxOvrDiff, newTeam.league);
+      const potentialOpponent = getSmartOpponent(
+        potentialOpponentPool,
+        newTeam,
+        matchupStats,
+        Date.now(),
+        maxOvrDiff,
+        newTeam.league
+      );
       if (potentialOpponent) {
         newOpponent = potentialOpponent;
       } else {
@@ -449,7 +576,7 @@ function App() {
     updatedMatch[otherTeamIndex] = newOpponent;
     setMatch(updatedMatch);
     handleCloseEditModal();
-  }, [match, editingTeamIndex, filteredTeams, matchesToday, maxOvrDiff]);
+  }, [match, editingTeamIndex, filteredTeams, matchesToday, maxOvrDiff, matchupStats]);
 
   // --- Settings Modal Handlers ---
   const handleOpenSettingsModal = () => setIsSettingsModalOpen(true);
@@ -475,6 +602,10 @@ function App() {
 
   // --- Player Name Update Handler ---
   const handleUpdatePlayerName = async (playerId: string, newName: string): Promise<boolean> => {
+    if (!isAdmin) {
+      console.warn('[App] Non-admin attempted to update a player name.');
+      return false;
+    }
     console.log(`[App] Attempting to update player ${playerId} to name: ${newName}`);
     try {
       const { error } = await supabase
@@ -569,27 +700,25 @@ function App() {
       const team2 = teamMap.get(match.team2_id);
 
       const hasScores = match.team1_score !== null && match.team2_score !== null;
+      if (!hasScores) return;
+
       let winnerTeamNumber: 1 | 2 | null = null;
-      if (hasScores) {
-        const score1 = match.team1_score!;
-        const score2 = match.team2_score!;
-        if (score1 > score2) winnerTeamNumber = 1;
-        else if (score2 > score1) winnerTeamNumber = 2;
-        // Check for penalties winner if scores are equal
-        else if (score1 === score2 && match.penalties_winner) {
-          winnerTeamNumber = match.penalties_winner;
-        }
+      const score1 = match.team1_score!;
+      const score2 = match.team2_score!;
+      if (score1 > score2) winnerTeamNumber = 1;
+      else if (score2 > score1) winnerTeamNumber = 2;
+      // Check for penalties winner if scores are equal
+      else if (score1 === score2 && match.penalties_winner) {
+        winnerTeamNumber = match.penalties_winner;
       }
 
       match.team1_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          if (hasScores) {
-            standing.goalsFor += match.team1_score!;
-            standing.goalsAgainst += match.team2_score!;
-            if (winnerTeamNumber === 1) {
-              standing.points += 1;
-            }
+          standing.goalsFor += match.team1_score!;
+          standing.goalsAgainst += match.team2_score!;
+          if (winnerTeamNumber === 1) {
+            standing.points += 1;
           }
           if (team1) {
             standing.totalOverallRating += team1.overallRating;
@@ -601,12 +730,10 @@ function App() {
       match.team2_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          if (hasScores) {
-            standing.goalsFor += match.team2_score!;
-            standing.goalsAgainst += match.team1_score!;
-            if (winnerTeamNumber === 2) {
-              standing.points += 1;
-            }
+          standing.goalsFor += match.team2_score!;
+          standing.goalsAgainst += match.team1_score!;
+          if (winnerTeamNumber === 2) {
+            standing.points += 1;
           }
           if (team2) {
             standing.totalOverallRating += team2.overallRating;
@@ -656,27 +783,25 @@ function App() {
       const team2 = teamMap.get(match.team2_id);
 
       const hasScores = match.team1_score !== null && match.team2_score !== null;
+      if (!hasScores) return;
+
       let winnerTeamNumber: 1 | 2 | null = null;
-      if (hasScores) {
-        const score1 = match.team1_score!;
-        const score2 = match.team2_score!;
-        if (score1 > score2) winnerTeamNumber = 1;
-        else if (score2 > score1) winnerTeamNumber = 2;
-        // Check for penalties winner if scores are equal
-        else if (score1 === score2 && match.penalties_winner) {
-          winnerTeamNumber = match.penalties_winner;
-        }
+      const score1 = match.team1_score!;
+      const score2 = match.team2_score!;
+      if (score1 > score2) winnerTeamNumber = 1;
+      else if (score2 > score1) winnerTeamNumber = 2;
+      // Check for penalties winner if scores are equal
+      else if (score1 === score2 && match.penalties_winner) {
+        winnerTeamNumber = match.penalties_winner;
       }
 
       match.team1_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          if (hasScores) {
-            standing.goalsFor += match.team1_score!;
-            standing.goalsAgainst += match.team2_score!;
-            if (winnerTeamNumber === 1) {
-              standing.points += 1;
-            }
+          standing.goalsFor += match.team1_score!;
+          standing.goalsAgainst += match.team2_score!;
+          if (winnerTeamNumber === 1) {
+            standing.points += 1;
           }
           if (team1) {
             standing.totalOverallRating += team1.overallRating;
@@ -688,12 +813,10 @@ function App() {
       match.team2_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          if (hasScores) {
-            standing.goalsFor += match.team2_score!;
-            standing.goalsAgainst += match.team1_score!;
-            if (winnerTeamNumber === 2) {
-              standing.points += 1;
-            }
+          standing.goalsFor += match.team2_score!;
+          standing.goalsAgainst += match.team1_score!;
+          if (winnerTeamNumber === 2) {
+            standing.points += 1;
           }
           if (team2) {
             standing.totalOverallRating += team2.overallRating;

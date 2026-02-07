@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, User, Edit3, Check, RefreshCw } from 'lucide-react';
 import { Player } from '../types';
 import { supabase } from '../lib/supabaseClient';
+import { AdminOnly } from './RoleBasedComponents';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -371,71 +372,80 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
 
-        {/* --- Manage Players Section --- */}
-        <div className="mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-medium mb-2 sm:mb-3 text-gray-700">Manage Players</h3>
-            {allPlayers.length === 0 ? (
-                <p className="text-xs sm:text-sm text-gray-500">No players found.</p>
-            ) : (
-                <ul className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-60 overflow-y-auto pr-1 sm:pr-2">
-                    {allPlayers.map(player => {
-                        const state = editingPlayers[player.id] || { currentName: player.name, isEditing: false, isLoading: false, error: null, success: false };
-                        const originalName = player.name;
+        <AdminOnly
+          fallback={
+            <div className="mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-medium mb-2 sm:mb-3 text-gray-700">Manage Players</h3>
+              <p className="text-xs sm:text-sm text-gray-500">Admin access is required to manage players.</p>
+            </div>
+          }
+        >
+          {/* --- Manage Players Section --- */}
+          <div className="mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-medium mb-2 sm:mb-3 text-gray-700">Manage Players</h3>
+              {allPlayers.length === 0 ? (
+                  <p className="text-xs sm:text-sm text-gray-500">No players found.</p>
+              ) : (
+                  <ul className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-60 overflow-y-auto pr-1 sm:pr-2">
+                      {allPlayers.map(player => {
+                          const state = editingPlayers[player.id] || { currentName: player.name, isEditing: false, isLoading: false, error: null, success: false };
+                          const originalName = player.name;
 
-                        return (
-                            <li key={player.id} className="flex items-center space-x-2 sm:space-x-3 p-2 border rounded-md">
-                                <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
-                                <div className="grow min-w-0">
-                                    {state.isEditing ? (
-                                        <input
-                                            type="text"
-                                            value={state.currentName}
-                                            onChange={(e) => handlePlayerNameChange(player.id, e.target.value)}
-                                            className={`w-full px-2 py-1 border rounded-md text-xs sm:text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-hidden focus:ring-1 focus:ring-brand-medium`}
-                                            disabled={state.isLoading}
-                                        />
-                                    ) : (
-                                        <span className="text-xs sm:text-sm font-medium text-gray-800 truncate">{state.currentName}</span>
-                                    )}
-                                     {state.error && <p className="text-xs text-red-600 mt-1">{state.error}</p>}
-                                     {state.success && <p className="text-xs text-green-600 mt-1 flex items-center"><Check className="w-3 h-3 mr-1"/> Saved!</p>}
-                                </div>
-                                <div className="shrink-0 flex items-center space-x-1">
-                                    {state.isEditing ? (
-                                        <>
-                                            <button
-                                                onClick={() => handleSavePlayerName(player.id)}
-                                                className="p-1 text-brand-dark hover:text-brand-medium disabled:opacity-50"
-                                                disabled={state.isLoading || state.currentName.trim() === originalName || !state.currentName.trim()}
-                                                title="Save Name"
-                                            >
-                                                {state.isLoading ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
-                                            </button>
-                                            <button
-                                                onClick={() => toggleEditPlayer(player.id)}
-                                                className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                                                disabled={state.isLoading}
-                                                title="Cancel Edit"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <button
-                                            onClick={() => toggleEditPlayer(player.id)}
-                                            className="p-1 text-blue-600 hover:text-blue-800" // Keep edit icon blue for distinction
-                                            title="Edit Name"
-                                        >
-                                            <Edit3 className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-        </div>
+                          return (
+                              <li key={player.id} className="flex items-center space-x-2 sm:space-x-3 p-2 border rounded-md">
+                                  <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+                                  <div className="grow min-w-0">
+                                      {state.isEditing ? (
+                                          <input
+                                              type="text"
+                                              value={state.currentName}
+                                              onChange={(e) => handlePlayerNameChange(player.id, e.target.value)}
+                                              className={`w-full px-2 py-1 border rounded-md text-xs sm:text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-hidden focus:ring-1 focus:ring-brand-medium`}
+                                              disabled={state.isLoading}
+                                          />
+                                      ) : (
+                                          <span className="text-xs sm:text-sm font-medium text-gray-800 truncate">{state.currentName}</span>
+                                      )}
+                                       {state.error && <p className="text-xs text-red-600 mt-1">{state.error}</p>}
+                                       {state.success && <p className="text-xs text-green-600 mt-1 flex items-center"><Check className="w-3 h-3 mr-1"/> Saved!</p>}
+                                  </div>
+                                  <div className="shrink-0 flex items-center space-x-1">
+                                      {state.isEditing ? (
+                                          <>
+                                              <button
+                                                  onClick={() => handleSavePlayerName(player.id)}
+                                                  className="p-1 text-brand-dark hover:text-brand-medium disabled:opacity-50"
+                                                  disabled={state.isLoading || state.currentName.trim() === originalName || !state.currentName.trim()}
+                                                  title="Save Name"
+                                              >
+                                                  {state.isLoading ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                                              </button>
+                                              <button
+                                                  onClick={() => toggleEditPlayer(player.id)}
+                                                  className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                                                  disabled={state.isLoading}
+                                                  title="Cancel Edit"
+                                              >
+                                                  <X className="w-4 h-4" />
+                                              </button>
+                                          </>
+                                      ) : (
+                                          <button
+                                              onClick={() => toggleEditPlayer(player.id)}
+                                              className="p-1 text-blue-600 hover:text-blue-800" // Keep edit icon blue for distinction
+                                              title="Edit Name"
+                                          >
+                                              <Edit3 className="w-4 h-4" />
+                                          </button>
+                                      )}
+                                  </div>
+                              </li>
+                          );
+                      })}
+                  </ul>
+              )}
+          </div>
+        </AdminOnly>
 
 
         {/* Action Buttons (Overall Close) */}

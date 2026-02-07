@@ -99,26 +99,24 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
       const team2 = teamMap.get(match.team2_id);
 
       const hasScores = match.team1_score !== null && match.team2_score !== null;
+      if (!hasScores) return;
+
       let winnerTeamNumber: 1 | 2 | null = null;
-      if (hasScores) {
-        const score1 = match.team1_score!;
-        const score2 = match.team2_score!;
-        if (score1 > score2) winnerTeamNumber = 1;
-        else if (score2 > score1) winnerTeamNumber = 2;
-        else if (score1 === score2 && match.penalties_winner) {
-          winnerTeamNumber = match.penalties_winner;
-        }
+      const score1 = match.team1_score!;
+      const score2 = match.team2_score!;
+      if (score1 > score2) winnerTeamNumber = 1;
+      else if (score2 > score1) winnerTeamNumber = 2;
+      else if (score1 === score2 && match.penalties_winner) {
+        winnerTeamNumber = match.penalties_winner;
       }
 
       match.team1_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          if (hasScores) {
-            standing.goalsFor += match.team1_score!;
-            standing.goalsAgainst += match.team2_score!;
-            if (winnerTeamNumber === 1) {
-              standing.points += 1;
-            }
+          standing.goalsFor += match.team1_score!;
+          standing.goalsAgainst += match.team2_score!;
+          if (winnerTeamNumber === 1) {
+            standing.points += 1;
           }
           if (team1) {
             standing.totalOverallRating += team1.overallRating;
@@ -130,12 +128,10 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
       match.team2_players.forEach(player => {
         const standing = standingsMap.get(player.id);
         if (standing) {
-          if (hasScores) {
-            standing.goalsFor += match.team2_score!;
-            standing.goalsAgainst += match.team1_score!;
-            if (winnerTeamNumber === 2) {
-              standing.points += 1;
-            }
+          standing.goalsFor += match.team2_score!;
+          standing.goalsAgainst += match.team1_score!;
+          if (winnerTeamNumber === 2) {
+            standing.points += 1;
           }
           if (team2) {
             standing.totalOverallRating += team2.overallRating;
