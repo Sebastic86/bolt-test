@@ -169,11 +169,11 @@ const UserManagement: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 max-w-4xl mx-auto mb-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 max-w-4xl mx-auto mb-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <div className="flex items-center space-x-2">
-          <Users className="w-6 h-6 text-brand-dark" />
-          <h2 className="text-2xl font-semibold text-gray-700">User Management</h2>
+          <Users className="w-5 h-5 sm:w-6 sm:h-6 text-brand-dark" />
+          <h2 className="text-lg sm:text-2xl font-semibold text-gray-700">User Management</h2>
         </div>
         <button
           onClick={fetchUsers}
@@ -186,35 +186,35 @@ const UserManagement: React.FC = () => {
       </div>
 
       {users.length === 0 ? (
-        <p className="text-gray-500 text-center py-8">No users found.</p>
+        <p className="text-gray-500 text-center py-8 text-sm">No users found.</p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {users.map(user => (
-            <div key={user.id} className="border border-gray-200 rounded-md p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
+            <div key={user.id} className="border border-gray-200 rounded-md p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
                   <div className="flex-shrink-0">
                     {user.profile?.role === 'admin' ? (
-                      <Shield className="w-5 h-5 text-red-600" />
+                      <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
                     ) : user.profile?.role === 'normal' ? (
-                      <User className="w-5 h-5 text-blue-600" />
+                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                     ) : (
-                      <User className="w-5 h-5 text-gray-400" />
+                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                     )}
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{user.email}</p>
-                    <p className="text-sm text-gray-500">ID: {user.id}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{user.email}</p>
+                    <p className="text-xs sm:text-sm text-gray-500 truncate">ID: {user.id}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                   {editingUserId === user.id ? (
                     <>
                       <select
                         value={editingRole}
                         onChange={(e) => setEditingRole(e.target.value as 'admin' | 'normal')}
-                        className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                        className="px-2 sm:px-3 py-1 border border-gray-300 rounded-md text-xs sm:text-sm flex-1 sm:flex-none"
                         disabled={saving}
                       >
                         <option value="normal">Normal User</option>
@@ -239,9 +239,9 @@ const UserManagement: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        user.profile?.role === 'admin' 
-                          ? 'bg-red-100 text-red-800' 
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                        user.profile?.role === 'admin'
+                          ? 'bg-red-100 text-red-800'
                           : user.profile?.role === 'normal'
                           ? 'bg-blue-100 text-blue-800'
                           : 'bg-gray-100 text-gray-800'
@@ -251,15 +251,15 @@ const UserManagement: React.FC = () => {
                       <button
                         onClick={() => handleEditRole(user.id, user.profile?.role || null)}
                         disabled={saving}
-                        className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50"
+                        className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50 whitespace-nowrap"
                       >
-                        {user.profile ? 'Edit Role' : 'Add Role'}
+                        {user.profile ? 'Edit' : 'Add Role'}
                       </button>
                       {user.profile && (
                         <button
                           onClick={() => handleDeleteProfile(user.id, user.email)}
                           disabled={saving}
-                          className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
+                          className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50 whitespace-nowrap"
                         >
                           Remove
                         </button>
@@ -273,13 +273,13 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-        <h3 className="font-medium text-blue-800 mb-2">Instructions:</h3>
-        <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Users must sign up through the application first before you can assign roles</li>
-          <li>• Admin users can manage teams, matches, and other users</li>
-          <li>• Normal users have read-only access to the application</li>
-          <li>• Users without roles cannot access the application</li>
+      <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-md">
+        <h3 className="font-medium text-blue-800 mb-2 text-sm sm:text-base">Instructions:</h3>
+        <ul className="text-xs sm:text-sm text-blue-700 space-y-1">
+          <li>• Users must sign up first before assigning roles</li>
+          <li>• Admins can manage teams, matches, and users</li>
+          <li>• Normal users have read-only access</li>
+          <li>• Users without roles cannot access the app</li>
         </ul>
       </div>
     </div>

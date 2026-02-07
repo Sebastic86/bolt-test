@@ -235,29 +235,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg relative my-8">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-full sm:max-w-lg relative my-4 sm:my-8 max-h-[95vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+          className="absolute top-2 right-2 sm:top-3 sm:right-3 text-gray-400 hover:text-gray-600 z-10"
           aria-label="Close modal"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
-        <h2 className="text-xl font-semibold mb-6 text-gray-800 text-center">Settings</h2>
+        <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-gray-800 text-center pr-8">Settings</h2>
 
         {/* --- Filter Section --- */}
-        <div className="mb-6 border-b pb-6">
-            <h3 className="text-lg font-medium mb-3 text-gray-700">Team Filters</h3>
+        <div className="mb-4 sm:mb-6 border-b pb-4 sm:pb-6">
+            <h3 className="text-base sm:text-lg font-medium mb-2 sm:mb-3 text-gray-700">Team Filters</h3>
 
             {/* Rating Filter */}
-            <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">
+            <div className="mb-3 sm:mb-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Star Rating (0.0 to 5.0)
                 </p>
-                <div className="flex flex-col sm:flex-row sm:space-x-4">
-                    <div className="mb-2 sm:mb-0 flex-1">
+                <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0">
+                    <div className="flex-1">
                         <label htmlFor="min-rating" className="block text-xs font-medium text-gray-500 mb-1">
                             Minimum
                         </label>
@@ -361,40 +361,41 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex justify-end mt-4">
                  <button
                     onClick={handleSaveSettings} // Changed from handleSaveRatings
-                    className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-brand-medium"
+                    className="flex items-center px-3 sm:px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-brand-medium text-sm"
                 >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Filters & Close
+                    <Save className="w-4 h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Save Filters & Close</span>
+                    <span className="sm:hidden">Save & Close</span>
                 </button>
             </div>
         </div>
 
 
         {/* --- Manage Players Section --- */}
-        <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3 text-gray-700">Manage Players</h3>
+        <div className="mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-medium mb-2 sm:mb-3 text-gray-700">Manage Players</h3>
             {allPlayers.length === 0 ? (
-                <p className="text-sm text-gray-500">No players found.</p>
+                <p className="text-xs sm:text-sm text-gray-500">No players found.</p>
             ) : (
-                <ul className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                <ul className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-60 overflow-y-auto pr-1 sm:pr-2">
                     {allPlayers.map(player => {
                         const state = editingPlayers[player.id] || { currentName: player.name, isEditing: false, isLoading: false, error: null, success: false };
                         const originalName = player.name;
 
                         return (
-                            <li key={player.id} className="flex items-center space-x-3 p-2 border rounded-md">
-                                <User className="w-5 h-5 text-gray-500 shrink-0" />
+                            <li key={player.id} className="flex items-center space-x-2 sm:space-x-3 p-2 border rounded-md">
+                                <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
                                 <div className="grow min-w-0">
                                     {state.isEditing ? (
                                         <input
                                             type="text"
                                             value={state.currentName}
                                             onChange={(e) => handlePlayerNameChange(player.id, e.target.value)}
-                                            className={`w-full px-2 py-1 border rounded-md text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-hidden focus:ring-1 focus:ring-brand-medium`}
+                                            className={`w-full px-2 py-1 border rounded-md text-xs sm:text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-hidden focus:ring-1 focus:ring-brand-medium`}
                                             disabled={state.isLoading}
                                         />
                                     ) : (
-                                        <span className="text-sm font-medium text-gray-800 truncate">{state.currentName}</span>
+                                        <span className="text-xs sm:text-sm font-medium text-gray-800 truncate">{state.currentName}</span>
                                     )}
                                      {state.error && <p className="text-xs text-red-600 mt-1">{state.error}</p>}
                                      {state.success && <p className="text-xs text-green-600 mt-1 flex items-center"><Check className="w-3 h-3 mr-1"/> Saved!</p>}
@@ -438,10 +439,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
 
         {/* Action Buttons (Overall Close) */}
-        <div className="flex justify-end space-x-3 border-t pt-4">
+        <div className="flex justify-end space-x-2 sm:space-x-3 border-t pt-3 sm:pt-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gray-400"
+            className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gray-400 text-sm"
           >
             Close
           </button>
