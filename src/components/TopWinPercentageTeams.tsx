@@ -10,6 +10,7 @@ interface TopWinPercentageTeamsProps {
   error: string | null;
   title?: string;
   allMatches: MatchHistoryItem[];
+  hideTitle?: boolean;
 }
 
 const TopWinPercentageTeams: React.FC<TopWinPercentageTeamsProps> = ({ 
@@ -17,7 +18,8 @@ const TopWinPercentageTeams: React.FC<TopWinPercentageTeamsProps> = ({
   loading, 
   error, 
   title = "Top 5 Teams by Win Percentage",
-  allMatches 
+  allMatches,
+  hideTitle = false,
 }) => {
   const [selectedTeam, setSelectedTeam] = useState<{ id: string; name: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string>('All');
@@ -136,9 +138,9 @@ const TopWinPercentageTeams: React.FC<TopWinPercentageTeamsProps> = ({
     .slice(0, 5); // Take top 5
 
   return (
-    <div className="w-full max-w-4xl mt-8">
+    <div className="w-full max-w-4xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-        <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>
+        {!hideTitle && <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>}
         <div className="flex items-center gap-2">
           <label htmlFor="version-filter-win" className="text-sm font-medium text-gray-700">
             Version:

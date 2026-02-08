@@ -11,6 +11,7 @@ interface MatchHistoryProps {
   error: string | null;
   onRefresh: () => void;
   allPlayers: Player[];
+  hideTitle?: boolean;
 }
 
 // State to track logo errors within the history list
@@ -45,6 +46,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   error,
   onRefresh,
   allPlayers,
+  hideTitle = false,
 }) => {
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
   const [score1Input, setScore1Input] = useState<string>('');
@@ -283,9 +285,9 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mt-8">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold text-gray-700">Today's Matches</h2>
+    <div className="w-full max-w-4xl">
+      <div className={`flex justify-between items-center mb-4 ${hideTitle ? 'justify-end' : ''}`}>
+        {!hideTitle && <h2 className="text-2xl font-semibold text-gray-700">Today's Matches</h2>}
         <button
             onClick={onRefresh}
             className="p-2 text-gray-500 hover:text-brand-dark disabled:opacity-50"

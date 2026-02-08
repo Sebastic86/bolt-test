@@ -7,6 +7,7 @@ interface PlayerWinMatrixProps {
   allMatches: MatchHistoryItem[];
   loading: boolean;
   error: string | null;
+  hideTitle?: boolean;
 }
 
 interface PlayerPairStats {
@@ -21,6 +22,7 @@ const PlayerWinMatrix: React.FC<PlayerWinMatrixProps> = ({
   allMatches,
   loading,
   error,
+  hideTitle = false,
 }) => {
   const [selectedVersion, setSelectedVersion] = useState<string>('All');
   const [availableVersions, setAvailableVersions] = useState<string[]>([]);
@@ -166,9 +168,9 @@ const PlayerWinMatrix: React.FC<PlayerWinMatrixProps> = ({
   };
 
   return (
-    <div className="w-full max-w-6xl mt-8">
+    <div className="w-full max-w-6xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-        <h2 className="text-2xl font-semibold text-gray-700">Player Win Percentage Matrix</h2>
+        {!hideTitle && <h2 className="text-2xl font-semibold text-gray-700">Player Win Percentage Matrix</h2>}
         <div className="flex items-center gap-2">
           <label htmlFor="version-filter-matrix" className="text-sm font-medium text-gray-700">
             Version:

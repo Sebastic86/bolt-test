@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import Header from './components/Header'; // Import the new Header component
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import Header from './components/Header';
 import AuthWrapper from './components/AuthWrapper';
 import { AdminOnly } from './components/RoleBasedComponents';
 import UserManagement from './components/UserManagement';
@@ -14,270 +14,36 @@ import TopWinPercentageTeams from './components/TopWinPercentageTeams';
 import TopLossPercentageTeams from './components/TopLossPercentageTeams';
 import PlayerWinMatrix from './components/PlayerWinMatrix';
 import PlayerTopTeams from './components/PlayerTopTeams';
-import { Team, Player, MatchPlayer, MatchHistoryItem, PlayerStanding, TeamStanding } from './types';
+import CollapsibleSection from './components/CollapsibleSection';
+import BottomNav from './components/BottomNav';
+import MatchComparison from './components/MatchComparison';
+import PlayerAchievements from './components/PlayerAchievements';
+import MatchRevealAnimation from './components/MatchRevealAnimation';
+import ErrorBoundary from './components/ErrorBoundary';
+import { Team, Player } from './types';
 import { supabase } from './lib/supabaseClient';
 import { useAuth } from './contexts/AuthContext';
+import { useSettings } from './hooks/useSettings';
+import { useMatchData, fetchAllTeams, fetchAllPlayers } from './hooks/useMatchData';
+import { useMatchGenerator } from './hooks/useMatchGenerator';
+import { usePlayerStandings } from './hooks/usePlayerStandings';
+import { useTeamStatistics } from './hooks/useTeamStatistics';
 import { Dices, Settings, PlusSquare, List, ArrowLeft } from 'lucide-react';
-
-// --- Constants for Session Storage ---
-const MIN_RATING_STORAGE_KEY = 'fcGeneratorMinRating';
-const MAX_RATING_STORAGE_KEY = 'fcGeneratorMaxRating';
-const EXCLUDE_NATIONS_STORAGE_KEY = 'fcGeneratorExcludeNations'; // New key
-const SELECTED_VERSION_STORAGE_KEY = 'fcGeneratorSelectedVersion'; // New key for version
-const MAX_OVR_DIFF_STORAGE_KEY = 'fcGeneratorMaxOvrDiff'; // New key for max OVR difference
-
-// --- Helper Functions for Session Storage ---
-const getInitialRating = (key: string, defaultValue: number): number => {
-  try {
-    const storedValue = sessionStorage.getItem(key);
-    if (storedValue !== null) {
-      const parsedValue = parseFloat(storedValue);
-      if (!isNaN(parsedValue) && parsedValue >= 0 && parsedValue <= 5) {
-        return parsedValue;
-      }
-    }
-  } catch (error) {
-    console.error(`Error reading ${key} from sessionStorage:`, error);
-  }
-  return defaultValue;
-};
-
-const getInitialBoolean = (key: string, defaultValue: boolean): boolean => {
-  try {
-    const storedValue = sessionStorage.getItem(key);
-    if (storedValue !== null) {
-      return storedValue === 'true'; // Check if the stored string is 'true'
-    }
-  } catch (error) {
-    console.error(`Error reading ${key} from sessionStorage:`, error);
-  }
-  return defaultValue;
-};
-
-const getInitialString = (key: string, defaultValue: string): string => {
-  try {
-    const storedValue = sessionStorage.getItem(key);
-    if (storedValue !== null) {
-      return storedValue;
-    }
-  } catch (error) {
-    console.error(`Error reading ${key} from sessionStorage:`, error);
-  }
-  return defaultValue;
-};
-
-// --- Matchup Weighting Helpers ---
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_RECENCY_DAYS = 30;
-
-type MatchupStats = {
-  teamCounts: Map<string, number>;
-  lastPlayed: Map<string, number>;
-  pairCounts: Map<string, number>;
-  pairLastPlayed: Map<string, number>;
-  maxTeamCount: number;
-};
-
-const getPairKey = (team1Id: string, team2Id: string): string => {
-  return team1Id < team2Id ? `${team1Id}|${team2Id}` : `${team2Id}|${team1Id}`;
-};
-
-const buildMatchupStats = (matches: MatchHistoryItem[]): MatchupStats => {
-  const teamCounts = new Map<string, number>();
-  const lastPlayed = new Map<string, number>();
-  const pairCounts = new Map<string, number>();
-  const pairLastPlayed = new Map<string, number>();
-  let maxTeamCount = 0;
-
-  matches.forEach(match => {
-    const playedAt = Date.parse(match.played_at);
-    const teamIds = [match.team1_id, match.team2_id];
-
-    teamIds.forEach(teamId => {
-      const nextCount = (teamCounts.get(teamId) ?? 0) + 1;
-      teamCounts.set(teamId, nextCount);
-      if (nextCount > maxTeamCount) {
-        maxTeamCount = nextCount;
-      }
-
-      if (!Number.isNaN(playedAt)) {
-        const previousPlayed = lastPlayed.get(teamId) ?? 0;
-        if (playedAt > previousPlayed) {
-          lastPlayed.set(teamId, playedAt);
-        }
-      }
-    });
-
-    const pairKey = getPairKey(match.team1_id, match.team2_id);
-    pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1);
-
-    if (!Number.isNaN(playedAt)) {
-      const previousPairPlayed = pairLastPlayed.get(pairKey) ?? 0;
-      if (playedAt > previousPairPlayed) {
-        pairLastPlayed.set(pairKey, playedAt);
-      }
-    }
-  });
-
-  return { teamCounts, lastPlayed, pairCounts, pairLastPlayed, maxTeamCount };
-};
-
-function getWeightedRandom<T>(items: T[], getWeight: (item: T) => number): T | null {
-  if (items.length === 0) return null;
-
-  const weights = items.map(item => Math.max(0, getWeight(item)));
-  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-
-  if (totalWeight <= 0) {
-    return items[Math.floor(Math.random() * items.length)];
-  }
-
-  let threshold = Math.random() * totalWeight;
-  for (let i = 0; i < items.length; i++) {
-    threshold -= weights[i];
-    if (threshold <= 0) {
-      return items[i];
-    }
-  }
-
-  return items[items.length - 1];
-}
-
-const getTeamWeight = (teamId: string, stats: MatchupStats, now: number): number => {
-  const count = stats.teamCounts.get(teamId) ?? 0;
-  const usageWeight = Math.max(1, stats.maxTeamCount - count + 1);
-  const lastPlayed = stats.lastPlayed.get(teamId);
-  const daysSincePlayed = lastPlayed !== undefined
-    ? Math.floor(Math.max(0, now - lastPlayed) / DAY_MS)
-    : MAX_RECENCY_DAYS;
-  const recencyWeight = Math.min(MAX_RECENCY_DAYS, daysSincePlayed) + 1;
-
-  return usageWeight * recencyWeight;
-};
-
-const getPairWeight = (pairKey: string, stats: MatchupStats, now: number): number => {
-  const pairCount = stats.pairCounts.get(pairKey) ?? 0;
-  const lastPlayed = stats.pairLastPlayed.get(pairKey);
-  const daysSincePlayed = lastPlayed !== undefined
-    ? Math.floor(Math.max(0, now - lastPlayed) / DAY_MS)
-    : MAX_RECENCY_DAYS;
-  const recencyWeight = Math.min(MAX_RECENCY_DAYS, daysSincePlayed) + 1;
-  const frequencyWeight = 1 / (1 + pairCount);
-
-  return recencyWeight * frequencyWeight;
-};
-
-const getSmartTeam = (teams: Team[], stats: MatchupStats, now: number): Team | null => {
-  return getWeightedRandom(teams, team => getTeamWeight(team.id, stats, now));
-};
-
-const getSmartOpponent = (
-  teams: Team[],
-  referenceTeam: Team,
-  stats: MatchupStats,
-  now: number,
-  maxOvrDiff?: number,
-  referenceLeague?: string
-): Team | null => {
-  if (teams.length === 0) return null;
-
-  let availableTeams = teams.filter(team => team.id !== referenceTeam.id);
-
-  if (referenceLeague === 'Nation') {
-    availableTeams = availableTeams.filter(team => team.league === 'Nation');
-  }
-
-  if (maxOvrDiff !== undefined) {
-    availableTeams = availableTeams.filter(
-      team => Math.abs(team.overallRating - referenceTeam.overallRating) <= maxOvrDiff
-    );
-  }
-
-  if (availableTeams.length === 0) return null;
-
-  return getWeightedRandom(availableTeams, team => {
-    const pairKey = getPairKey(referenceTeam.id, team.id);
-    const pairWeight = getPairWeight(pairKey, stats, now);
-    const teamWeight = getTeamWeight(team.id, stats, now);
-    const diff = Math.abs(team.overallRating - referenceTeam.overallRating);
-    const ovrWeight = maxOvrDiff !== undefined ? Math.max(1, maxOvrDiff - diff + 1) : 1;
-
-    return teamWeight * pairWeight * ovrWeight;
-  });
-};
-
-const getSmartMatch = (
-  teams: Team[],
-  stats: MatchupStats,
-  now: number,
-  maxOvrDiff?: number
-): [Team, Team] | null => {
-  if (teams.length < 2) return null;
-  const team1 = getSmartTeam(teams, stats, now);
-  if (!team1) return null;
-  const team2 = getSmartOpponent(teams, team1, stats, now, maxOvrDiff, team1.league);
-  if (!team2) return null;
-  return [team1, team2];
-};
-
-
-// Fetch all teams from Supabase
-const fetchAllTeams = async (): Promise<Team[]> => {
-  console.log("Fetching all teams...");
-  const { data, error } = await supabase.from('teams').select('*');
-  if (error) {
-    console.error("Error fetching teams:", error);
-    throw new Error(`Failed to fetch teams: ${error.message}`);
-  }
-  return data || [];
-};
-
-// Fetch all players from Supabase
-const fetchAllPlayers = async (): Promise<Player[]> => {
-    console.log("Fetching all players...");
-    const { data, error } = await supabase.from('players').select('*').order('name');
-    if (error) {
-        console.error("Error fetching players:", error);
-        throw new Error(`Failed to fetch players: ${error.message}`);
-    }
-    return data || [];
-};
 
 
 function App() {
   const { isAdmin } = useAuth();
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
-  const [match, setMatch] = useState<[Team, Team] | null>(null);
-  const [lastMatchPlayers, setLastMatchPlayers] = useState<{
-    team1Id: string;
-    team2Id: string;
-    team1Players: Player[];
-    team2Players: Player[];
-  } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
 
-  // Settings State
-  const [minRating, setMinRating] = useState<number>(() => getInitialRating(MIN_RATING_STORAGE_KEY, 4));
-  const [maxRating, setMaxRating] = useState<number>(() => getInitialRating(MAX_RATING_STORAGE_KEY, 5));
-  const [excludeNations, setExcludeNations] = useState<boolean>(() => getInitialBoolean(EXCLUDE_NATIONS_STORAGE_KEY, false)); // New state
-  const [selectedVersion, setSelectedVersion] = useState<string>(() => getInitialString(SELECTED_VERSION_STORAGE_KEY, 'FC26')); // New state for version
-  const [maxOvrDiff, setMaxOvrDiff] = useState<number>(() => {
-    try {
-      const storedValue = sessionStorage.getItem(MAX_OVR_DIFF_STORAGE_KEY);
-      if (storedValue !== null) {
-        const parsedValue = parseInt(storedValue);
-        if (!isNaN(parsedValue) && parsedValue >= 0) {
-          return parsedValue;
-        }
-      }
-    } catch (error) {
-      console.error(`Error reading ${MAX_OVR_DIFF_STORAGE_KEY} from sessionStorage:`, error);
-    }
-    return 5;
-  }); // New state for max OVR difference
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+  // Settings (persisted to localStorage)
+  const settings = useSettings();
+  const {
+    minRating, maxRating, excludeNations, selectedVersion, maxOvrDiff,
+    isSettingsModalOpen, handleOpenSettingsModal, handleCloseSettingsModal, handleSaveSettings,
+  } = settings;
 
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
@@ -289,182 +55,52 @@ function App() {
   // Page Navigation State
   const [currentPage, setCurrentPage] = useState<'main' | 'allMatches'>('main');
 
-  // Match History State
-  const [matchesToday, setMatchesToday] = useState<MatchHistoryItem[]>([]);
-  const [allMatches, setAllMatches] = useState<MatchHistoryItem[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
-  const [loadingAllMatches, setLoadingAllMatches] = useState<boolean>(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [allMatchesError, setAllMatchesError] = useState<string | null>(null);
-  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
-
-  const matchupStats = useMemo(() => buildMatchupStats(allMatches), [allMatches]);
-
   // Filtered teams based on rating, nation, and version settings
   const filteredTeams = useMemo(() => {
     return allTeams.filter(team => {
-        const ratingMatch = team.rating >= minRating && team.rating <= maxRating;
-        const nationMatch = !excludeNations || team.league !== 'Nation';
-        const versionMatch = team.version === selectedVersion;
-        return ratingMatch && nationMatch && versionMatch;
+      const ratingMatch = team.rating >= minRating && team.rating <= maxRating;
+      const nationMatch = !excludeNations || team.league !== 'Nation';
+      const versionMatch = team.version === selectedVersion;
+      return ratingMatch && nationMatch && versionMatch;
     });
-  }, [allTeams, minRating, maxRating, excludeNations, selectedVersion]); // Add selectedVersion dependency
+  }, [allTeams, minRating, maxRating, excludeNations, selectedVersion]);
 
-  // Fetch Today's Match History
-  const fetchTodaysMatches = useCallback(async () => {
-    setLoadingHistory(true);
-    setHistoryError(null);
-    console.log("[App] Fetching today's matches...");
+  // Match data (with real-time subscriptions)
+  const matchData = useMatchData(allTeams, allPlayers);
+  const {
+    matchesToday, allMatches, loadingHistory, loadingAllMatches,
+    historyError, allMatchesError, triggerRefresh, fetchAllMatchesData,
+  } = matchData;
 
-    try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(todayStart);
-      todayEnd.setDate(todayStart.getDate() + 1);
+  // Match generator
+  const generator = useMatchGenerator({
+    allTeams, filteredTeams, matchesToday, allMatches,
+    maxOvrDiff, excludeNations, minRating, maxRating, loading,
+  });
+  const {
+    match, isAnimating, pendingMatch, error: matchError,
+    canGenerateNewMatch, playedTeamIdsToday, initialMatchPlayers,
+    handleGenerateNewMatch, handleAnimationComplete, handleUpdateTeam,
+    setLastMatchPlayers, setMatchError,
+  } = generator;
 
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select('*')
-        .gte('played_at', todayStart.toISOString())
-        .lt('played_at', todayEnd.toISOString())
-        .order('played_at', { ascending: false });
+  // Player standings (today + overall)
+  const { playerStandings, overallPlayerStandings } = usePlayerStandings(
+    matchesToday, allMatches, allPlayers, allTeams
+  );
 
-      if (matchesError) throw matchesError;
-      if (!matchesData) {
-          setMatchesToday([]);
-          setLoadingHistory(false);
-          return;
-      }
-
-      const matchIds = matchesData.map(m => m.id);
-      let matchPlayersData: MatchPlayer[] = [];
-      if (matchIds.length > 0) {
-          const { data: mpData, error: mpError } = await supabase
-              .from('match_players')
-              .select('*')
-              .in('match_id', matchIds);
-          if (mpError) throw mpError;
-          matchPlayersData = mpData || [];
-      }
-
-      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-      const teamMap = new Map(allTeams.map(t => [t.id, t]));
-
-
-      const combinedMatches: MatchHistoryItem[] = matchesData.map(match => {
-        const team1 = teamMap.get(match.team1_id);
-        const team2 = teamMap.get(match.team2_id);
-        const playersInMatch = matchPlayersData.filter(mp => mp.match_id === match.id);
-
-        return {
-          ...match,
-          team1_name: team1?.name ?? 'Unknown Team',
-          team1_logoUrl: team1?.logoUrl ?? '',
-          team1_version: team1?.version ?? '',
-          team2_name: team2?.name ?? 'Unknown Team',
-          team2_logoUrl: team2?.logoUrl ?? '',
-          team2_version: team2?.version ?? '',
-          team1_players: playersInMatch
-            .filter(mp => mp.team_number === 1)
-            .map(mp => playerMap.get(mp.player_id))
-            .filter((p): p is Player => p !== undefined),
-          team2_players: playersInMatch
-            .filter(mp => mp.team_number === 2)
-            .map(mp => playerMap.get(mp.player_id))
-            .filter((p): p is Player => p !== undefined),
-        };
-      });
-
-      console.log("[App] Today's matches fetched:", combinedMatches);
-      setMatchesToday(combinedMatches);
-
-    } catch (err) {
-      console.error('[App] Error fetching match history:', err);
-      setHistoryError('Failed to load match history.');
-      setMatchesToday([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [allTeams, allPlayers]);
-
-  // Fetch All Matches (for overall standings)
-  const fetchAllMatches = useCallback(async () => {
-    setLoadingAllMatches(true);
-    setAllMatchesError(null);
-    console.log("[App] Fetching all matches...");
-
-    try {
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select('*')
-        .order('played_at', { ascending: false });
-
-      if (matchesError) throw matchesError;
-      if (!matchesData) {
-          setAllMatches([]);
-          setLoadingAllMatches(false);
-          return;
-      }
-
-      const matchIds = matchesData.map(m => m.id);
-      let matchPlayersData: MatchPlayer[] = [];
-      if (matchIds.length > 0) {
-          const { data: mpData, error: mpError } = await supabase
-              .from('match_players')
-              .select('*')
-              .in('match_id', matchIds);
-          if (mpError) throw mpError;
-          matchPlayersData = mpData || [];
-      }
-
-      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-      const teamMap = new Map(allTeams.map(t => [t.id, t]));
-
-      const combinedMatches: MatchHistoryItem[] = matchesData.map(match => {
-        const team1 = teamMap.get(match.team1_id);
-        const team2 = teamMap.get(match.team2_id);
-        const playersInMatch = matchPlayersData.filter(mp => mp.match_id === match.id);
-
-        return {
-          ...match,
-          team1_name: team1?.name ?? 'Unknown Team',
-          team1_logoUrl: team1?.logoUrl ?? '',
-          team1_version: team1?.version ?? '',
-          team2_name: team2?.name ?? 'Unknown Team',
-          team2_logoUrl: team2?.logoUrl ?? '',
-          team2_version: team2?.version ?? '',
-          team1_players: playersInMatch
-            .filter(mp => mp.team_number === 1)
-            .map(mp => playerMap.get(mp.player_id))
-            .filter((p): p is Player => p !== undefined),
-          team2_players: playersInMatch
-            .filter(mp => mp.team_number === 2)
-            .map(mp => playerMap.get(mp.player_id))
-            .filter((p): p is Player => p !== undefined),
-        };
-      });
-
-      console.log("[App] All matches fetched:", combinedMatches);
-      setAllMatches(combinedMatches);
-
-    } catch (err) {
-      console.error('[App] Error fetching all matches:', err);
-      setAllMatchesError('Failed to load all match history.');
-      setAllMatches([]);
-    } finally {
-      setLoadingAllMatches(false);
-    }
-  }, [allTeams, allPlayers]);
+  // Team statistics
+  const { teamStatistics } = useTeamStatistics(allMatches, allTeams);
 
   // Fetch initial data (teams, players)
   useEffect(() => {
     setLoading(true);
-    setError(null);
+    setInitError(null);
     Promise.all([fetchAllTeams(), fetchAllPlayers()])
       .then(([teamsData, playersData]) => {
         if (teamsData.length === 0) {
           console.warn("No teams found in the database.");
-          setError("No teams found. Please ensure the 'teams' table exists and contains data.");
+          setInitError("No teams found. Please ensure the 'teams' table exists and contains data.");
           setAllTeams([]);
         } else {
           setAllTeams(teamsData);
@@ -473,69 +109,14 @@ function App() {
       })
       .catch(err => {
         console.error("Failed to fetch initial data:", err);
-        setError(err.message || "Failed to load initial data.");
+        setInitError(err.message || "Failed to load initial data.");
         setAllTeams([]);
         setAllPlayers([]);
-        setMatch(null);
       })
       .finally(() => {
         setLoading(false);
       });
   }, []);
-
-  // Fetch history once teams/players are loaded, and when triggered
-  useEffect(() => {
-    if (allTeams.length > 0 && allPlayers.length > 0) {
-        fetchTodaysMatches();
-        fetchAllMatches();
-    }
-  }, [allTeams, allPlayers, refreshHistoryTrigger, fetchTodaysMatches, fetchAllMatches]);
-
-
-  // Effect to set initial match or update when filters/teams change
-  useEffect(() => {
-    if (!loading && allTeams.length > 0) {
-        const currentMatchIsValid = match &&
-                                    filteredTeams.some(t => t.id === match[0].id) &&
-                                    filteredTeams.some(t => t.id === match[1].id);
-
-        if (!currentMatchIsValid) {
-             const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
-             const availableForInitialMatch = filteredTeams.filter(t => !playedTeamIds.has(t.id));
-             setMatch(getSmartMatch(availableForInitialMatch, matchupStats, Date.now(), maxOvrDiff));
-        } else if (filteredTeams.length < 2) {
-             setMatch(null);
-        }
-    } else if (!loading && allTeams.length === 0) {
-        setMatch(null);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredTeams, loading, allTeams, matchesToday, maxOvrDiff, matchupStats]);
-
-
-  const handleGenerateNewMatch = (extraExcludedTeamIds?: Set<string>) => {
-    const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
-    if (extraExcludedTeamIds) {
-      extraExcludedTeamIds.forEach(teamId => playedTeamIds.add(teamId));
-    }
-    const availableTeamsForNewMatchup = filteredTeams.filter(team => !playedTeamIds.has(team.id));
-
-    if (availableTeamsForNewMatchup.length >= 2) {
-      const newMatch = getSmartMatch(availableTeamsForNewMatchup, matchupStats, Date.now(), maxOvrDiff);
-      if (newMatch) {
-        setMatch(newMatch);
-        setError(null);
-      } else {
-        setMatch(null);
-        const nationFilterText = excludeNations ? " excluding nations" : "";
-        setError(`Not enough teams available for a new matchup within the current filter (${minRating.toFixed(1)}-${maxRating.toFixed(1)} stars${nationFilterText}, max OVR diff ${maxOvrDiff}) that haven't played today. Only ${availableTeamsForNewMatchup.length} team(s) remaining.`);
-      }
-    } else {
-      setMatch(null);
-      const nationFilterText = excludeNations ? " excluding nations" : "";
-      setError(`Not enough teams available for a new matchup within the current filter (${minRating.toFixed(1)}-${maxRating.toFixed(1)} stars${nationFilterText}) that haven't played today. Only ${availableTeamsForNewMatchup.length} team(s) remaining.`);
-    }
-  };
 
   // --- Edit Modal Handlers ---
   const handleOpenEditModal = (index: 0 | 1) => {
@@ -546,68 +127,11 @@ function App() {
     setIsEditModalOpen(false);
     setEditingTeamIndex(null);
   };
-  const handleUpdateTeam = useCallback((newTeam: Team) => {
-    if (editingTeamIndex === null || !match) return;
-
-    const playedTeamIds = new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id]));
-    // Ensure the potential opponent pool also respects the current filters (rating + nations)
-    const potentialOpponentPool = filteredTeams.filter(t => !playedTeamIds.has(t.id) && t.id !== newTeam.id);
-
-    const otherTeamIndex = editingTeamIndex === 0 ? 1 : 0;
-    let newOpponent = match[otherTeamIndex];
-
-    // Check if the current opponent is invalid (same as new team, already played, doesn't match filters, OVR diff too large, or league mismatch)
-    const leagueMatch = newTeam.league === 'Nation' ? newOpponent.league === 'Nation' : true;
-    const currentOpponentIsValid = filteredTeams.some(t => t.id === newOpponent.id) &&
-                                    !playedTeamIds.has(newOpponent.id) &&
-                                    Math.abs(newOpponent.overallRating - newTeam.overallRating) <= maxOvrDiff &&
-                                    leagueMatch;
-
-    if (newOpponent.id === newTeam.id || !currentOpponentIsValid) {
-      const potentialOpponent = getSmartOpponent(
-        potentialOpponentPool,
-        newTeam,
-        matchupStats,
-        Date.now(),
-        maxOvrDiff,
-        newTeam.league
-      );
-      if (potentialOpponent) {
-        newOpponent = potentialOpponent;
-      } else {
-        console.warn("Could not find a different, unplayed, filter-matching opponent with acceptable OVR difference and league constraint.");
-        // Optionally, keep the old opponent if no better one is found, or handle error
-      }
-    }
-
-    const updatedMatch: [Team, Team] = [...match];
-    updatedMatch[editingTeamIndex] = newTeam;
-    updatedMatch[otherTeamIndex] = newOpponent;
-    setMatch(updatedMatch);
+  const handleTeamSelected = useCallback((newTeam: Team) => {
+    if (editingTeamIndex === null) return;
+    handleUpdateTeam(newTeam, editingTeamIndex);
     handleCloseEditModal();
-  }, [match, editingTeamIndex, filteredTeams, matchesToday, maxOvrDiff, matchupStats]);
-
-  // --- Settings Modal Handlers ---
-  const handleOpenSettingsModal = () => setIsSettingsModalOpen(true);
-  const handleCloseSettingsModal = () => setIsSettingsModalOpen(false);
-  const handleSaveSettings = (newMinRating: number, newMaxRating: number, newExcludeNations: boolean, newSelectedVersion: string, newMaxOvrDiff: number) => {
-    setMinRating(newMinRating);
-    setMaxRating(newMaxRating);
-    setExcludeNations(newExcludeNations); // Save new setting
-    setSelectedVersion(newSelectedVersion); // Save new version setting
-    setMaxOvrDiff(newMaxOvrDiff); // Save new max OVR diff setting
-    try {
-      sessionStorage.setItem(MIN_RATING_STORAGE_KEY, newMinRating.toString());
-      sessionStorage.setItem(MAX_RATING_STORAGE_KEY, newMaxRating.toString());
-      sessionStorage.setItem(EXCLUDE_NATIONS_STORAGE_KEY, newExcludeNations.toString()); // Persist new setting
-      sessionStorage.setItem(SELECTED_VERSION_STORAGE_KEY, newSelectedVersion); // Persist new version setting
-      sessionStorage.setItem(MAX_OVR_DIFF_STORAGE_KEY, newMaxOvrDiff.toString()); // Persist new max OVR diff setting
-    } catch (error) {
-      console.error("Error saving settings to sessionStorage:", error);
-    }
-    setError(null);
-    // Modal closing is handled within SettingsModal component itself
-  };
+  }, [editingTeamIndex, handleUpdateTeam]);
 
   // --- Player Name Update Handler ---
   const handleUpdatePlayerName = async (playerId: string, newName: string): Promise<boolean> => {
@@ -633,15 +157,12 @@ function App() {
       setAllPlayers(prevPlayers =>
         prevPlayers.map(p => (p.id === playerId ? { ...p, name: newName } : p))
       );
-      console.log(`[App] Player ${playerId} updated successfully locally.`);
       return true;
-
     } catch (err) {
-        console.error(`[App] Error updating player ${playerId} in DB:`, err);
+      console.error(`[App] Error updating player ${playerId} in DB:`, err);
       return false;
     }
   };
-
 
   // --- Add Match Modal Handlers ---
   const handleOpenAddMatchModal = () => setIsAddMatchModalOpen(true);
@@ -653,7 +174,7 @@ function App() {
     team2Players: Player[];
     action: 'next' | 'rematch';
   }) => {
-    setRefreshHistoryTrigger(prev => prev + 1);
+    triggerRefresh();
     setLastMatchPlayers({
       team1Id: payload.team1Id,
       team2Id: payload.team2Id,
@@ -668,23 +189,13 @@ function App() {
 
   // --- Manual Refresh Handler ---
   const handleManualRefreshHistory = () => {
-    setRefreshHistoryTrigger(prev => prev + 1);
+    triggerRefresh();
   };
 
   // Page Navigation Handlers
-  const handleNavigateToAllMatches = () => {
-    setCurrentPage('allMatches');
-  };
-
-  const handleNavigateToMain = () => {
-    setCurrentPage('main');
-  };
-
-  // Refresh handler for AllMatches page
-  const handleRefreshAllMatches = () => {
-    fetchAllMatches();
-  };
-
+  const handleNavigateToAllMatches = () => setCurrentPage('allMatches');
+  const handleNavigateToMain = () => setCurrentPage('main');
+  const handleRefreshAllMatches = () => fetchAllMatchesData();
 
   // Calculate differences
   const differences = match ? {
@@ -696,284 +207,50 @@ function App() {
   const team1Differences = differences ? { overall: differences.overall, attack: differences.attack, midfield: differences.midfield, defend: differences.defend } : undefined;
   const team2Differences = differences ? { overall: -differences.overall, attack: -differences.attack, midfield: -differences.midfield, defend: -differences.defend } : undefined;
 
-  // Determine if New Matchup button should be disabled
-  const playedTeamIdsToday = useMemo(() => new Set(matchesToday.flatMap(m => [m.team1_id, m.team2_id])), [matchesToday]);
-  const availableForNewMatchupCount = useMemo(() => filteredTeams.filter(team => !playedTeamIdsToday.has(team.id)).length, [filteredTeams, playedTeamIdsToday]);
-  const canGenerateNewMatch = availableForNewMatchupCount >= 2;
-  const initialMatchPlayers = useMemo(() => {
-    if (!match || !lastMatchPlayers) return null;
-    if (lastMatchPlayers.team1Id !== match[0].id || lastMatchPlayers.team2Id !== match[1].id) return null;
-    return {
-      team1Players: lastMatchPlayers.team1Players,
-      team2Players: lastMatchPlayers.team2Players,
-    };
-  }, [match, lastMatchPlayers]);
-
-  // Calculate Player Standings
-  const playerStandings = useMemo(() => {
-    console.log("[App] Calculating player standings...");
-    const standingsMap = new Map<string, PlayerStanding>();
-    const teamMap = new Map(allTeams.map(t => [t.id, t]));
-
-    allPlayers.forEach(player => {
-      standingsMap.set(player.id, {
-        playerId: player.id,
-        playerName: player.name,
-        points: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        goalDifference: 0,
-        totalOverallRating: 0,
-        matchesPlayed: 0,
-      });
-    });
-
-    matchesToday.forEach(match => {
-      const team1 = teamMap.get(match.team1_id);
-      const team2 = teamMap.get(match.team2_id);
-
-      const hasScores = match.team1_score !== null && match.team2_score !== null;
-      if (!hasScores) return;
-
-      let winnerTeamNumber: 1 | 2 | null = null;
-      const score1 = match.team1_score!;
-      const score2 = match.team2_score!;
-      if (score1 > score2) winnerTeamNumber = 1;
-      else if (score2 > score1) winnerTeamNumber = 2;
-      // Check for penalties winner if scores are equal
-      else if (score1 === score2 && match.penalties_winner) {
-        winnerTeamNumber = match.penalties_winner;
-      }
-
-      match.team1_players.forEach(player => {
-        const standing = standingsMap.get(player.id);
-        if (standing) {
-          standing.goalsFor += match.team1_score!;
-          standing.goalsAgainst += match.team2_score!;
-          if (winnerTeamNumber === 1) {
-            standing.points += 1;
-          }
-          if (team1) {
-            standing.totalOverallRating += team1.overallRating;
-            standing.matchesPlayed += 1;
-          }
-        }
-      });
-
-      match.team2_players.forEach(player => {
-        const standing = standingsMap.get(player.id);
-        if (standing) {
-          standing.goalsFor += match.team2_score!;
-          standing.goalsAgainst += match.team1_score!;
-          if (winnerTeamNumber === 2) {
-            standing.points += 1;
-          }
-          if (team2) {
-            standing.totalOverallRating += team2.overallRating;
-            standing.matchesPlayed += 1;
-          }
-        }
-      });
-    });
-
-    const standingsArray = Array.from(standingsMap.values()).map(s => ({
-        ...s,
-        goalDifference: s.goalsFor - s.goalsAgainst
-    }));
-
-    standingsArray.sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-      return b.goalsFor - a.goalsFor;
-    });
-
-    console.log("[App] Player standings calculated:", standingsArray);
-    return standingsArray;
-
-  }, [matchesToday, allPlayers, allTeams]);
-
-  // Calculate Overall Player Standings (all matches)
-  const overallPlayerStandings = useMemo(() => {
-    console.log("[App] Calculating overall player standings...");
-    const standingsMap = new Map<string, PlayerStanding>();
-    const teamMap = new Map(allTeams.map(t => [t.id, t]));
-
-    allPlayers.forEach(player => {
-      standingsMap.set(player.id, {
-        playerId: player.id,
-        playerName: player.name,
-        points: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        goalDifference: 0,
-        totalOverallRating: 0,
-        matchesPlayed: 0,
-      });
-    });
-
-    allMatches.forEach(match => {
-      const team1 = teamMap.get(match.team1_id);
-      const team2 = teamMap.get(match.team2_id);
-
-      const hasScores = match.team1_score !== null && match.team2_score !== null;
-      if (!hasScores) return;
-
-      let winnerTeamNumber: 1 | 2 | null = null;
-      const score1 = match.team1_score!;
-      const score2 = match.team2_score!;
-      if (score1 > score2) winnerTeamNumber = 1;
-      else if (score2 > score1) winnerTeamNumber = 2;
-      // Check for penalties winner if scores are equal
-      else if (score1 === score2 && match.penalties_winner) {
-        winnerTeamNumber = match.penalties_winner;
-      }
-
-      match.team1_players.forEach(player => {
-        const standing = standingsMap.get(player.id);
-        if (standing) {
-          standing.goalsFor += match.team1_score!;
-          standing.goalsAgainst += match.team2_score!;
-          if (winnerTeamNumber === 1) {
-            standing.points += 1;
-          }
-          if (team1) {
-            standing.totalOverallRating += team1.overallRating;
-            standing.matchesPlayed += 1;
-          }
-        }
-      });
-
-      match.team2_players.forEach(player => {
-        const standing = standingsMap.get(player.id);
-        if (standing) {
-          standing.goalsFor += match.team2_score!;
-          standing.goalsAgainst += match.team1_score!;
-          if (winnerTeamNumber === 2) {
-            standing.points += 1;
-          }
-          if (team2) {
-            standing.totalOverallRating += team2.overallRating;
-            standing.matchesPlayed += 1;
-          }
-        }
-      });
-    });
-
-    const standingsArray = Array.from(standingsMap.values()).map(s => ({
-        ...s,
-        goalDifference: s.goalsFor - s.goalsAgainst
-    }));
-
-    standingsArray.sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-      return b.goalsFor - a.goalsFor;
-    });
-
-    console.log("[App] Overall player standings calculated:", standingsArray);
-    return standingsArray;
-
-  }, [allMatches, allPlayers, allTeams]);
-
-  // Calculate Team Statistics (all matches)
-  const teamStatistics = useMemo(() => {
-    console.log("[App] Calculating team statistics...");
-    const statsMap = new Map<string, TeamStanding>();
-
-    // Initialize all teams
-    allTeams.forEach(team => {
-      statsMap.set(team.id, {
-        teamId: team.id,
-        teamName: team.name,
-        logoUrl: team.logoUrl,
-        totalMatches: 0,
-        totalWins: 0,
-        totalLosses: 0,
-        winPercentage: 0,
-        lossPercentage: 0,
-      });
-    });
-
-    // Process all matches
-    allMatches.forEach(match => {
-      const team1Stats = statsMap.get(match.team1_id);
-      const team2Stats = statsMap.get(match.team2_id);
-
-      const hasScores = match.team1_score !== null && match.team2_score !== null;
-      if (!hasScores || !team1Stats || !team2Stats) return;
-
-      // Increment matches played for both teams
-      team1Stats.totalMatches += 1;
-      team2Stats.totalMatches += 1;
-
-      const score1 = match.team1_score!;
-      const score2 = match.team2_score!;
-
-      // Determine winner
-      let winnerTeamNumber: 1 | 2 | null = null;
-      if (score1 > score2) {
-        winnerTeamNumber = 1;
-      } else if (score2 > score1) {
-        winnerTeamNumber = 2;
-      } else if (score1 === score2 && match.penalties_winner) {
-        winnerTeamNumber = match.penalties_winner;
-      }
-
-      // Update win/loss counts
-      if (winnerTeamNumber === 1) {
-        team1Stats.totalWins += 1;
-        team2Stats.totalLosses += 1;
-      } else if (winnerTeamNumber === 2) {
-        team2Stats.totalWins += 1;
-        team1Stats.totalLosses += 1;
-      }
-      // Note: Draws (when no penalties winner) don't count as wins or losses
-    });
-
-    // Calculate percentages
-    const statsArray = Array.from(statsMap.values()).map(stats => ({
-      ...stats,
-      winPercentage: stats.totalMatches > 0 ? (stats.totalWins / stats.totalMatches) * 100 : 0,
-      lossPercentage: stats.totalMatches > 0 ? (stats.totalLosses / stats.totalMatches) * 100 : 0,
-    }));
-
-    console.log("[App] Team statistics calculated:", statsArray);
-    return statsArray;
-
-  }, [allMatches, allTeams]);
-
+  // Combined error display
+  const displayError = initError || matchError;
 
   return (
-    <div className="flex flex-col min-h-screen"> {/* Changed to flex-col */}
-      <Header /> {/* Add the Header component */}
+    <div className="flex flex-col min-h-screen">
+      <Header />
       <AuthWrapper>
-        <main className="grow bg-linear-to-br from-brand-lighter via-brand-light to-brand-medium p-4 flex flex-col items-center">
-        {/* Removed the old h1 title */}
+        <main className="grow bg-linear-to-br from-brand-lighter via-brand-light to-brand-medium p-4 pb-20 md:pb-4 flex flex-col items-center">
 
         {loading && <p className="text-gray-600 mt-8">Loading initial data...</p>}
-        {error && <p className="text-red-600 bg-red-100 p-3 rounded-sm text-center mb-4 max-w-xl mx-auto mt-8">{error}</p>}
+        {displayError && <p className="text-red-600 bg-red-100 p-3 rounded-sm text-center mb-4 max-w-xl mx-auto mt-8">{displayError}</p>}
+
+        {/* Match Reveal Animation */}
+        {!loading && !initError && isAnimating && pendingMatch && (
+          <MatchRevealAnimation
+            teams={pendingMatch}
+            allTeams={filteredTeams}
+            onAnimationComplete={handleAnimationComplete}
+          />
+        )}
 
         {/* Match Display */}
-        {!loading && !error && match && (
-          <div className="w-full max-w-4xl mb-6 mt-8"> {/* Added mt-8 */}
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-              <TeamCard team={match[0]} differences={team1Differences} onEdit={() => handleOpenEditModal(0)} />
-              <div className="text-2xl font-bold text-gray-700 my-2 md:my-0">VS</div>
-              <TeamCard team={match[1]} differences={team2Differences} onEdit={() => handleOpenEditModal(1)} />
+        {!loading && !initError && match && !isAnimating && (
+          <ErrorBoundary fallbackTitle="Error displaying match">
+            <div className="w-full max-w-4xl mb-6 mt-8">
+              <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
+                <TeamCard team={match[0]} differences={team1Differences} onEdit={() => handleOpenEditModal(0)} />
+                <div className="text-2xl font-bold text-gray-700 my-2 md:my-0">VS</div>
+                <TeamCard team={match[1]} differences={team2Differences} onEdit={() => handleOpenEditModal(1)} />
+              </div>
+              <MatchComparison team1={match[0]} team2={match[1]} />
             </div>
-          </div>
+          </ErrorBoundary>
         )}
-         {!loading && !error && !match && filteredTeams.length >= 2 && !canGenerateNewMatch && (
-           <p className="text-yellow-700 bg-yellow-100 p-3 rounded-sm mb-6 text-center max-w-md mt-8"> {/* Added mt-8 */}
+         {!loading && !initError && !match && filteredTeams.length >= 2 && !canGenerateNewMatch && (
+           <p className="text-yellow-700 bg-yellow-100 p-3 rounded-sm mb-6 text-center max-w-md mt-8">
               No valid matchup displayed. All teams within the current filter have played today.
            </p>
          )}
 
          {/* Buttons Container */}
-         {!loading && !error && allTeams.length > 0 && currentPage === 'main' && (
+         {!loading && !initError && allTeams.length > 0 && currentPage === 'main' && (
            <div className="flex items-center justify-center mb-6">
-             {/* Button Group Container - Removed gradient, added shadow */}
-             <div className="inline-flex rounded-lg shadow-md overflow-hidden">
+             <div className="hidden md:inline-flex rounded-lg shadow-md overflow-hidden">
                <button
                  onClick={() => handleGenerateNewMatch()}
                  className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
@@ -1011,9 +288,9 @@ function App() {
            </div>
          )}
 
-         {/* All Matches Page Back Button */}
+         {/* All Matches Page Back Button (desktop only) */}
          {currentPage === 'allMatches' && (
-           <div className="flex items-center justify-center mb-6">
+           <div className="hidden md:flex items-center justify-center mb-6">
              <button
                onClick={handleNavigateToMain}
                className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out rounded-lg shadow-md"
@@ -1025,77 +302,111 @@ function App() {
          )}
 
         {/* Informative messages */}
-         {!loading && !error && allTeams.length > 0 && filteredTeams.length < 2 && (
+         {!loading && !initError && allTeams.length > 0 && filteredTeams.length < 2 && (
            <p className="text-yellow-700 bg-yellow-100 p-3 rounded-sm mb-6 text-center max-w-md">
              Only {filteredTeams.length} team(s) match the current rating filter ({minRating.toFixed(1)} - {maxRating.toFixed(1)} stars{excludeNations ? ', excluding nations' : ''}). Need at least 2 to generate a match. Adjust settings.
            </p>
          )}
-          {!loading && !error && allTeams.length > 0 && filteredTeams.length >= 2 && !canGenerateNewMatch && (
+          {!loading && !initError && allTeams.length > 0 && filteredTeams.length >= 2 && !canGenerateNewMatch && (
            <p className="text-yellow-700 bg-yellow-100 p-3 rounded-sm mb-6 text-center max-w-md">
              All {filteredTeams.length} team(s) matching the filter{excludeNations ? ' (excluding nations)' : ''} have already played today. Cannot generate a new matchup.
            </p>
          )}
-         {!loading && !error && allTeams.length === 0 && (
-           <p className="text-gray-600 mb-6 text-center mt-8">No teams available to display.</p> 
+         {!loading && !initError && allTeams.length === 0 && (
+           <p className="text-gray-600 mb-6 text-center mt-8">No teams available to display.</p>
          )}
 
          {/* Main Page Content */}
          {currentPage === 'main' && (
            <>
-             {/* Match History */}
-             {!loading && !error && (
-                 <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading today's matches">
+                 <CollapsibleSection title="Today's Matches" storageKey="section-todayMatches" badge={matchesToday.length} defaultOpen={true}>
+                   <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} hideTitle />
+                 </CollapsibleSection>
+               </ErrorBoundary>
              )}
 
-             {/* Player Standings */}
-             {!loading && !error && (
-                  <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} title="Player Standings (Today)" matches={matchesToday} />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading standings">
+                 <CollapsibleSection title="Player Standings (Today)" storageKey="section-standingsToday" defaultOpen={true}>
+                   <PlayerStandings standings={playerStandings} loading={loadingHistory} error={historyError} title="Player Standings (Today)" matches={matchesToday} hideTitle />
+                 </CollapsibleSection>
+               </ErrorBoundary>
              )}
 
-             {/* Overall Player Standings */}
-             {!loading && !error && (
-                  <PlayerStandings
-                    standings={overallPlayerStandings}
-                    loading={loadingAllMatches}
-                    error={allMatchesError}
-                    title="Player Standings (Overall)"
-                    matches={allMatches}
-                    allPlayers={allPlayers}
-                    allTeams={allTeams}
-                    enableVersionFilter={true}
-                  />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading overall standings">
+                 <CollapsibleSection title="Player Standings (Overall)" storageKey="section-standingsOverall" defaultOpen={false}>
+                   <PlayerStandings
+                      standings={overallPlayerStandings}
+                      loading={loadingAllMatches}
+                      error={allMatchesError}
+                      title="Player Standings (Overall)"
+                      matches={allMatches}
+                      allPlayers={allPlayers}
+                      allTeams={allTeams}
+                      enableVersionFilter={true}
+                      hideTitle
+                    />
+                 </CollapsibleSection>
+               </ErrorBoundary>
              )}
 
-             {/* Player Top Teams */}
-             {!loading && !error && (
-                  <PlayerTopTeams
-                    allPlayers={allPlayers}
-                    allMatches={allMatches}
-                    allTeams={allTeams}
-                    loading={loadingAllMatches}
-                    error={allMatchesError}
-                  />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading player top teams">
+                 <CollapsibleSection title="Top 3 Teams per Player" storageKey="section-playerTopTeams" defaultOpen={false}>
+                   <PlayerTopTeams
+                      allPlayers={allPlayers}
+                      allMatches={allMatches}
+                      allTeams={allTeams}
+                      loading={loadingAllMatches}
+                      error={allMatchesError}
+                      hideTitle
+                    />
+                 </CollapsibleSection>
+               </ErrorBoundary>
              )}
 
-             {/* Top Win Percentage Teams */}
-             {!loading && !error && (
-                  <TopWinPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading win percentage teams">
+                 <CollapsibleSection title="Top Win % Teams" storageKey="section-topWin" defaultOpen={false}>
+                   <TopWinPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} hideTitle />
+                 </CollapsibleSection>
+               </ErrorBoundary>
              )}
 
-             {/* Top Loss Percentage Teams */}
-             {!loading && !error && (
-                  <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading loss percentage teams">
+                 <CollapsibleSection title="Top Loss % Teams" storageKey="section-topLoss" defaultOpen={false}>
+                   <TopLossPercentageTeams teamStandings={teamStatistics} loading={loadingAllMatches} error={allMatchesError} allMatches={allMatches} hideTitle />
+                 </CollapsibleSection>
+               </ErrorBoundary>
              )}
 
-             {/* Player Win Percentage Matrix */}
-             {!loading && !error && (
-                  <PlayerWinMatrix allPlayers={allPlayers} allMatches={allMatches} loading={loadingAllMatches} error={allMatchesError} />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading head-to-head matrix">
+                 <CollapsibleSection title="Head-to-Head Matrix" storageKey="section-winMatrix" defaultOpen={false}>
+                   <PlayerWinMatrix allPlayers={allPlayers} allMatches={allMatches} loading={loadingAllMatches} error={allMatchesError} hideTitle />
+                 </CollapsibleSection>
+               </ErrorBoundary>
              )}
 
-              User Management - Admin Only
-             <AdminOnly>
-               {!loading && !error && (
-                 <UserManagement />
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading achievements">
+                 <CollapsibleSection title="Player Achievements" storageKey="section-achievements" defaultOpen={false}>
+                   <PlayerAchievements allMatches={allMatches} allPlayers={allPlayers} allTeams={allTeams} loading={loadingAllMatches} error={allMatchesError} />
+                 </CollapsibleSection>
+               </ErrorBoundary>
+             )}
+
+              <AdminOnly>
+               {!loading && !initError && (
+                 <ErrorBoundary fallbackTitle="Error loading user management">
+                   <CollapsibleSection title="User Management" storageKey="section-userManagement" defaultOpen={false}>
+                     <UserManagement />
+                   </CollapsibleSection>
+                 </ErrorBoundary>
                )}
              </AdminOnly>
            </>
@@ -1103,27 +414,29 @@ function App() {
 
          {/* All Matches Page Content */}
          {currentPage === 'allMatches' && (
-             <AllMatches 
-               allMatches={allMatches} 
-               loading={loadingAllMatches} 
-               error={allMatchesError} 
-               onRefresh={handleRefreshAllMatches} 
-               allPlayers={allPlayers} 
+           <ErrorBoundary fallbackTitle="Error loading all matches">
+             <AllMatches
+               allMatches={allMatches}
+               loading={loadingAllMatches}
+               error={allMatchesError}
+               onRefresh={handleRefreshAllMatches}
+               allPlayers={allPlayers}
              />
+           </ErrorBoundary>
          )}
       </main>
 
       {/* Modals */}
-      <EditTeamModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} allTeams={filteredTeams.filter(team => !playedTeamIdsToday.has(team.id))} onTeamSelected={handleUpdateTeam} currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined} />
+      <EditTeamModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} allTeams={filteredTeams.filter(team => !playedTeamIdsToday.has(team.id))} onTeamSelected={handleTeamSelected} currentTeam={editingTeamIndex !== null && match ? match[editingTeamIndex] : undefined} />
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={handleCloseSettingsModal}
         onSave={handleSaveSettings}
         initialMinRating={minRating}
         initialMaxRating={maxRating}
-        initialExcludeNations={excludeNations} // Pass initial state
-        initialSelectedVersion={selectedVersion} // Pass initial version state
-        initialMaxOvrDiff={maxOvrDiff} // Pass initial max OVR diff state
+        initialExcludeNations={excludeNations}
+        initialSelectedVersion={selectedVersion}
+        initialMaxOvrDiff={maxOvrDiff}
         allPlayers={allPlayers}
         onUpdatePlayerName={handleUpdatePlayerName}
       />
@@ -1135,6 +448,20 @@ function App() {
          initialTeam1Players={initialMatchPlayers?.team1Players}
          initialTeam2Players={initialMatchPlayers?.team2Players}
        />
+      {/* Bottom Navigation (mobile only) */}
+      {!loading && !initError && allTeams.length > 0 && (
+        <BottomNav
+          onNewMatchup={() => handleGenerateNewMatch()}
+          onAddMatch={handleOpenAddMatchModal}
+          onAllMatches={handleNavigateToAllMatches}
+          onSettings={handleOpenSettingsModal}
+          onBackToMain={handleNavigateToMain}
+          canGenerateNewMatch={canGenerateNewMatch}
+          hasMatch={!!match}
+          isAdmin={isAdmin}
+          currentPage={currentPage}
+        />
+      )}
       </AuthWrapper>
     </div>
   );

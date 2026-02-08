@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PlayerStanding, MatchHistoryItem, Player, Team } from '../types';
 import PlayerMatchDetails from './PlayerMatchDetails';
 import { supabase } from '../lib/supabaseClient';
+import { calculateStandings } from '../utils/standingsUtils';
 
 interface PlayerStandingsProps {
   standings: PlayerStanding[];
   loading: boolean; // Pass loading state if calculation depends on async data
   error: string | null; // Pass error state
   title?: string; // Optional title prop
+  hideTitle?: boolean;
   matches: MatchHistoryItem[]; // Matches data to show when clicking on a player
   allPlayers?: Player[]; // All players for recalculating standings
   allTeams?: Team[]; // All teams for recalculating standings
@@ -22,7 +24,8 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
   matches,
   allPlayers,
   allTeams,
-  enableVersionFilter = false
+  enableVersionFilter = false,
+  hideTitle = false
 }) => {
   const [selectedPlayer, setSelectedPlayer] = useState<{ id: string; name: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string>('All');
@@ -77,83 +80,8 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
 
     console.log(`[PlayerStandings] Filtered ${versionFilteredMatches.length} matches for version ${selectedVersion}`);
 
-    // Recalculate standings based on filtered matches
-    const standingsMap = new Map<string, PlayerStanding>();
-    const teamMap = new Map(allTeams.map(t => [t.id, t]));
-
-    allPlayers.forEach(player => {
-      standingsMap.set(player.id, {
-        playerId: player.id,
-        playerName: player.name,
-        points: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        goalDifference: 0,
-        totalOverallRating: 0,
-        matchesPlayed: 0,
-      });
-    });
-
-    versionFilteredMatches.forEach(match => {
-      const team1 = teamMap.get(match.team1_id);
-      const team2 = teamMap.get(match.team2_id);
-
-      const hasScores = match.team1_score !== null && match.team2_score !== null;
-      if (!hasScores) return;
-
-      let winnerTeamNumber: 1 | 2 | null = null;
-      const score1 = match.team1_score!;
-      const score2 = match.team2_score!;
-      if (score1 > score2) winnerTeamNumber = 1;
-      else if (score2 > score1) winnerTeamNumber = 2;
-      else if (score1 === score2 && match.penalties_winner) {
-        winnerTeamNumber = match.penalties_winner;
-      }
-
-      match.team1_players.forEach(player => {
-        const standing = standingsMap.get(player.id);
-        if (standing) {
-          standing.goalsFor += match.team1_score!;
-          standing.goalsAgainst += match.team2_score!;
-          if (winnerTeamNumber === 1) {
-            standing.points += 1;
-          }
-          if (team1) {
-            standing.totalOverallRating += team1.overallRating;
-            standing.matchesPlayed += 1;
-          }
-        }
-      });
-
-      match.team2_players.forEach(player => {
-        const standing = standingsMap.get(player.id);
-        if (standing) {
-          standing.goalsFor += match.team2_score!;
-          standing.goalsAgainst += match.team1_score!;
-          if (winnerTeamNumber === 2) {
-            standing.points += 1;
-          }
-          if (team2) {
-            standing.totalOverallRating += team2.overallRating;
-            standing.matchesPlayed += 1;
-          }
-        }
-      });
-    });
-
-    const standingsArray = Array.from(standingsMap.values()).map(s => ({
-      ...s,
-      goalDifference: s.goalsFor - s.goalsAgainst
-    }));
-
-    standingsArray.sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-      return b.goalsFor - a.goalsFor;
-    });
-
-    console.log('[PlayerStandings] Recalculated standings:', standingsArray);
-    return standingsArray;
+    // Recalculate standings based on filtered matches using shared utility
+    return calculateStandings(versionFilteredMatches, allPlayers, allTeams);
   }, [enableVersionFilter, selectedVersion, matches, allPlayers, allTeams, standings]);
 
   // Use filtered matches for the player details modal
@@ -167,9 +95,9 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
   }, [enableVersionFilter, selectedVersion, matches]);
   
   return (
-    <div className="w-full max-w-4xl mt-8">
+    <div className="w-full max-w-4xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-        <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>
+        {!hideTitle && <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>}
         
         {/* Version Filter Dropdown - only shown when enableVersionFilter is true */}
         {enableVersionFilter && (

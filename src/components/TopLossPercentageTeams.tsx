@@ -10,6 +10,7 @@ interface TopLossPercentageTeamsProps {
   error: string | null;
   title?: string;
   allMatches: MatchHistoryItem[];
+  hideTitle?: boolean;
 }
 
 const TopLossPercentageTeams: React.FC<TopLossPercentageTeamsProps> = ({ 
@@ -17,7 +18,8 @@ const TopLossPercentageTeams: React.FC<TopLossPercentageTeamsProps> = ({
   loading, 
   error, 
   title = "Top 5 Teams with Highest Loss Percentage",
-  allMatches
+  allMatches,
+  hideTitle = false,
 }) => {
   const [selectedTeam, setSelectedTeam] = useState<{ id: string; name: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string>('All');
@@ -132,9 +134,9 @@ const TopLossPercentageTeams: React.FC<TopLossPercentageTeamsProps> = ({
     .slice(0, 5); // Top 5 teams
 
   return (
-    <div className="w-full max-w-4xl mt-8">
+    <div className="w-full max-w-4xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-        <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>
+        {!hideTitle && <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>}
         <div className="flex items-center gap-2">
           <label htmlFor="version-filter-loss" className="text-sm font-medium text-gray-700">
             Version:

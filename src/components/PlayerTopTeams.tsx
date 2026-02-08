@@ -10,6 +10,7 @@ interface PlayerTopTeamsProps {
   allTeams: Team[];
   loading: boolean;
   error: string | null;
+  hideTitle?: boolean;
 }
 
 interface TeamStats {
@@ -33,6 +34,7 @@ const PlayerTopTeams: React.FC<PlayerTopTeamsProps> = ({
   allTeams,
   loading,
   error,
+  hideTitle = false,
 }) => {
   const [selectedVersion, setSelectedVersion] = useState<string>('All');
   const [availableVersions, setAvailableVersions] = useState<string[]>([]);
@@ -195,9 +197,9 @@ const PlayerTopTeams: React.FC<PlayerTopTeamsProps> = ({
   }, [allPlayers, filteredMatches, allTeams]);
 
   return (
-    <div className="w-full max-w-6xl mt-8">
+    <div className="w-full max-w-6xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-        <h2 className="text-2xl font-semibold text-gray-700">Top 3 Teams per Player</h2>
+        {!hideTitle && <h2 className="text-2xl font-semibold text-gray-700">Top 3 Teams per Player</h2>}
         <div className="flex items-center gap-2">
           <label htmlFor="version-filter-top-teams" className="text-sm font-medium text-gray-700">
             Version:
