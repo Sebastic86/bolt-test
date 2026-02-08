@@ -120,6 +120,8 @@ export const getSmartOpponent = (
 
   if (referenceLeague === 'Nation') {
     availableTeams = availableTeams.filter(team => team.league === 'Nation');
+  } else {
+    availableTeams = availableTeams.filter(team => team.league !== 'Nation');
   }
 
   if (maxOvrDiff !== undefined) {
