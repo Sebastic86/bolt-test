@@ -52,7 +52,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     <div className="w-full max-w-4xl mt-8">
       <button
         onClick={handleToggle}
-        className="w-full flex items-center justify-between py-3 px-1 group cursor-pointer focus:outline-hidden"
+        className="w-full flex items-center justify-between py-3 px-1 group cursor-pointer focus:outline-none"
         aria-expanded={isOpen}
       >
         <div className="flex items-center space-x-3">

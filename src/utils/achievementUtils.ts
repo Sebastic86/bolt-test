@@ -14,6 +14,7 @@ export interface Achievement {
   emoji: string;
   description: string;
   earnedCount: number;
+  matchIds: string[]; // Track which matches this achievement was earned in
 }
 
 export interface PlayerAchievementData {
@@ -105,11 +106,25 @@ export function calculatePlayerAchievements(
 
   return allPlayers.map(player => {
     const results: WinResult[] = [];
-    let giantKillerCount = 0;
-    let cleanSheetCount = 0;
-    let demolitionCount = 0;
-    let penaltySpecialistCount = 0;
+
+    // Track match IDs for each achievement type
+    const giantKillerMatches: string[] = [];
+    const cleanSheetMatches: string[] = [];
+    const demolitionMatches: string[] = [];
+    const penaltySpecialistMatches: string[] = [];
+    const lightningStrikeMatches: string[] = [];
+    const diamondLeagueMatches: string[] = [];
+    const underdogHeroMatches: string[] = [];
+    const comebackMatches: string[] = [];
+
+    // Track for consistency and versatility
+    const teamWinCounts = new Map<string, number>();
+    const uniqueTeamsWon = new Set<string>();
+
     let totalMatches = 0;
+    let totalWins = 0;
+    let currentLossStreak = 0;
+    let maxLossStreakBeforeWin = 0;
 
     for (const match of sortedMatches) {
       const { result, teamNumber } = getPlayerResult(match, player.id);
@@ -126,80 +141,311 @@ export function calculatePlayerAchievements(
       const playerScore = teamNumber === 1 ? match.team1_score! : match.team2_score!;
       const opponentScore = teamNumber === 1 ? match.team2_score! : match.team1_score!;
 
-      if (result === 'win') {
+      // Track loss streaks for Comeback Kid
+      if (result === 'loss') {
+        currentLossStreak++;
+        maxLossStreakBeforeWin = Math.max(maxLossStreakBeforeWin, currentLossStreak);
+      } else if (result === 'win') {
+        totalWins++;
+
+        // Comeback Kid: won after having 3+ loss streak
+        if (currentLossStreak >= 3) {
+          comebackMatches.push(match.id);
+        }
+        currentLossStreak = 0;
+
+        // Track team consistency
+        const teamKey = `${playerTeamId}`;
+        teamWinCounts.set(teamKey, (teamWinCounts.get(teamKey) || 0) + 1);
+        uniqueTeamsWon.add(teamKey);
+
         // Giant Killer: won with team OVR 5+ lower
         if (playerTeam && opponentTeam && (opponentTeam.overallRating - playerTeam.overallRating) >= 5) {
-          giantKillerCount++;
+          giantKillerMatches.push(match.id);
         }
 
         // Demolition: won by 4+ goals
         if ((playerScore - opponentScore) >= 4) {
-          demolitionCount++;
+          demolitionMatches.push(match.id);
+        }
+
+        // Lightning Strike: scored 6+ goals
+        if (playerScore >= 6) {
+          lightningStrikeMatches.push(match.id);
         }
 
         // Penalty Specialist: won on penalties
         if (match.team1_score === match.team2_score && match.penalties_winner === teamNumber) {
-          penaltySpecialistCount++;
+          penaltySpecialistMatches.push(match.id);
+        }
+
+        // Diamond League: won with 90+ OVR team
+        if (playerTeam && playerTeam.overallRating >= 90) {
+          diamondLeagueMatches.push(match.id);
+        }
+
+        // Underdog Hero: won with sub-70 OVR team
+        if (playerTeam && playerTeam.overallRating < 70) {
+          underdogHeroMatches.push(match.id);
         }
       }
 
-      // Clean Sheet: conceded 0 goals and scored at least 1
+      // Clean Sheet: conceded 0 goals and scored at least 1 (can be in loss/win)
       if (opponentScore === 0 && playerScore > 0) {
-        cleanSheetCount++;
+        cleanSheetMatches.push(match.id);
       }
     }
 
     const streak = calculateStreak(results);
+    const winRate = totalMatches > 0 ? (totalWins / totalMatches) * 100 : 0;
 
     const achievements: Achievement[] = [];
 
-    if (giantKillerCount > 0) {
+    // Giant Killer
+    if (giantKillerMatches.length > 0) {
       achievements.push({
         id: 'giant-killer',
         name: 'Giant Killer',
         emoji: '🗡️',
         description: 'Won with a team 5+ OVR lower than opponent',
-        earnedCount: giantKillerCount,
+        earnedCount: giantKillerMatches.length,
+        matchIds: giantKillerMatches,
       });
     }
 
-    if (cleanSheetCount > 0) {
+    // Clean Sheet King
+    if (cleanSheetMatches.length > 0) {
       achievements.push({
         id: 'clean-sheet',
         name: 'Clean Sheet King',
         emoji: '🧤',
         description: 'Kept a clean sheet (0 goals conceded, 1+ scored)',
-        earnedCount: cleanSheetCount,
+        earnedCount: cleanSheetMatches.length,
+        matchIds: cleanSheetMatches,
       });
     }
 
-    if (demolitionCount > 0) {
+    // Fortress (5+ clean sheets)
+    if (cleanSheetMatches.length >= 5) {
+      achievements.push({
+        id: 'fortress',
+        name: 'Fortress',
+        emoji: '🛡️',
+        description: 'Achieved 5+ clean sheets',
+        earnedCount: 1,
+        matchIds: cleanSheetMatches,
+      });
+    }
+
+    // Demolition
+    if (demolitionMatches.length > 0) {
       achievements.push({
         id: 'demolition',
         name: 'Demolition',
         emoji: '💀',
         description: 'Won by 4+ goals difference',
-        earnedCount: demolitionCount,
+        earnedCount: demolitionMatches.length,
+        matchIds: demolitionMatches,
       });
     }
 
-    if (penaltySpecialistCount > 0) {
+    // Lightning Strike
+    if (lightningStrikeMatches.length > 0) {
+      achievements.push({
+        id: 'lightning-strike',
+        name: 'Lightning Strike',
+        emoji: '⚡',
+        description: 'Scored 6+ goals in a match',
+        earnedCount: lightningStrikeMatches.length,
+        matchIds: lightningStrikeMatches,
+      });
+    }
+
+    // Penalty Specialist
+    if (penaltySpecialistMatches.length > 0) {
       achievements.push({
         id: 'penalty-specialist',
         name: 'Penalty Specialist',
         emoji: '🤝',
         description: 'Won a match on penalties',
-        earnedCount: penaltySpecialistCount,
+        earnedCount: penaltySpecialistMatches.length,
+        matchIds: penaltySpecialistMatches,
       });
     }
 
+    // Lucky Charm (3+ penalty wins)
+    if (penaltySpecialistMatches.length >= 3) {
+      achievements.push({
+        id: 'lucky-charm',
+        name: 'Lucky Charm',
+        emoji: '🎲',
+        description: 'Won 3+ matches on penalties',
+        earnedCount: 1,
+        matchIds: penaltySpecialistMatches,
+      });
+    }
+
+    // Hot Streak (3+ win streak)
     if (streak.longestWinStreak >= 3) {
+      // Find matches that contributed to the longest win streak
+      const streakMatches: string[] = [];
+      let tempStreak = 0;
+      let longestStreakMatches: string[] = [];
+
+      for (let i = 0; i < sortedMatches.length; i++) {
+        const match = sortedMatches[i];
+        const { result } = getPlayerResult(match, player.id);
+        if (result === 'win') {
+          tempStreak++;
+          streakMatches.push(match.id);
+          if (tempStreak === streak.longestWinStreak) {
+            longestStreakMatches = [...streakMatches];
+          }
+        } else if (result === 'loss') {
+          tempStreak = 0;
+          streakMatches.length = 0;
+        }
+      }
+
       achievements.push({
         id: 'hot-streak',
         name: 'Hot Streak',
         emoji: '🔥',
         description: `Achieved a ${streak.longestWinStreak}-game win streak`,
         earnedCount: 1,
+        matchIds: longestStreakMatches,
+      });
+    }
+
+    // Unbeatable (5+ win streak)
+    if (streak.longestWinStreak >= 5) {
+      const streakMatches: string[] = [];
+      let tempStreak = 0;
+      let longestStreakMatches: string[] = [];
+
+      for (let i = 0; i < sortedMatches.length; i++) {
+        const match = sortedMatches[i];
+        const { result } = getPlayerResult(match, player.id);
+        if (result === 'win') {
+          tempStreak++;
+          streakMatches.push(match.id);
+          if (tempStreak === streak.longestWinStreak) {
+            longestStreakMatches = [...streakMatches];
+          }
+        } else if (result === 'loss') {
+          tempStreak = 0;
+          streakMatches.length = 0;
+        }
+      }
+
+      achievements.push({
+        id: 'unbeatable',
+        name: 'Unbeatable',
+        emoji: '🏆',
+        description: `Achieved a ${streak.longestWinStreak}-game win streak`,
+        earnedCount: 1,
+        matchIds: longestStreakMatches,
+      });
+    }
+
+    // Consistency King (3+ wins with same team)
+    const consistentTeams = Array.from(teamWinCounts.entries()).filter(([_, count]) => count >= 3);
+    if (consistentTeams.length > 0) {
+      const consistencyMatches: string[] = [];
+      for (const match of sortedMatches) {
+        const { result, teamNumber } = getPlayerResult(match, player.id);
+        if (result === 'win' && teamNumber !== null) {
+          const playerTeamId = teamNumber === 1 ? match.team1_id : match.team2_id;
+          if (consistentTeams.some(([teamKey]) => teamKey === playerTeamId)) {
+            consistencyMatches.push(match.id);
+          }
+        }
+      }
+
+      achievements.push({
+        id: 'consistency-king',
+        name: 'Consistency King',
+        emoji: '🎯',
+        description: 'Won 3+ matches with the same team',
+        earnedCount: consistentTeams.length,
+        matchIds: consistencyMatches,
+      });
+    }
+
+    // Versatile (5+ different teams won with)
+    if (uniqueTeamsWon.size >= 5) {
+      const versatileMatches: string[] = [];
+      for (const match of sortedMatches) {
+        const { result, teamNumber } = getPlayerResult(match, player.id);
+        if (result === 'win' && teamNumber !== null) {
+          versatileMatches.push(match.id);
+        }
+      }
+
+      achievements.push({
+        id: 'versatile',
+        name: 'Versatile',
+        emoji: '🎭',
+        description: `Won with ${uniqueTeamsWon.size} different teams`,
+        earnedCount: 1,
+        matchIds: versatileMatches,
+      });
+    }
+
+    // Diamond League
+    if (diamondLeagueMatches.length > 0) {
+      achievements.push({
+        id: 'diamond-league',
+        name: 'Diamond League',
+        emoji: '💎',
+        description: 'Won with a 90+ OVR rated team',
+        earnedCount: diamondLeagueMatches.length,
+        matchIds: diamondLeagueMatches,
+      });
+    }
+
+    // Underdog Hero
+    if (underdogHeroMatches.length > 0) {
+      achievements.push({
+        id: 'underdog-hero',
+        name: 'Underdog Hero',
+        emoji: '🌟',
+        description: 'Won with a team rated below 70 OVR',
+        earnedCount: underdogHeroMatches.length,
+        matchIds: underdogHeroMatches,
+      });
+    }
+
+    // Comeback Kid
+    if (comebackMatches.length > 0) {
+      achievements.push({
+        id: 'comeback-kid',
+        name: 'Comeback Kid',
+        emoji: '🔄',
+        description: 'Won a match after having a 3+ loss streak',
+        earnedCount: comebackMatches.length,
+        matchIds: comebackMatches,
+      });
+    }
+
+    // Perfectionist (75%+ win rate with 10+ matches)
+    if (totalMatches >= 10 && winRate >= 75) {
+      // Include all wins for perfectionist
+      const perfectionistMatches: string[] = [];
+      for (const match of sortedMatches) {
+        const { result } = getPlayerResult(match, player.id);
+        if (result === 'win') {
+          perfectionistMatches.push(match.id);
+        }
+      }
+
+      achievements.push({
+        id: 'perfectionist',
+        name: 'Perfectionist',
+        emoji: '📈',
+        description: `Maintained ${winRate.toFixed(0)}% win rate over ${totalMatches} matches`,
+        earnedCount: 1,
+        matchIds: perfectionistMatches,
       });
     }
 
