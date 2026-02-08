@@ -20,6 +20,7 @@ import MatchComparison from './components/MatchComparison';
 import PlayerAchievements from './components/PlayerAchievements';
 import MatchRevealAnimation from './components/MatchRevealAnimation';
 import ErrorBoundary from './components/ErrorBoundary';
+import GameSessions from './components/GameSessions';
 import { Team, Player } from './types';
 import { supabase } from './lib/supabaseClient';
 import { useAuth } from './contexts/AuthContext';
@@ -323,6 +324,14 @@ function App() {
                <ErrorBoundary fallbackTitle="Error loading today's matches">
                  <CollapsibleSection title="Today's Matches" storageKey="section-todayMatches" badge={matchesToday.length} defaultOpen={true}>
                    <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} hideTitle />
+                 </CollapsibleSection>
+               </ErrorBoundary>
+             )}
+
+             {!loading && !initError && (
+               <ErrorBoundary fallbackTitle="Error loading game sessions">
+                 <CollapsibleSection title="Game Sessions" storageKey="section-gameSessions" defaultOpen={false}>
+                   <GameSessions allMatches={allMatches} allPlayers={allPlayers} loading={loadingAllMatches} error={allMatchesError} hideTitle />
                  </CollapsibleSection>
                </ErrorBoundary>
              )}
