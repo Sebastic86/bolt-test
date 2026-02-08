@@ -33,9 +33,24 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   const [contentHeight, setContentHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    if (contentRef.current) {
-      setContentHeight(contentRef.current.scrollHeight);
-    }
+    if (!contentRef.current) return;
+
+    // Use ResizeObserver to dynamically track content height changes
+    // This handles nested collapsibles (like PlayerAchievements cards)
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContentHeight(entry.target.scrollHeight);
+      }
+    });
+
+    resizeObserver.observe(contentRef.current);
+
+    // Initial height calculation
+    setContentHeight(contentRef.current.scrollHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [children, isOpen]);
 
   const handleToggle = () => {

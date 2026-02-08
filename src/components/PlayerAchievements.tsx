@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { MatchHistoryItem, Player, Team } from '../types';
 import { calculatePlayerAchievements, PlayerAchievementData, Achievement } from '../utils/achievementUtils';
-import { ChevronDown, Trophy, X, Calendar, Shield } from 'lucide-react';
+import { ChevronDown, Trophy, X, Calendar, Shield, Users } from 'lucide-react';
 
 interface PlayerAchievementsProps {
   allMatches: MatchHistoryItem[];
@@ -15,9 +15,173 @@ interface AchievementModalProps {
   achievement: Achievement | null;
   matches: MatchHistoryItem[];
   onClose: () => void;
+  onMatchClick: (match: MatchHistoryItem) => void;
 }
 
-const AchievementModal: React.FC<AchievementModalProps> = ({ achievement, matches, onClose }) => {
+interface MatchDetailsModalProps {
+  match: MatchHistoryItem | null;
+  onClose: () => void;
+}
+
+const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({ match, onClose }) => {
+  if (!match) return null;
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-brand-dark to-brand-light p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-6 h-6 text-white" />
+            <div>
+              <h2 className="text-xl font-bold text-white">Match Details</h2>
+              <p className="text-sm text-white/90">{formatDate(match.played_at)}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-white/20 p-1 rounded-full transition-colors"
+            aria-label="Close modal"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Match Score Section */}
+        <div className="p-6 bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center justify-between gap-8">
+            {/* Team 1 */}
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <div className="w-16 h-16 flex items-center justify-center bg-white rounded-lg shadow-sm mb-2">
+                {match.team1_logoUrl ? (
+                  <img
+                    src={match.team1_logoUrl}
+                    alt={match.team1_name}
+                    className="w-12 h-12 object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <Shield className="w-8 h-8 text-gray-400 hidden" />
+              </div>
+              <p className="text-lg font-bold text-gray-800 text-center truncate w-full">{match.team1_name}</p>
+              <p className="text-sm text-gray-500">{match.team1_version}</p>
+            </div>
+
+            {/* Score */}
+            <div className="flex flex-col items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl font-bold text-gray-800">{match.team1_score}</span>
+                <span className="text-2xl text-gray-400">-</span>
+                <span className="text-4xl font-bold text-gray-800">{match.team2_score}</span>
+              </div>
+              {match.penalties_winner && (
+                <span className="mt-2 text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-medium">
+                  Won on Penalties
+                </span>
+              )}
+            </div>
+
+            {/* Team 2 */}
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <div className="w-16 h-16 flex items-center justify-center bg-white rounded-lg shadow-sm mb-2">
+                {match.team2_logoUrl ? (
+                  <img
+                    src={match.team2_logoUrl}
+                    alt={match.team2_name}
+                    className="w-12 h-12 object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <Shield className="w-8 h-8 text-gray-400 hidden" />
+              </div>
+              <p className="text-lg font-bold text-gray-800 text-center truncate w-full">{match.team2_name}</p>
+              <p className="text-sm text-gray-500">{match.team2_version}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Players Section */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Team 1 Players */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-5 h-5 text-brand-dark" />
+                <h3 className="text-lg font-semibold text-gray-800">{match.team1_name}</h3>
+              </div>
+              <div className="space-y-2">
+                {match.team1_players.length > 0 ? (
+                  match.team1_players.map((player) => (
+                    <div
+                      key={player.id}
+                      className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2"
+                    >
+                      <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
+                        {player.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-gray-800">{player.name}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No players recorded</p>
+                )}
+              </div>
+            </div>
+
+            {/* Team 2 Players */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-5 h-5 text-brand-dark" />
+                <h3 className="text-lg font-semibold text-gray-800">{match.team2_name}</h3>
+              </div>
+              <div className="space-y-2">
+                {match.team2_players.length > 0 ? (
+                  match.team2_players.map((player) => (
+                    <div
+                      key={player.id}
+                      className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2"
+                    >
+                      <div className="w-8 h-8 bg-red-200 rounded-full flex items-center justify-center text-red-700 font-bold text-sm">
+                        {player.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-gray-800">{player.name}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No players recorded</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-gray-50 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="w-full bg-brand-dark text-white py-2 px-4 rounded-sm hover:bg-brand-darker transition-colors font-medium"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AchievementModal: React.FC<AchievementModalProps> = ({ achievement, matches, onClose, onMatchClick }) => {
   if (!achievement) return null;
 
   // Filter matches that earned this achievement
@@ -69,9 +233,10 @@ const AchievementModal: React.FC<AchievementModalProps> = ({ achievement, matche
           ) : (
             <div className="space-y-3">
               {achievementMatches.map((match) => (
-                <div
+                <button
                   key={match.id}
-                  className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                  onClick={() => onMatchClick(match)}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md hover:border-brand-light transition-all cursor-pointer text-left"
                 >
                   {/* Date */}
                   <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
@@ -137,7 +302,7 @@ const AchievementModal: React.FC<AchievementModalProps> = ({ achievement, matche
                       </div>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -166,10 +331,29 @@ const PlayerAchievements: React.FC<PlayerAchievementsProps> = ({
 }) => {
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<MatchHistoryItem | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<string>('All Versions');
+
+  // Get unique versions from all teams
+  const availableVersions = useMemo(() => {
+    const versions = new Set<string>();
+    allTeams.forEach(team => versions.add(team.version));
+    return ['All Versions', ...Array.from(versions).sort()];
+  }, [allTeams]);
+
+  // Filter matches by selected version
+  const filteredMatches = useMemo(() => {
+    if (selectedVersion === 'All Versions') {
+      return allMatches;
+    }
+    return allMatches.filter(match =>
+      match.team1_version === selectedVersion || match.team2_version === selectedVersion
+    );
+  }, [allMatches, selectedVersion]);
 
   const playerData = useMemo(() => {
-    return calculatePlayerAchievements(allMatches, allPlayers, allTeams);
-  }, [allMatches, allPlayers, allTeams]);
+    return calculatePlayerAchievements(filteredMatches, allPlayers, allTeams);
+  }, [filteredMatches, allPlayers, allTeams]);
 
   const togglePlayer = (playerId: string) => {
     setExpandedPlayerId(prev => (prev === playerId ? null : playerId));
@@ -179,8 +363,16 @@ const PlayerAchievements: React.FC<PlayerAchievementsProps> = ({
     setSelectedAchievement(achievement);
   };
 
-  const closeModal = () => {
+  const handleMatchClick = (match: MatchHistoryItem) => {
+    setSelectedMatch(match);
+  };
+
+  const closeAchievementModal = () => {
     setSelectedAchievement(null);
+  };
+
+  const closeMatchModal = () => {
+    setSelectedMatch(null);
   };
 
   if (loading) {
@@ -198,6 +390,25 @@ const PlayerAchievements: React.FC<PlayerAchievementsProps> = ({
   return (
     <>
       <div className="w-full max-w-4xl">
+        {/* Version Filter Dropdown */}
+        <div className="mb-6">
+          <label htmlFor="version-filter" className="block text-sm font-medium text-gray-700 mb-2">
+            Filter by Version
+          </label>
+          <select
+            id="version-filter"
+            value={selectedVersion}
+            onChange={(e) => setSelectedVersion(e.target.value)}
+            className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-dark focus:border-transparent transition-all"
+          >
+            {availableVersions.map((version) => (
+              <option key={version} value={version}>
+                {version}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {playerData.map((player) => (
             <PlayerAchievementCard
@@ -215,8 +426,17 @@ const PlayerAchievements: React.FC<PlayerAchievementsProps> = ({
       {selectedAchievement && (
         <AchievementModal
           achievement={selectedAchievement}
-          matches={allMatches}
-          onClose={closeModal}
+          matches={filteredMatches}
+          onClose={closeAchievementModal}
+          onMatchClick={handleMatchClick}
+        />
+      )}
+
+      {/* Match Details Modal */}
+      {selectedMatch && (
+        <MatchDetailsModal
+          match={selectedMatch}
+          onClose={closeMatchModal}
         />
       )}
     </>
