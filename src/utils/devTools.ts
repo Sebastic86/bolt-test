@@ -23,13 +23,21 @@
 import { resolveAllTeamLogos, resolveTeamLogo } from '../scripts/resolveAllTeamLogos';
 import { clearLogoCache } from '../services/logoService';
 import { testTeamLogo, populateApiTeamNames } from '../scripts/populateApiTeamNames';
+import {
+  migrateAllLogosToStorage,
+  migrateTeamLogoToStorage,
+  checkStorageMigrationStatus,
+  listTeamsNeedingMigration,
+  testTeamStorageMigration,
+} from '../scripts/migrateLogosToStorage';
+import { getStorageStats } from '../services/logoStorageService';
 
 // Define the devTools interface
 export const devTools = {
   /**
    * Resolve all team logos and save to database
    */
-  async resolveAllLogos(forceUpdate = false, delayMs = 500) {
+  async resolveAllLogos(forceUpdate = false, delayMs = 2500) {
     console.log('🚀 Starting bulk logo resolution...');
     const stats = await resolveAllTeamLogos(forceUpdate, delayMs);
     console.log('✅ Complete!');
@@ -80,6 +88,67 @@ export const devTools = {
   },
 
   /**
+   * Migrate all logos to Supabase Storage
+   */
+  async migrateLogosToStorage(forceUpdate = false, delayMs = 500) {
+    console.log('🚀 Starting logo migration to Supabase Storage...');
+    const stats = await migrateAllLogosToStorage(forceUpdate, delayMs);
+    console.log('✅ Migration complete!');
+    console.log(`  Success: ${stats.success}`);
+    console.log(`  Failed: ${stats.failed}`);
+    console.log(`  Skipped: ${stats.skipped}`);
+    return stats;
+  },
+
+  /**
+   * Migrate single team logo to Supabase Storage
+   */
+  async migrateTeamLogoToStorage(teamId: string, forceUpdate = false) {
+    console.log(`🚀 Migrating logo for team: ${teamId}`);
+    const success = await migrateTeamLogoToStorage(teamId, forceUpdate);
+    if (success) {
+      console.log('✅ Logo migrated to Supabase Storage!');
+    } else {
+      console.log('❌ Failed to migrate logo');
+    }
+    return success;
+  },
+
+  /**
+   * Check storage migration status
+   */
+  async checkStorageMigrationStatus() {
+    await checkStorageMigrationStatus();
+  },
+
+  /**
+   * Get storage statistics
+   */
+  async getStorageStats() {
+    const stats = await getStorageStats();
+    console.log('📊 Storage Statistics:');
+    console.log(`  Total Teams: ${stats.totalTeams}`);
+    console.log(`  In Storage: ${stats.teamsInStorage}`);
+    console.log(`  Need Migration: ${stats.teamsNeedingMigration}`);
+    console.log(`  Without Logos: ${stats.teamsWithoutLogos}`);
+    return stats;
+  },
+
+  /**
+   * List teams needing migration
+   */
+  async listTeamsNeedingMigration() {
+    await listTeamsNeedingMigration();
+  },
+
+  /**
+   * Test storage migration for specific team
+   */
+  async testTeamStorageMigration(teamName: string) {
+    await testTeamStorageMigration(teamName);
+  },
+
+  /**
    * Show help information
    */
   help() {
@@ -87,12 +156,21 @@ export const devTools = {
 🛠️  Development Tools - Available Commands:
 
 📦 Logo Resolution:
-  await devTools.resolveAllLogos()          - Resolve all team logos
+  await devTools.resolveAllLogos()          - Resolve all team logos from API
   await devTools.resolveAllLogos(true)      - Force re-resolve all logos
   await devTools.resolveTeamLogo('uuid')    - Resolve single team logo
 
+☁️  Storage Migration:
+  await devTools.migrateLogosToStorage()    - Migrate all logos to Supabase Storage
+  await devTools.migrateLogosToStorage(true)- Force re-migrate all logos
+  await devTools.migrateTeamLogoToStorage('uuid') - Migrate single team
+  await devTools.checkStorageMigrationStatus() - Check migration progress
+  await devTools.getStorageStats()          - Get storage statistics
+  await devTools.listTeamsNeedingMigration()- List teams needing migration
+
 🧪 Testing:
-  await devTools.testTeamLogo('Arsenal')    - Test logo for specific team
+  await devTools.testTeamLogo('Arsenal')    - Test API logo resolution
+  await devTools.testTeamStorageMigration('Arsenal') - Test storage migration
 
 🗑️  Cache Management:
   devTools.clearCache()                     - Clear browser logo cache
@@ -103,8 +181,10 @@ export const devTools = {
 ❓ Help:
   devTools.help()                           - Show this help message
 
-Example:
-  await devTools.resolveAllLogos()
+Full Workflow Example:
+  1. await devTools.populateApiNames()      - Populate API names
+  2. await devTools.resolveAllLogos()       - Resolve logos from API
+  3. await devTools.migrateLogosToStorage() - Migrate to Supabase Storage
     `);
   }
 };

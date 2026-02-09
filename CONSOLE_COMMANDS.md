@@ -14,7 +14,7 @@ Quick reference for development tools available in the browser console.
 ### 📦 Logo Resolution
 
 ```javascript
-// Resolve all team logos (recommended after setup)
+// Resolve all team logos from API (uses CORS proxy + backup)
 await devTools.resolveAllLogos()
 // Returns: { success: 245, failed: 5, skipped: 0 }
 
@@ -29,12 +29,43 @@ await devTools.resolveTeamLogo('team-uuid-here')
 // Returns: true/false
 ```
 
+### ☁️ Storage Migration
+
+```javascript
+// Migrate all logos to Supabase Storage
+await devTools.migrateLogosToStorage()
+// Returns: { success: 240, failed: 0, skipped: 10 }
+
+// Force re-migrate all logos
+await devTools.migrateLogosToStorage(true)
+
+// Migrate single team logo
+await devTools.migrateTeamLogoToStorage('team-uuid-here')
+// Returns: true/false
+
+// Check migration status
+await devTools.checkStorageMigrationStatus()
+// Shows: total teams, migrated, pending, without logos
+
+// Get storage statistics
+await devTools.getStorageStats()
+// Returns: { totalTeams, teamsInStorage, teamsNeedingMigration, teamsWithoutLogos }
+
+// List teams needing migration
+await devTools.listTeamsNeedingMigration()
+// Shows all teams with external URLs that need migration
+```
+
 ### 🧪 Testing
 
 ```javascript
-// Test logo resolution for a team
+// Test API logo resolution for a team
 await devTools.testTeamLogo('Bayern Munich')
 // Logs: team data, API search results, found logo URL
+
+// Test storage migration for a team
+await devTools.testTeamStorageMigration('Arsenal')
+// Tests downloading and uploading to Supabase Storage
 
 // Test with special characters
 await devTools.testTeamLogo('FC Bayern München')
@@ -59,22 +90,40 @@ devTools.clearCache()
 ### ❓ Help
 
 ```javascript
-// Show available commands
+// Show available commands with full workflow
 devTools.help()
 ```
 
 ## Common Workflows
 
-### Initial Setup
+### Initial Setup (With CORS Fix)
 
 ```javascript
 // 1. Populate API names
 await devTools.populateApiNames()
 
-// 2. Resolve all logos
+// 2. Resolve all logos (uses CORS proxy automatically)
 await devTools.resolveAllLogos()
 
-// Done! Logos are now permanently stored in database
+// 3. Migrate to Supabase Storage (recommended for best performance)
+await devTools.migrateLogosToStorage()
+
+// Done! Logos are now in your Supabase Storage
+```
+
+### Quick CORS Troubleshooting
+
+```javascript
+// 1. Test if CORS proxy is working
+await devTools.testTeamLogo('Arsenal')
+// Should see: Logo resolved successfully
+
+// 2. If still failing, clear cache and retry
+devTools.clearCache()
+await devTools.testTeamLogo('Arsenal')
+
+// 3. Check if API-Sports backup is configured
+// (See CORS_FIX.md for API-Sports setup)
 ```
 
 ### Troubleshooting a Team
@@ -175,6 +224,8 @@ If you need to run scripts in production:
 
 ## Need More Help?
 
-- Full documentation: `LOGO_MANAGEMENT.md`
-- Quick start guide: `QUICK_START_LOGOS.md`
-- Persistent storage guide: `PERSISTENT_LOGO_STORAGE.md`
+- **CORS issues**: `CORS_FIX.md` - Complete CORS troubleshooting guide
+- **Full documentation**: `LOGO_MANAGEMENT.md` - Complete logo system guide
+- **Quick start**: `QUICK_START_LOGOS.md` - Setup in 5 minutes
+- **Storage migration**: `SUPABASE_STORAGE_SETUP.md` - Migrate to Supabase Storage
+- **Persistent storage**: `PERSISTENT_LOGO_STORAGE.md` - Database storage details

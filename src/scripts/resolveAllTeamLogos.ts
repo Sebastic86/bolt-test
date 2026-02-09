@@ -116,7 +116,7 @@ async function fetchLogoByTeamName(teamName: string): Promise<string | null> {
  */
 export async function resolveAllTeamLogos(
   forceUpdate = false,
-  delayMs = 1500
+  delayMs = 3500
 ): Promise<{ success: number; failed: number; skipped: number }> {
   console.log('[resolveAllTeamLogos] Starting bulk logo resolution...');
 
@@ -126,7 +126,9 @@ export async function resolveAllTeamLogos(
     // Fetch all teams
     const query = supabase
       .from('teams')
-      .select('id, name, apiTeamId, apiTeamName, resolvedLogoUrl');
+      .select('id, name, apiTeamId, apiTeamName, resolvedLogoUrl')
+        .gte('rating',4)
+
 
     const { data: teams, error: fetchError } = await query;
 
@@ -199,6 +201,7 @@ export async function resolveAllTeamLogos(
 
       // Delay to avoid rate limiting
       if (delayMs > 0) {
+         console.log(`  Pausing for ${delayMs / 1000}s...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }

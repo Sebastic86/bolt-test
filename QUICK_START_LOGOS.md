@@ -144,17 +144,82 @@ This will:
 - Skip teams that already have resolved URLs
 - Report progress and statistics
 
+## Step 6: (Recommended) Migrate Logos to Supabase Storage
+
+For maximum reliability and control, migrate your logos to Supabase Storage!
+
+### Why Migrate?
+
+- **Full Control**: Own your images, no external dependencies
+- **Performance**: Fast CDN delivery via Supabase
+- **Reliability**: No risk of external URLs breaking
+- **Privacy**: No external tracking
+
+### Setup Supabase Storage Bucket
+
+1. Go to Supabase Dashboard → **Storage**
+2. Click **"New bucket"**
+3. Name: `team-logos`
+4. Check **"Public bucket"** (logos need to be publicly accessible)
+5. Click **"Create bucket"**
+
+### Migrate All Logos
+
+Open your browser console and run:
+
+```javascript
+// Migrate all logos to Supabase Storage
+await devTools.migrateLogosToStorage()
+
+// Check migration progress
+await devTools.checkStorageMigrationStatus()
+
+// Force re-migrate all logos
+await devTools.migrateLogosToStorage(true)
+```
+
+This will:
+- Download logos from TheSportsDB URLs
+- Upload to your Supabase Storage bucket
+- Update database with new Supabase URLs
+- Report progress and statistics
+
+Typical migration time: **~1-2 seconds per team** (with 500ms delay between uploads)
+
+### Verify Migration
+
+```javascript
+// Check how many teams are migrated
+await devTools.getStorageStats()
+
+// List teams that still need migration
+await devTools.listTeamsNeedingMigration()
+```
+
+After migration, your logos load from:
+```
+https://YOUR_PROJECT.supabase.co/storage/v1/object/public/team-logos/TEAM_UUID.png
+```
+
+For detailed storage setup instructions, see **`SUPABASE_STORAGE_SETUP.md`**
+
 ### Other Console Commands
 
 ```javascript
 // Show available commands
 devTools.help()
 
-// Test a specific team
+// Test API resolution for specific team
 await devTools.testTeamLogo('Bayern Munich')
+
+// Test storage migration for specific team
+await devTools.testTeamStorageMigration('Bayern Munich')
 
 // Resolve single team by ID
 await devTools.resolveTeamLogo('team-uuid-here')
+
+// Migrate single team to storage
+await devTools.migrateTeamLogoToStorage('team-uuid-here')
 
 // Clear browser cache
 devTools.clearCache()
@@ -167,8 +232,9 @@ devTools.clearCache()
 - ✅ **Auto-caching** - 7-day cache for performance
 - ✅ **Automatic fallback** - Uses local logos if API fails
 - ✅ **Easy to add teams** - Just provide team name
-- ✅ **NEW: Persistent storage** - Logos saved to database after first load (instant subsequent loads!)
-- ✅ **NEW: No repeated API calls** - Once resolved, logos load from database forever
+- ✅ **Persistent storage** - Logos saved to database after first load
+- ✅ **No repeated API calls** - Once resolved, logos load from database forever
+- ✅ **NEW: Supabase Storage** - Own your images with full control and CDN delivery!
 
 ## Next Steps
 

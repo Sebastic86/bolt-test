@@ -3,10 +3,21 @@
  */
 
 import { supabase } from '../lib/supabaseClient';
+import { fetchTeamLogoFromApiSports, isApiSportsConfigured } from './apiSportsService';
 
 const THESPORTSDB_API_BASE = 'https://www.thesportsdb.com/api/v1/json/3';
 const CACHE_KEY_PREFIX = 'team_logo_';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
+// CORS Proxy configuration
+const CORS_PROXY_URL = import.meta.env.VITE_CORS_PROXY_URL || 'https://corsproxy.io/?';
+
+/**
+ * Wrap URL with CORS proxy to bypass CORS restrictions
+ */
+function withCorsProxy(url: string): string {
+  return `${CORS_PROXY_URL}${encodeURIComponent(url)}`;
+}
 
 /**
  * Normalize team name for API searches by converting special characters to ASCII
@@ -123,15 +134,15 @@ async function saveResolvedLogoToDatabase(
 
 /**
  * Fetch team data from TheSportsDB API by team ID
+ * Uses CORS proxy to bypass browser CORS restrictions
  */
 async function fetchTeamByIdFromAPI(teamId: string): Promise<string | null> {
   try {
-    const response = await fetch(
-      `${THESPORTSDB_API_BASE}/lookupteam.php?id=${teamId}`
-    );
+    const apiUrl = `${THESPORTSDB_API_BASE}/lookupteam.php?id=${teamId}`;
+    const response = await fetch(withCorsProxy(apiUrl));
 
     if (!response.ok) {
-      console.warn(`[logoService] API request failed: ${response.status}`);
+      console.warn(`[logoService] TheSportsDB API request failed: ${response.status}`);
       return null;
     }
 
@@ -144,7 +155,13 @@ async function fetchTeamByIdFromAPI(teamId: string): Promise<string | null> {
 
     return null;
   } catch (error) {
-    console.error('[logoService] Error fetching team by ID:', error);
+    // Check if it's a CORS error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('CORS') || errorMessage.includes('NetworkError')) {
+      console.error('[logoService] CORS error fetching team by ID. Consider using API-Sports as backup.');
+    } else {
+      console.error('[logoService] Error fetching team by ID:', error);
+    }
     return null;
   }
 }
@@ -152,16 +169,16 @@ async function fetchTeamByIdFromAPI(teamId: string): Promise<string | null> {
 /**
  * Fetch team data from TheSportsDB API by team name
  * Tries both original name and normalized name for better matching
+ * Uses CORS proxy to bypass browser CORS restrictions
  */
 async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> {
   try {
     // First try with original name
-    let response = await fetch(
-      `${THESPORTSDB_API_BASE}/searchteams.php?t=${encodeURIComponent(teamName)}`
-    );
+    const apiUrl = `${THESPORTSDB_API_BASE}/searchteams.php?t=${encodeURIComponent(teamName)}`;
+    let response = await fetch(withCorsProxy(apiUrl));
 
     if (!response.ok) {
-      console.warn(`[logoService] API request failed: ${response.status}`);
+      console.warn(`[logoService] TheSportsDB API request failed: ${response.status}`);
       return null;
     }
 
@@ -177,9 +194,8 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
     if (normalizedName !== teamName) {
       console.log(`[logoService] Trying normalized name: "${teamName}" -> "${normalizedName}"`);
 
-      response = await fetch(
-        `${THESPORTSDB_API_BASE}/searchteams.php?t=${encodeURIComponent(normalizedName)}`
-      );
+      const normalizedUrl = `${THESPORTSDB_API_BASE}/searchteams.php?t=${encodeURIComponent(normalizedName)}`;
+      response = await fetch(withCorsProxy(normalizedUrl));
 
       if (response.ok) {
         data = await response.json();
@@ -192,7 +208,13 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
 
     return null;
   } catch (error) {
-    console.error('[logoService] Error fetching team by name:', error);
+    // Check if it's a CORS error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('CORS') || errorMessage.includes('NetworkError')) {
+      console.error('[logoService] CORS error fetching team by name. Consider using API-Sports as backup.');
+    } else {
+      console.error('[logoService] Error fetching team by name:', error);
+    }
     return null;
   }
 }
@@ -201,15 +223,19 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
  * Get logo URL for a team with caching and fallback logic
  *
  * Resolution order:
- * 1. Check resolvedLogoUrl from database (if teamId provided)
+ * 1. Check resolvedLogoUrl from database (instant!)
  * 2. Check browser cache
- * 3. Try API by team ID
- * 4. Try API by team name
- * 5. Fallback to local logoUrl
- * 6. Return empty string (will trigger onError handler in components)
+ * 3. Try TheSportsDB API by team ID (with CORS proxy)
+ * 4. Try TheSportsDB API by team name (with CORS proxy)
+ * 5. Try API-Sports as backup (if configured)
+ * 6. Fallback to local logoUrl
+ * 7. Return empty string (will trigger onError handler in components)
  *
  * When a logo is found via API, it's automatically saved to the database
  * for permanent storage and faster future loads.
+ *
+ * CORS Fix: All external API calls now use CORS proxy to bypass browser restrictions.
+ * API-Sports backup provides redundancy when TheSportsDB fails.
  *
  * @param teamId - Database team ID (for saving resolved URL)
  * @param apiTeamId - TheSportsDB team ID (optional)
@@ -265,9 +291,28 @@ export async function getTeamLogoUrl(
     }
   }
 
-  // Step 4: Try API by team name
+  // Step 4: Try API by team name (TheSportsDB with CORS proxy)
   if (apiTeamName) {
     const logoUrl = await fetchTeamByNameFromAPI(apiTeamName);
+    if (logoUrl) {
+      // Save to browser cache
+      if (cacheKey) {
+        setCachedLogo(cacheKey, logoUrl);
+      }
+      // Save to database for permanent storage (async, don't block)
+      if (teamId) {
+        saveResolvedLogoToDatabase(teamId, logoUrl).catch(err =>
+          console.error('[logoService] Failed to save to DB:', err)
+        );
+      }
+      return logoUrl;
+    }
+  }
+
+  // Step 5: Try API-Sports as backup (if configured and TheSportsDB failed)
+  if (apiTeamName && isApiSportsConfigured()) {
+    console.log('[logoService] TheSportsDB failed, trying API-Sports backup...');
+    const logoUrl = await fetchTeamLogoFromApiSports(apiTeamName);
     if (logoUrl) {
       // Save to browser cache
       if (cacheKey) {
