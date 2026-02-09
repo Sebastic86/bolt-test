@@ -24,14 +24,14 @@ All TheSportsDB API calls now use a CORS proxy service that adds the necessary h
 - **Configurable**: Set `VITE_CORS_PROXY_URL` in `.env` to use a different proxy
 - **How it works**: Proxy server fetches the data server-side (no CORS) and returns it to your browser with proper CORS headers
 
-### 2. API-Sports Backup (Optional)
+### 2. API-Sports (Primary Provider)
 
-If TheSportsDB fails (even with proxy), the system automatically tries API-Sports as backup:
+API-Sports is now the PRIMARY logo provider:
 
-- **Free Tier**: 100 requests/day per sport API
-- **Better CORS support**: Designed for browser usage
+- **Paid Subscription**: Better reliability and higher rate limits
+- **Better CORS support**: Designed for browser usage, no proxy needed
 - **Requires API key**: Sign up at https://api-sports.io
-- **Optional**: Works without it, but provides extra redundancy
+- **Primary**: TheSportsDB now serves as fallback
 
 ### 3. Local Fallback
 
@@ -49,16 +49,15 @@ Just restart your dev server with a hard refresh:
 - Windows/Linux: `Ctrl + Shift + R`
 - Mac: `Cmd + Shift + R`
 
-### Option B: Add API-Sports Backup (Recommended)
+### Option B: Configure API-Sports (Primary Provider - REQUIRED)
 
-For maximum reliability, add API-Sports as a backup:
+API-Sports is now the primary logo provider. You MUST configure it:
 
-**Step 1: Sign Up**
+**Step 1: Get Your API Key**
 1. Go to https://api-sports.io
-2. Click "Register" (free account)
-3. Verify your email
-4. Go to Dashboard → API Key
-5. Copy your API key
+2. Sign in to your account (paid subscription)
+3. Go to Dashboard → API Key
+4. Copy your API key
 
 **Step 2: Configure**
 Add to your `.env` file:
@@ -68,6 +67,8 @@ VITE_API_SPORTS_KEY=your_api_key_here
 
 **Step 3: Restart**
 Restart your dev server
+
+**Without API-Sports configured**, the system will fall back to TheSportsDB (free, with CORS proxy)
 
 ---
 
@@ -82,17 +83,22 @@ The logo resolution now follows this order:
 2. Browser Cache (7 days) ──────────────────→ ✅ Return (fast!)
    ↓ Expired/Not found
 
-3. TheSportsDB API (with CORS proxy) ───────→ ✅ Return + Save to DB
+3. API-Sports (PRIMARY - paid subscription) ─→ ✅ Return + Save to DB
+   ↓ Failed/Not configured
+
+4. TheSportsDB API by ID (CORS proxy) ──────→ ✅ Return + Save to DB
    ↓ Failed
 
-4. API-Sports Backup (if configured) ────────→ ✅ Return + Save to DB
+5. TheSportsDB API by Name (CORS proxy) ────→ ✅ Return + Save to DB
    ↓ Failed
 
-5. Local Logo Files ─────────────────────────→ ✅ Return
+6. Local Logo Files ─────────────────────────→ ✅ Return
    ↓ Not found
 
-6. Empty String (shows placeholder) ─────────→ ⚠️ Logo not available
+7. Empty String (shows placeholder) ─────────→ ⚠️ Logo not available
 ```
+
+**Note:** API-Sports is now the PRIMARY provider (paid subscription). TheSportsDB serves as free fallback with CORS proxy support.
 
 ---
 

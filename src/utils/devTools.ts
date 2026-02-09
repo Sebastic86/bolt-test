@@ -37,7 +37,7 @@ export const devTools = {
   /**
    * Resolve all team logos and save to database
    */
-  async resolveAllLogos(forceUpdate = false, delayMs = 2500) {
+  async resolveAllLogos(forceUpdate = false, delayMs = 200) {
     console.log('🚀 Starting bulk logo resolution...');
     const stats = await resolveAllTeamLogos(forceUpdate, delayMs);
     console.log('✅ Complete!');

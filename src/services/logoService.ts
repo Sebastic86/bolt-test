@@ -225,17 +225,17 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
  * Resolution order:
  * 1. Check resolvedLogoUrl from database (instant!)
  * 2. Check browser cache
- * 3. Try TheSportsDB API by team ID (with CORS proxy)
- * 4. Try TheSportsDB API by team name (with CORS proxy)
- * 5. Try API-Sports as backup (if configured)
+ * 3. Try API-Sports (primary - paid subscription with better reliability)
+ * 4. Try TheSportsDB API by team ID (with CORS proxy - fallback)
+ * 5. Try TheSportsDB API by team name (with CORS proxy - fallback)
  * 6. Fallback to local logoUrl
  * 7. Return empty string (will trigger onError handler in components)
  *
  * When a logo is found via API, it's automatically saved to the database
  * for permanent storage and faster future loads.
  *
- * CORS Fix: All external API calls now use CORS proxy to bypass browser restrictions.
- * API-Sports backup provides redundancy when TheSportsDB fails.
+ * API-Sports is now the primary provider (paid subscription).
+ * TheSportsDB serves as free fallback with CORS proxy.
  *
  * @param teamId - Database team ID (for saving resolved URL)
  * @param apiTeamId - TheSportsDB team ID (optional)
@@ -273,10 +273,32 @@ export async function getTeamLogoUrl(
     }
   }
 
-  // Step 3: Try API by team ID
+  // Step 3: Try API-Sports FIRST (primary provider - paid subscription)
+  if (apiTeamName && isApiSportsConfigured()) {
+    console.log('[logoService] Trying API-Sports (primary provider)...');
+    const logoUrl = await fetchTeamLogoFromApiSports(apiTeamName);
+    if (logoUrl) {
+      console.log('[logoService] ✅ Found via API-Sports');
+      // Save to browser cache
+      if (cacheKey) {
+        setCachedLogo(cacheKey, logoUrl);
+      }
+      // Save to database for permanent storage (async, don't block)
+      if (teamId) {
+        saveResolvedLogoToDatabase(teamId, logoUrl).catch(err =>
+          console.error('[logoService] Failed to save to DB:', err)
+        );
+      }
+      return logoUrl;
+    }
+    console.log('[logoService] API-Sports did not find logo, trying TheSportsDB fallback...');
+  }
+
+  // Step 4: Try TheSportsDB by team ID (fallback)
   if (apiTeamId) {
     const logoUrl = await fetchTeamByIdFromAPI(apiTeamId);
     if (logoUrl) {
+      console.log('[logoService] ✅ Found via TheSportsDB (by ID)');
       // Save to browser cache
       if (cacheKey) {
         setCachedLogo(cacheKey, logoUrl);
@@ -291,29 +313,11 @@ export async function getTeamLogoUrl(
     }
   }
 
-  // Step 4: Try API by team name (TheSportsDB with CORS proxy)
+  // Step 5: Try TheSportsDB by team name (fallback with CORS proxy)
   if (apiTeamName) {
     const logoUrl = await fetchTeamByNameFromAPI(apiTeamName);
     if (logoUrl) {
-      // Save to browser cache
-      if (cacheKey) {
-        setCachedLogo(cacheKey, logoUrl);
-      }
-      // Save to database for permanent storage (async, don't block)
-      if (teamId) {
-        saveResolvedLogoToDatabase(teamId, logoUrl).catch(err =>
-          console.error('[logoService] Failed to save to DB:', err)
-        );
-      }
-      return logoUrl;
-    }
-  }
-
-  // Step 5: Try API-Sports as backup (if configured and TheSportsDB failed)
-  if (apiTeamName && isApiSportsConfigured()) {
-    console.log('[logoService] TheSportsDB failed, trying API-Sports backup...');
-    const logoUrl = await fetchTeamLogoFromApiSports(apiTeamName);
-    if (logoUrl) {
+      console.log('[logoService] ✅ Found via TheSportsDB (by name)');
       // Save to browser cache
       if (cacheKey) {
         setCachedLogo(cacheKey, logoUrl);
