@@ -3,7 +3,7 @@ import { Team } from '../types';
 import * as LucideIcons from 'lucide-react'; // Keep Star icon import
 import { Pencil, Shield } from 'lucide-react'; // Import Pencil and Shield icons
 import { AdminOnly } from './RoleBasedComponents';
-import { getLogoPath } from '../utils/logoUtils';
+import { TeamLogo } from './TeamLogo';
 
 interface TeamCardProps {
   team: Team;
@@ -57,17 +57,6 @@ const getDifferenceColor = (diff: number | undefined): string => {
 
 
 const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
-  const [logoError, setLogoError] = useState(false); // State to track logo loading error
-
-  const handleLogoError = () => {
-    setLogoError(true);
-  };
-
-  // Reset error state if the team prop changes (e.g., new match generated)
-  React.useEffect(() => {
-    setLogoError(false);
-  }, [team.logoUrl]);
-
   return (
     <div className="relative bg-white rounded-lg shadow-md p-4 w-full max-w-sm mx-auto border border-brand-light flex items-center space-x-4">
       {/* Edit Button */}
@@ -83,19 +72,9 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
         )}
       </AdminOnly>
 
-      {/* Left Side: Logo or Fallback Icon */}
-      <div className="shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded-sm bg-gray-100 text-gray-400">
-        {logoError ? (
-          // Use Shield as a generic fallback
-          <Shield className="w-10 h-10" aria-label="Team logo fallback" />
-        ) : (
-          <img
-            src={getLogoPath(team.logoUrl)}
-            alt={`${team.name} logo`}
-            className="w-full h-full object-contain"
-            onError={handleLogoError} // Use the handler
-          />
-        )}
+      {/* Left Side: Logo */}
+      <div className="shrink-0 w-16 h-16 flex items-center justify-center">
+        <TeamLogo team={team} size="xl" />
       </div>
 
       {/* Right Side: Details */}

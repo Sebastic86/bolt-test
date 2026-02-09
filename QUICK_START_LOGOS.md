@@ -1,0 +1,123 @@
+# Quick Start: New Logo System
+
+This is a simplified guide to get you started with the new API-based logo system.
+
+## Step 1: Apply Database Migration
+
+Run this migration to add the new fields to your teams table:
+
+```bash
+# Using Supabase CLI
+supabase db push
+
+# Or copy/paste the SQL from:
+# supabase/migrations/add_api_team_fields.sql
+```
+
+This adds:
+- `apiTeamId` - TheSportsDB team ID
+- `apiTeamName` - Team name for API searches
+
+## Step 2: Populate API Names
+
+Add this to your app (e.g., in a settings page or one-time setup):
+
+```tsx
+import { populateApiTeamNames } from './scripts/populateApiTeamNames';
+
+// Run once to populate apiTeamName for all existing teams
+const handlePopulateNames = async () => {
+  await populateApiTeamNames();
+  alert('Team names populated! Check console for details.');
+};
+```
+
+Or run directly in browser console:
+
+```javascript
+const { populateApiTeamNames } = await import('./src/scripts/populateApiTeamNames');
+await populateApiTeamNames();
+```
+
+## Step 3: Start Using New Components
+
+### Replace Old Logo Code
+
+**Before:**
+```tsx
+<img src={getLogoPath(team.logoUrl)} alt={team.name} className="w-8 h-8" />
+```
+
+**After:**
+```tsx
+import { TeamLogo } from './components/TeamLogo';
+
+<TeamLogo team={team} size="md" />
+```
+
+That's it! Logos will now load from API with automatic fallback to local files.
+
+## Step 4: Add New Teams Easily
+
+When adding a new team, just set the `apiTeamName`:
+
+```sql
+INSERT INTO teams (name, league, rating, logoUrl, apiTeamName, overallRating, ...)
+VALUES ('Arsenal', 'Premier League', 5.0, 'arsenal.png', 'Arsenal', 90, ...);
+```
+
+The logo will automatically load from TheSportsDB API!
+
+## Testing
+
+Test a specific team to see if API is working:
+
+```tsx
+import { testTeamLogo } from './scripts/populateApiTeamNames';
+
+await testTeamLogo('Arsenal');
+// Check console for API results and logo URLs
+```
+
+## Troubleshooting
+
+### Logos not loading?
+
+1. Check browser console for errors
+2. Make sure `apiTeamName` is populated:
+   ```sql
+   SELECT name, apiTeamName FROM teams LIMIT 10;
+   ```
+3. Clear cache if needed:
+   ```tsx
+   import { clearLogoCache } from './services/logoService';
+   clearLogoCache();
+   ```
+
+### Want to use local logos only?
+
+Just don't populate `apiTeamName` or `apiTeamId`, and the system will automatically use local logos from `logoUrl`.
+
+Or force local mode:
+```tsx
+<TeamLogo team={team} useApiFirst={false} />
+```
+
+## Benefits
+
+- ✅ **No more manual logo downloads** - API handles it
+- ✅ **Smaller bundle size** - Logos loaded on-demand
+- ✅ **Auto-caching** - 7-day cache for performance
+- ✅ **Automatic fallback** - Uses local logos if API fails
+- ✅ **Easy to add teams** - Just provide team name
+
+## Next Steps
+
+- Read `LOGO_MANAGEMENT.md` for detailed documentation
+- Update components to use `<TeamLogo />` component
+- Optional: Remove old local logo files to reduce bundle size
+- Optional: Set specific `apiTeamId` for better accuracy
+
+## Need Help?
+
+Check the full documentation in `LOGO_MANAGEMENT.md`

@@ -3,12 +3,14 @@ export interface Team {
   name: string;
   league: string;
   rating: number; // Star rating (e.g., 4.5, 5.0)
-  logoUrl: string; // URL of the team logo image
+  logoUrl: string; // URL of the team logo image (or filename for local logos)
   overallRating: number; // e.g., 85, 90
   attackRating: number; // e.g., 88, 92
   midfieldRating: number; // e.g., 82, 87
   defendRating: number; // e.g., 80, 85
   version: string; // Version identifier (e.g., 'FC25')
+  apiTeamId?: string | null; // TheSportsDB team ID for API logo fetching
+  apiTeamName?: string | null; // Team name for API searches
 }
 
 export interface Player {

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import Header from './components/Header';
 import AuthWrapper from './components/AuthWrapper';
-import { AdminOnly } from './components/RoleBasedComponents';
+import {AdminOnly} from './components/RoleBasedComponents';
 import UserManagement from './components/UserManagement';
 import TeamCard from './components/TeamCard';
 import EditTeamModal from './components/EditTeamModal';
@@ -21,15 +21,15 @@ import PlayerAchievements from './components/PlayerAchievements';
 import MatchRevealAnimation from './components/MatchRevealAnimation';
 import ErrorBoundary from './components/ErrorBoundary';
 import GameSessions from './components/GameSessions';
-import { Team, Player } from './types';
-import { supabase } from './lib/supabaseClient';
-import { useAuth } from './contexts/AuthContext';
-import { useSettings } from './hooks/useSettings';
-import { useMatchData, fetchAllTeams, fetchAllPlayers } from './hooks/useMatchData';
-import { useMatchGenerator } from './hooks/useMatchGenerator';
-import { usePlayerStandings } from './hooks/usePlayerStandings';
-import { useTeamStatistics } from './hooks/useTeamStatistics';
-import { Dices, Settings, PlusSquare, List, ArrowLeft } from 'lucide-react';
+import {Player, Team} from './types';
+import {supabase} from './lib/supabaseClient';
+import {useAuth} from './contexts/AuthContext';
+import {useSettings} from './hooks/useSettings';
+import {fetchAllPlayers, fetchAllTeams, useMatchData} from './hooks/useMatchData';
+import {useMatchGenerator} from './hooks/useMatchGenerator';
+import {usePlayerStandings} from './hooks/usePlayerStandings';
+import {useTeamStatistics} from './hooks/useTeamStatistics';
+import {ArrowLeft, Dices, List, PlusSquare, Settings} from 'lucide-react';
 
 
 function App() {

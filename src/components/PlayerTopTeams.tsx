@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem, Team } from '../types';
 import { Shield } from 'lucide-react';
-import { getLogoPath } from '../utils/logoUtils';
+import { TeamLogo } from './TeamLogo';
 
 interface PlayerTopTeamsProps {
   allPlayers: Player[];
@@ -39,12 +39,6 @@ const PlayerTopTeams: React.FC<PlayerTopTeamsProps> = ({
   const [selectedVersion, setSelectedVersion] = useState<string>('All');
   const [availableVersions, setAvailableVersions] = useState<string[]>([]);
   const [versionsLoading, setVersionsLoading] = useState<boolean>(false);
-  const [failedLogos, setFailedLogos] = useState<Set<string>>(new Set());
-
-  // Handle logo loading error
-  const handleLogoError = (teamId: string) => {
-    setFailedLogos(prev => new Set(prev).add(teamId));
-  };
 
   // Fetch available versions
   useEffect(() => {
@@ -254,17 +248,11 @@ const PlayerTopTeams: React.FC<PlayerTopTeamsProps> = ({
                       <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center font-bold text-gray-600">
                         #{index + 1}
                       </div>
-                      <div className="shrink-0 w-10 h-10 flex items-center justify-center overflow-hidden rounded-sm bg-gray-100 text-gray-400">
-                        {failedLogos.has(team.teamId) ? (
-                          <Shield className="w-6 h-6" aria-label="Team logo fallback" />
-                        ) : (
-                          <img
-                            src={getLogoPath(team.logoUrl)}
-                            alt={team.teamName}
-                            className="w-full h-full object-contain"
-                            onError={() => handleLogoError(team.teamId)}
-                          />
-                        )}
+                      <div className="shrink-0">
+                        <TeamLogo
+                          team={{ name: team.teamName, logoUrl: team.logoUrl, apiTeamId: null, apiTeamName: null }}
+                          size="md"
+                        />
                       </div>
                       <div className="flex-grow min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate" title={team.teamName}>

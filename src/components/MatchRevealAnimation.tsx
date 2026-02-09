@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Team } from '../types';
 import { Shield } from 'lucide-react';
-import { getLogoPath } from '../utils/logoUtils';
+import { TeamLogo } from './TeamLogo';
 
 interface MatchRevealAnimationProps {
   teams: [Team, Team];
@@ -19,14 +19,9 @@ const MatchRevealAnimation: React.FC<MatchRevealAnimationProps> = ({
   const [phase, setPhase] = useState<Phase>('spinning');
   const [displayTeam1, setDisplayTeam1] = useState<Team>(allTeams[0] || teams[0]);
   const [displayTeam2, setDisplayTeam2] = useState<Team>(allTeams[0] || teams[1]);
-  const [logoErrors, setLogoErrors] = useState<Set<string>>(new Set());
 
   const interval1Ref = useRef<ReturnType<typeof setInterval> | null>(null);
   const interval2Ref = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const handleLogoError = (teamId: string) => {
-    setLogoErrors(prev => new Set(prev).add(teamId));
-  };
 
   const getRandomTeam = useCallback(() => {
     if (allTeams.length === 0) return teams[0];
@@ -115,17 +110,8 @@ const MatchRevealAnimation: React.FC<MatchRevealAnimationProps> = ({
               : 'border-gray-200'
           } ${!isLanded1 ? 'slot-blur' : ''}`}
         >
-          <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-sm bg-gray-100 text-gray-400 mb-2">
-            {logoErrors.has(displayTeam1.id) ? (
-              <Shield className="w-10 h-10" />
-            ) : (
-              <img
-                src={getLogoPath(displayTeam1.logoUrl)}
-                alt={displayTeam1.name}
-                className="w-full h-full object-contain"
-                onError={() => handleLogoError(displayTeam1.id)}
-              />
-            )}
+          <div className="w-16 h-16 flex items-center justify-center mb-2">
+            <TeamLogo team={displayTeam1} size="xl" />
           </div>
           <p className={`text-lg font-semibold text-gray-800 text-center truncate max-w-full transition-opacity duration-300 ${
             isFullyLanded1 ? 'opacity-100' : 'opacity-70'
@@ -152,17 +138,8 @@ const MatchRevealAnimation: React.FC<MatchRevealAnimationProps> = ({
               : 'border-gray-200'
           } ${!isLanded2 ? 'slot-blur' : ''}`}
         >
-          <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-sm bg-gray-100 text-gray-400 mb-2">
-            {logoErrors.has(displayTeam2.id) ? (
-              <Shield className="w-10 h-10" />
-            ) : (
-              <img
-                src={getLogoPath(displayTeam2.logoUrl)}
-                alt={displayTeam2.name}
-                className="w-full h-full object-contain"
-                onError={() => handleLogoError(displayTeam2.id)}
-              />
-            )}
+          <div className="w-16 h-16 flex items-center justify-center mb-2">
+            <TeamLogo team={displayTeam2} size="xl" />
           </div>
           <p className={`text-lg font-semibold text-gray-800 text-center truncate max-w-full transition-opacity duration-300 ${
             isFullyLanded2 ? 'opacity-100' : 'opacity-70'

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Player, MatchHistoryItem } from '../types';
 import { Shield, ChevronDown, ChevronUp } from 'lucide-react';
-import { getLogoPath } from '../utils/logoUtils';
+import { TeamLogo } from './TeamLogo';
 
 interface GameSessionsProps {
   allMatches: MatchHistoryItem[];
@@ -17,9 +17,6 @@ interface GameSession {
   matches: MatchHistoryItem[];
 }
 
-interface LogoErrorState {
-  [logoKey: string]: boolean;
-}
 
 // Helper function to format date to YYYY-MM-DD
 const getDateKey = (isoString: string): string => {
@@ -68,7 +65,6 @@ const GameSessions: React.FC<GameSessionsProps> = ({
 }) => {
   const [selectedSessionDate, setSelectedSessionDate] = useState<string | null>(null);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
-  const [logoErrors, setLogoErrors] = useState<LogoErrorState>({});
 
   // Group matches by date and filter sessions with 2+ matches
   const gameSessions = useMemo<GameSession[]>(() => {
@@ -100,10 +96,6 @@ const GameSessions: React.FC<GameSessionsProps> = ({
     return sessions.sort((a, b) => b.date.localeCompare(a.date));
   }, [allMatches]);
 
-  const handleLogoError = (matchId: string, teamNumber: 1 | 2) => {
-    const key = `${matchId}-team${teamNumber}`;
-    setLogoErrors(prevErrors => ({ ...prevErrors, [key]: true }));
-  };
 
   const toggleExpandMatch = (matchId: string) => {
     setExpandedMatchId(prevId => (prevId === matchId ? null : matchId));
@@ -157,8 +149,6 @@ const GameSessions: React.FC<GameSessionsProps> = ({
               </h3>
               <ul className="space-y-4">
                 {selectedSession.matches.map((match) => {
-                  const logo1Error = logoErrors[`${match.id}-team1`];
-                  const logo2Error = logoErrors[`${match.id}-team2`];
                   const isExpanded = expandedMatchId === match.id;
 
                   return (
@@ -169,18 +159,12 @@ const GameSessions: React.FC<GameSessionsProps> = ({
                       <div className="flex flex-col sm:flex-row justify-between items-center mb-2">
                         {/* Teams and Score */}
                         <div className="flex items-center space-x-2 grow mb-2 sm:mb-0 min-w-0">
-                          {/* Team 1 Logo/Fallback */}
-                          <div className="w-6 h-6 flex items-center justify-center shrink-0 bg-gray-100 rounded-sm overflow-hidden text-gray-400">
-                            {logo1Error ? (
-                              <Shield className="w-5 h-5" aria-label="Team 1 logo fallback" />
-                            ) : (
-                              <img
-                                src={getLogoPath(match.team1_logoUrl)}
-                                alt={match.team1_name}
-                                className="w-full h-full object-contain"
-                                onError={() => handleLogoError(match.id, 1)}
-                              />
-                            )}
+                          {/* Team 1 Logo */}
+                          <div className="shrink-0">
+                            <TeamLogo
+                              team={{ name: match.team1_name, logoUrl: match.team1_logoUrl, apiTeamId: null, apiTeamName: null }}
+                              size="sm"
+                            />
                           </div>
                           <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">
                             {match.team1_name} ({match.team1_version || 'FC25'})
@@ -203,17 +187,11 @@ const GameSessions: React.FC<GameSessionsProps> = ({
                           </span>
 
                           {/* Team 2 Logo/Fallback */}
-                          <div className="w-6 h-6 flex items-center justify-center shrink-0 bg-gray-100 rounded-sm overflow-hidden text-gray-400">
-                            {logo2Error ? (
-                              <Shield className="w-5 h-5" aria-label="Team 2 logo fallback" />
-                            ) : (
-                              <img
-                                src={getLogoPath(match.team2_logoUrl)}
-                                alt={match.team2_name}
-                                className="w-full h-full object-contain"
-                                onError={() => handleLogoError(match.id, 2)}
-                              />
-                            )}
+                          <div className="shrink-0">
+                            <TeamLogo
+                              team={{ name: match.team2_name, logoUrl: match.team2_logoUrl, apiTeamId: null, apiTeamName: null }}
+                              size="sm"
+                            />
                           </div>
                           <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">
                             {match.team2_name} ({match.team2_version || 'FC25'})

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Team, Player } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { X, Save, UserPlus, Trash2 } from 'lucide-react';
-import { getLogoPath } from '../utils/logoUtils';
+import TeamLogo from "./TeamLogo.tsx";
 
 type MatchSaveAction = 'next' | 'rematch';
 
@@ -427,12 +427,12 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
             <div className="flex justify-around items-center mb-6 border-b pb-4">
               {/* ... team display ... */}
                <div className="text-center">
-                <img src={getLogoPath(matchTeams[0].logoUrl)} alt={matchTeams[0].name} className="w-12 h-12 mx-auto mb-1 object-contain"/>
+                 <TeamLogo team={matchTeams[0]} size="md" />
                 <span className="font-semibold">{matchTeams[0].name}</span>
               </div>
               <span className="text-xl font-bold text-gray-500">VS</span>
               <div className="text-center">
-                <img src={getLogoPath(matchTeams[1].logoUrl)} alt={matchTeams[1].name} className="w-12 h-12 mx-auto mb-1 object-contain"/>
+                <TeamLogo team={matchTeams[1]} size="md" />
                 <span className="font-semibold">{matchTeams[1].name}</span>
               </div>
             </div>

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
 import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Plus } from 'lucide-react';
 import { AdminOnly } from './RoleBasedComponents';
-import { getLogoPath } from '../utils/logoUtils';
+import { TeamLogo } from './TeamLogo';
 
 interface AllMatchesProps {
   allMatches: MatchHistoryItem[];
@@ -13,10 +13,6 @@ interface AllMatchesProps {
   allPlayers: Player[];
 }
 
-// State to track logo errors within the history list
-interface LogoErrorState {
-  [logoKey: string]: boolean; // e.g., { 'matchId-team1': true, 'matchId-team2': false }
-}
 
 // Helper function to format date/time
 const formatDateTimeEuropean = (isoString: string): string => {
@@ -52,8 +48,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
   const [savingScore, setSavingScore] = useState<boolean>(false);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
-  const [logoErrors, setLogoErrors] = useState<LogoErrorState>({});
-  
+
   // Player editing state
   const [editingPlayersMatchId, setEditingPlayersMatchId] = useState<string | null>(null);
   const [savingPlayers, setSavingPlayers] = useState<boolean>(false);
@@ -61,16 +56,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
   // Add player state
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
 
-  // Function to handle logo loading errors
-  const handleLogoError = (matchId: string, teamNumber: 1 | 2) => {
-    const key = `${matchId}-team${teamNumber}`;
-    setLogoErrors(prevErrors => ({ ...prevErrors, [key]: true }));
-  };
 
-  // Reset logo errors when allMatches changes (e.g., on refresh)
-  React.useEffect(() => {
-    setLogoErrors({});
-  }, [allMatches]);
 
   const highlightedMatchIds = useMemo(() => {
     let maxDiff = -1;
@@ -304,26 +290,18 @@ const AllMatches: React.FC<AllMatchesProps> = ({
             // Use brand colors for background, keep yellow highlight distinct
             const highlightClasses = shouldHighlight ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-brand-light bg-brand-lighter';
             const isDeletingThisMatch = deletingMatchId === match.id;
-            const logo1Error = logoErrors[`${match.id}-team1`];
-            const logo2Error = logoErrors[`${match.id}-team2`];
 
             return (
               <li key={match.id} className={`rounded-lg shadow-sm p-4 border transition-all duration-200 ${highlightClasses} ${isDeletingThisMatch ? 'opacity-50' : ''}`}>
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-2">
                    {/* Teams and Score */}
                    <div className="flex items-center space-x-2 grow mb-2 sm:mb-0 min-w-0">
-                      {/* Team 1 Logo/Fallback */}
-                      <div className="w-6 h-6 flex items-center justify-center shrink-0 bg-gray-100 rounded-sm overflow-hidden text-gray-400">
-                        {logo1Error ? (
-                          <Shield className="w-5 h-5" aria-label="Team 1 logo fallback" />
-                        ) : (
-                          <img
-                            src={getLogoPath(match.team1_logoUrl)}
-                            alt={match.team1_name}
-                            className="w-full h-full object-contain"
-                            onError={() => handleLogoError(match.id, 1)}
-                          />
-                        )}
+                      {/* Team 1 Logo */}
+                      <div className="shrink-0">
+                        <TeamLogo
+                          team={{ name: match.team1_name, logoUrl: match.team1_logoUrl, apiTeamId: null, apiTeamName: null }}
+                          size="sm"
+                        />
                       </div>
                       <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team1_name} ({match.team1_version || 'FC25'})</span>
                       {editingScoreMatchId === match.id ? (
@@ -389,18 +367,12 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                               ) : 'vs'}
                           </span>
                       )}
-                      {/* Team 2 Logo/Fallback */}
-                       <div className="w-6 h-6 flex items-center justify-center shrink-0 bg-gray-100 rounded-sm overflow-hidden text-gray-400">
-                        {logo2Error ? (
-                          <Shield className="w-5 h-5" aria-label="Team 2 logo fallback" />
-                        ) : (
-                          <img
-                            src={getLogoPath(match.team2_logoUrl)}
-                            alt={match.team2_name}
-                            className="w-full h-full object-contain"
-                            onError={() => handleLogoError(match.id, 2)}
-                          />
-                        )}
+                      {/* Team 2 Logo */}
+                       <div className="shrink-0">
+                        <TeamLogo
+                          team={{ name: match.team2_name, logoUrl: match.team2_logoUrl, apiTeamId: null, apiTeamName: null }}
+                          size="sm"
+                        />
                       </div>
                       <span className="font-medium truncate shrink-0 w-24 sm:w-auto text-gray-800">{match.team2_name} ({match.team2_version || 'FC25'})</span>
                    </div>
