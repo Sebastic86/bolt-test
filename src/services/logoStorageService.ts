@@ -38,8 +38,9 @@ interface UploadResult {
 async function downloadImageAsBlob(url: string): Promise<Blob> {
   console.log(`[logoStorageService] Downloading image from: ${url.substring(0, 60)}...`);
 
-  // Use CORS proxy to download image
-  const proxiedUrl = withCorsProxy(url);
+  // Skip CORS proxy for Supabase storage URLs (they already have CORS enabled)
+  const isSupabaseUrl = url.includes('supabase.co/storage') || url.includes('.supabase.co/storage');
+  const proxiedUrl = isSupabaseUrl ? url : withCorsProxy(url);
   const response = await fetch(proxiedUrl);
 
   if (!response.ok) {
@@ -139,7 +140,7 @@ export async function migrateLogoToStorage(
     console.log(`[logoStorageService] Migrating logo for ${teamName}...`);
 
     // Check if already in Supabase Storage
-    if (!forceUpdate && sourceUrl.includes('supabase.co/storage')) {
+    if (!forceUpdate && isLogoInStorage(sourceUrl)) {
       console.log(`[logoStorageService] Already in Supabase Storage, skipping: ${teamName}`);
       return { success: true, url: sourceUrl };
     }
@@ -169,7 +170,9 @@ export async function migrateLogoToStorage(
  */
 export function isLogoInStorage(resolvedLogoUrl?: string | null): boolean {
   if (!resolvedLogoUrl) return false;
-  return resolvedLogoUrl.includes('supabase.co/storage');
+  return resolvedLogoUrl.includes('supabase.co/storage') ||
+         resolvedLogoUrl.includes('.supabase.co/storage') ||
+         resolvedLogoUrl.includes('/storage/v1/object/public/team-logos/');
 }
 
 /**
@@ -231,13 +234,15 @@ export async function getTeamsNeedingMigration(): Promise<Array<{
     .from('teams')
     .select('id, name, resolvedLogoUrl')
     .not('resolvedLogoUrl', 'is', null)
-    .not('resolvedLogoUrl', 'like', '%supabase.co/storage%');
+    .not('resolvedLogoUrl', 'like', '%supabase.co/storage%')
+    .not('resolvedLogoUrl', 'like', '%/storage/v1/object/public/team-logos/%');
 
   if (error) {
     throw new Error(`Failed to fetch teams: ${error.message}`);
   }
 
-  return data || [];
+  // Filter out any remaining Supabase storage URLs (for custom domains)
+  return (data || []).filter(team => !isLogoInStorage(team.resolvedLogoUrl));
 }
 
 /**
