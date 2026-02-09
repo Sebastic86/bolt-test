@@ -11,6 +11,7 @@ export interface Team {
   version: string; // Version identifier (e.g., 'FC25')
   apiTeamId?: string | null; // TheSportsDB team ID for API logo fetching
   apiTeamName?: string | null; // Team name for API searches
+  resolvedLogoUrl?: string | null; // Permanently stored API-resolved logo URL (eliminates API calls)
 }
 
 export interface Player {

@@ -3,9 +3,11 @@ import { getTeamLogoUrl } from '../services/logoService';
 import { getLogoPath } from '../utils/logoUtils';
 
 interface UseTeamLogoOptions {
+  teamId?: string | null; // Database team ID (for saving resolved URLs)
   apiTeamId?: string | null;
   apiTeamName?: string | null;
   fallbackLogoUrl?: string | null;
+  resolvedLogoUrl?: string | null; // Previously resolved logo URL from database
   useApiFirst?: boolean; // If true, use API first; if false, use local logos (default: true)
 }
 
@@ -18,19 +20,26 @@ interface UseTeamLogoResult {
 /**
  * React hook for loading team logos with API and fallback support
  *
+ * Now with persistent database storage! When a logo is found via API,
+ * it's automatically saved to the database for instant future loads.
+ *
  * Usage:
  * ```tsx
  * const { logoUrl, isLoading, error } = useTeamLogo({
+ *   teamId: team.id,  // Important: for saving resolved URLs
  *   apiTeamId: team.apiTeamId,
  *   apiTeamName: team.apiTeamName,
  *   fallbackLogoUrl: team.logoUrl,
+ *   resolvedLogoUrl: team.resolvedLogoUrl,  // If already resolved, instant load!
  * });
  * ```
  */
 export function useTeamLogo({
+  teamId,
   apiTeamId,
   apiTeamName,
   fallbackLogoUrl,
+  resolvedLogoUrl,
   useApiFirst = true
 }: UseTeamLogoOptions): UseTeamLogoResult {
   const [logoUrl, setLogoUrl] = useState<string>('');
@@ -46,8 +55,14 @@ export function useTeamLogo({
 
       try {
         if (useApiFirst) {
-          // Use new API-based logo service
-          const url = await getTeamLogoUrl(apiTeamId, apiTeamName, fallbackLogoUrl);
+          // Use new API-based logo service with database persistence
+          const url = await getTeamLogoUrl(
+            teamId,
+            apiTeamId,
+            apiTeamName,
+            fallbackLogoUrl,
+            resolvedLogoUrl
+          );
 
           if (isMounted) {
             if (url) {
@@ -91,7 +106,7 @@ export function useTeamLogo({
     return () => {
       isMounted = false;
     };
-  }, [apiTeamId, apiTeamName, fallbackLogoUrl, useApiFirst]);
+  }, [teamId, apiTeamId, apiTeamName, fallbackLogoUrl, resolvedLogoUrl, useApiFirst]);
 
   return { logoUrl, isLoading, error };
 }

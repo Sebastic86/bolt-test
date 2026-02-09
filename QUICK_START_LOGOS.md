@@ -1,26 +1,39 @@
 # Quick Start: New Logo System
 
-This is a simplified guide to get you started with the new API-based logo system.
+This is a simplified guide to get you started with the new API-based logo system with **persistent storage**.
 
-## Step 1: Apply Database Migration
+## Step 1: Apply Database Migrations
 
-Run this migration to add the new fields to your teams table:
+Run these migrations to add the new fields to your teams table:
 
 ```bash
 # Using Supabase CLI
 supabase db push
 
 # Or copy/paste the SQL from:
-# supabase/migrations/add_api_team_fields.sql
+# 1. supabase/migrations/add_api_team_fields.sql
+# 2. supabase/migrations/add_resolved_logo_url.sql (NEW!)
 ```
 
 This adds:
 - `apiTeamId` - TheSportsDB team ID
 - `apiTeamName` - Team name for API searches
+- `resolvedLogoUrl` - **NEW!** Permanently stores resolved logo URLs (eliminates API calls!)
 
 ## Step 2: Populate API Names
 
-Add this to your app (e.g., in a settings page or one-time setup):
+### Option A: Browser Console (Easiest!)
+
+Open your browser console and run:
+
+```javascript
+// Populate API names for all teams
+await devTools.populateApiNames()
+```
+
+### Option B: In Your App
+
+Add this to your app (e.g., in a settings page or admin panel):
 
 ```tsx
 import { populateApiTeamNames } from './scripts/populateApiTeamNames';
@@ -30,13 +43,6 @@ const handlePopulateNames = async () => {
   await populateApiTeamNames();
   alert('Team names populated! Check console for details.');
 };
-```
-
-Or run directly in browser console:
-
-```javascript
-const { populateApiTeamNames } = await import('./src/scripts/populateApiTeamNames');
-await populateApiTeamNames();
 ```
 
 ## Step 3: Start Using New Components
@@ -103,6 +109,57 @@ Or force local mode:
 <TeamLogo team={team} useApiFirst={false} />
 ```
 
+## Step 5: (Optional) Bulk Resolve All Logos
+
+Want to resolve all team logos at once?
+
+### Option A: Browser Console (Easiest!)
+
+Open your browser console and run:
+
+```javascript
+// Resolve all team logos (takes a few minutes for many teams)
+await devTools.resolveAllLogos()
+
+// Or force re-resolve all logos
+await devTools.resolveAllLogos(true)
+
+// Or with custom delay (1000ms between API calls)
+await devTools.resolveAllLogos(false, 1000)
+```
+
+### Option B: In Your App
+
+```tsx
+import { resolveAllTeamLogos } from './scripts/resolveAllTeamLogos';
+
+// Resolve all team logos and save to database
+const stats = await resolveAllTeamLogos();
+console.log(`Success: ${stats.success}, Failed: ${stats.failed}, Skipped: ${stats.skipped}`);
+```
+
+This will:
+- Fetch logos for all teams via API
+- **Save them to database permanently**
+- Skip teams that already have resolved URLs
+- Report progress and statistics
+
+### Other Console Commands
+
+```javascript
+// Show available commands
+devTools.help()
+
+// Test a specific team
+await devTools.testTeamLogo('Bayern Munich')
+
+// Resolve single team by ID
+await devTools.resolveTeamLogo('team-uuid-here')
+
+// Clear browser cache
+devTools.clearCache()
+```
+
 ## Benefits
 
 - ✅ **No more manual logo downloads** - API handles it
@@ -110,6 +167,8 @@ Or force local mode:
 - ✅ **Auto-caching** - 7-day cache for performance
 - ✅ **Automatic fallback** - Uses local logos if API fails
 - ✅ **Easy to add teams** - Just provide team name
+- ✅ **NEW: Persistent storage** - Logos saved to database after first load (instant subsequent loads!)
+- ✅ **NEW: No repeated API calls** - Once resolved, logos load from database forever
 
 ## Next Steps
 

@@ -30,6 +30,7 @@ import {useMatchGenerator} from './hooks/useMatchGenerator';
 import {usePlayerStandings} from './hooks/usePlayerStandings';
 import {useTeamStatistics} from './hooks/useTeamStatistics';
 import {ArrowLeft, Dices, List, PlusSquare, Settings} from 'lucide-react';
+import {resolveAllTeamLogos} from "./scripts/resolveAllTeamLogos.ts";
 
 
 function App() {

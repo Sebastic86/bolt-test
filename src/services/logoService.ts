@@ -2,6 +2,8 @@
  * Logo Service - Handles dynamic logo loading from TheSportsDB API with caching and fallback
  */
 
+import { supabase } from '../lib/supabaseClient';
+
 const THESPORTSDB_API_BASE = 'https://www.thesportsdb.com/api/v1/json/3';
 const CACHE_KEY_PREFIX = 'team_logo_';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
@@ -96,6 +98,30 @@ function setCachedLogo(cacheKey: string, url: string): void {
 }
 
 /**
+ * Save resolved logo URL to database for permanent storage
+ * This eliminates the need for repeated API calls
+ */
+async function saveResolvedLogoToDatabase(
+  teamId: string,
+  resolvedLogoUrl: string
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('teams')
+      .update({ resolvedLogoUrl })
+      .eq('id', teamId);
+
+    if (error) {
+      console.error('[logoService] Error saving resolved logo to database:', error);
+    } else {
+      console.log(`[logoService] Saved resolved logo for team ${teamId}`);
+    }
+  } catch (error) {
+    console.error('[logoService] Unexpected error saving to database:', error);
+  }
+}
+
+/**
  * Fetch team data from TheSportsDB API by team ID
  */
 async function fetchTeamByIdFromAPI(teamId: string): Promise<string | null> {
@@ -175,22 +201,35 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
  * Get logo URL for a team with caching and fallback logic
  *
  * Resolution order:
- * 1. Check cache
- * 2. Try API by team ID
- * 3. Try API by team name
- * 4. Fallback to local logoUrl
- * 5. Return empty string (will trigger onError handler in components)
+ * 1. Check resolvedLogoUrl from database (if teamId provided)
+ * 2. Check browser cache
+ * 3. Try API by team ID
+ * 4. Try API by team name
+ * 5. Fallback to local logoUrl
+ * 6. Return empty string (will trigger onError handler in components)
  *
+ * When a logo is found via API, it's automatically saved to the database
+ * for permanent storage and faster future loads.
+ *
+ * @param teamId - Database team ID (for saving resolved URL)
  * @param apiTeamId - TheSportsDB team ID (optional)
  * @param apiTeamName - Team name for search (optional)
  * @param fallbackLogoUrl - Local logo filename as fallback (optional)
+ * @param resolvedLogoUrl - Previously resolved logo URL from database (optional)
  * @returns Promise resolving to logo URL or empty string
  */
 export async function getTeamLogoUrl(
+  teamId?: string | null,
   apiTeamId?: string | null,
   apiTeamName?: string | null,
-  fallbackLogoUrl?: string | null
+  fallbackLogoUrl?: string | null,
+  resolvedLogoUrl?: string | null
 ): Promise<string> {
+  // Step 1: If we have a resolved URL from database, use it immediately (fastest path!)
+  if (resolvedLogoUrl) {
+    console.log(`[logoService] Using resolved URL from database for team ${teamId}`);
+    return resolvedLogoUrl;
+  }
   // Generate cache key based on available identifiers
   const cacheKey = apiTeamId
     ? `${CACHE_KEY_PREFIX}id_${apiTeamId}`
@@ -200,7 +239,7 @@ export async function getTeamLogoUrl(
     ? `${CACHE_KEY_PREFIX}local_${fallbackLogoUrl}`
     : null;
 
-  // Check cache first
+  // Step 2: Check browser cache
   if (cacheKey) {
     const cached = getCachedLogo(cacheKey);
     if (cached) {
@@ -208,20 +247,38 @@ export async function getTeamLogoUrl(
     }
   }
 
-  // Try API by team ID
+  // Step 3: Try API by team ID
   if (apiTeamId) {
     const logoUrl = await fetchTeamByIdFromAPI(apiTeamId);
-    if (logoUrl && cacheKey) {
-      setCachedLogo(cacheKey, logoUrl);
+    if (logoUrl) {
+      // Save to browser cache
+      if (cacheKey) {
+        setCachedLogo(cacheKey, logoUrl);
+      }
+      // Save to database for permanent storage (async, don't block)
+      if (teamId) {
+        saveResolvedLogoToDatabase(teamId, logoUrl).catch(err =>
+          console.error('[logoService] Failed to save to DB:', err)
+        );
+      }
       return logoUrl;
     }
   }
 
-  // Try API by team name
+  // Step 4: Try API by team name
   if (apiTeamName) {
     const logoUrl = await fetchTeamByNameFromAPI(apiTeamName);
-    if (logoUrl && cacheKey) {
-      setCachedLogo(cacheKey, logoUrl);
+    if (logoUrl) {
+      // Save to browser cache
+      if (cacheKey) {
+        setCachedLogo(cacheKey, logoUrl);
+      }
+      // Save to database for permanent storage (async, don't block)
+      if (teamId) {
+        saveResolvedLogoToDatabase(teamId, logoUrl).catch(err =>
+          console.error('[logoService] Failed to save to DB:', err)
+        );
+      }
       return logoUrl;
     }
   }

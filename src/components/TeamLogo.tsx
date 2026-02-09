@@ -3,7 +3,14 @@ import { useTeamLogo } from '../hooks/useTeamLogo';
 import { Team } from '../types';
 
 interface TeamLogoProps {
-  team: Pick<Team, 'name' | 'logoUrl' | 'apiTeamId' | 'apiTeamName'>;
+  team: {
+    id?: string; // Optional: if provided, resolved URLs will be saved to database
+    name: string;
+    logoUrl?: string | null;
+    apiTeamId?: string | null;
+    apiTeamName?: string | null;
+    resolvedLogoUrl?: string | null;
+  };
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   useApiFirst?: boolean; // If true, use API; if false, use local (default: true)
@@ -23,6 +30,7 @@ const sizeClasses = {
  *
  * Features:
  * - Automatically loads logos from TheSportsDB API
+ * - **NEW**: Saves resolved URLs to database for instant future loads!
  * - Falls back to local logos if API fails
  * - Shows placeholder on error
  * - Optional loading spinner
@@ -32,6 +40,8 @@ const sizeClasses = {
  * ```tsx
  * <TeamLogo team={team} size="md" />
  * ```
+ *
+ * Performance: After first load, logos load instantly from database (no API call!)
  */
 export const TeamLogo: React.FC<TeamLogoProps> = ({
   team,
@@ -42,9 +52,11 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
   alt
 }) => {
   const { logoUrl, isLoading, error } = useTeamLogo({
+    teamId: team.id,
     apiTeamId: team.apiTeamId,
     apiTeamName: team.apiTeamName,
     fallbackLogoUrl: team.logoUrl,
+    resolvedLogoUrl: team.resolvedLogoUrl,
     useApiFirst
   });
 
