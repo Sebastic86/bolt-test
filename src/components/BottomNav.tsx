@@ -1,22 +1,22 @@
 import React from 'react';
-import { Dices, PlusSquare, List, Settings, ArrowLeft } from 'lucide-react';
+import { Dices, PlusSquare, Shield, Settings, ArrowLeft } from 'lucide-react';
 
 interface BottomNavProps {
   onNewMatchup: () => void;
   onAddMatch: () => void;
-  onAllMatches: () => void;
+  onAdmin: () => void;
   onSettings: () => void;
   onBackToMain: () => void;
   canGenerateNewMatch: boolean;
   hasMatch: boolean;
   isAdmin: boolean;
-  currentPage: 'main' | 'allMatches';
+  currentPage: 'main' | 'allMatches' | 'admin';
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({
   onNewMatchup,
   onAddMatch,
-  onAllMatches,
+  onAdmin,
   onSettings,
   onBackToMain,
   canGenerateNewMatch,
@@ -24,7 +24,7 @@ const BottomNav: React.FC<BottomNavProps> = ({
   isAdmin,
   currentPage,
 }) => {
-  if (currentPage === 'allMatches') {
+  if (currentPage === 'allMatches' || currentPage === 'admin') {
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark shadow-[0_-2px_10px_rgba(0,0,0,0.15)] md:hidden bottom-nav">
         <div className="flex justify-center py-2 px-4">
@@ -65,14 +65,16 @@ const BottomNav: React.FC<BottomNavProps> = ({
           </button>
         )}
 
-        <button
-          onClick={onAllMatches}
-          className="flex flex-col items-center justify-center min-w-[60px] py-1 text-white/90 hover:text-white transition-colors"
-          title="All Matches"
-        >
-          <List className="w-6 h-6" />
-          <span className="text-[10px] mt-0.5 font-medium">All Matches</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={onAdmin}
+            className="flex flex-col items-center justify-center min-w-[60px] py-1 text-white/90 hover:text-white transition-colors"
+            title="Admin"
+          >
+            <Shield className="w-6 h-6" />
+            <span className="text-[10px] mt-0.5 font-medium">Admin</span>
+          </button>
+        )}
 
         <button
           onClick={onSettings}

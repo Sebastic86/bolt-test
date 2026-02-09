@@ -90,7 +90,7 @@ export const devTools = {
   /**
    * Migrate all logos to Supabase Storage
    */
-  async migrateLogosToStorage(forceUpdate = false, delayMs = 500) {
+  async migrateLogosToStorage(forceUpdate = false, delayMs = 1500) {
     console.log('🚀 Starting logo migration to Supabase Storage...');
     const stats = await migrateAllLogosToStorage(forceUpdate, delayMs);
     console.log('✅ Migration complete!');

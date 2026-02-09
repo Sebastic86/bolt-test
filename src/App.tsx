@@ -8,7 +8,7 @@ import EditTeamModal from './components/EditTeamModal';
 import SettingsModal from './components/SettingsModal';
 import AddMatchModal from './components/AddMatchModal';
 import MatchHistory from './components/MatchHistory';
-import AllMatches from './components/AllMatches';
+import AdminPage from './components/AdminPage';
 import PlayerStandings from './components/PlayerStandings';
 import TopWinPercentageTeams from './components/TopWinPercentageTeams';
 import TopLossPercentageTeams from './components/TopLossPercentageTeams';
@@ -54,7 +54,7 @@ function App() {
   const [isAddMatchModalOpen, setIsAddMatchModalOpen] = useState<boolean>(false);
 
   // Page Navigation State
-  const [currentPage, setCurrentPage] = useState<'main' | 'allMatches'>('main');
+  const [currentPage, setCurrentPage] = useState<'main' | 'allMatches' | 'admin'>('main');
 
   // Filtered teams based on rating, nation, and version settings
   const filteredTeams = useMemo(() => {
@@ -195,8 +195,19 @@ function App() {
 
   // Page Navigation Handlers
   const handleNavigateToAllMatches = () => setCurrentPage('allMatches');
+  const handleNavigateToAdmin = () => setCurrentPage('admin');
   const handleNavigateToMain = () => setCurrentPage('main');
   const handleRefreshAllMatches = () => fetchAllMatchesData();
+  const handleRefreshTeams = () => {
+    setLoading(true);
+    Promise.all([fetchAllTeams(), fetchAllPlayers()])
+      .then(([teamsData, playersData]) => {
+        setAllTeams(teamsData);
+        setAllPlayers(playersData);
+      })
+      .catch(err => console.error("Failed to refresh teams:", err))
+      .finally(() => setLoading(false));
+  };
 
   // Calculate differences
   const differences = match ? {
@@ -213,7 +224,7 @@ function App() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header />
+      <Header onNavigateToAdmin={handleNavigateToAdmin} />
       <AuthWrapper>
         <main className="grow bg-linear-to-br from-brand-lighter via-brand-light to-brand-medium p-4 pb-20 md:pb-4 flex flex-col items-center">
 
@@ -270,13 +281,6 @@ function App() {
                    <PlusSquare className="w-5 h-5 mr-2" /> Add Match
                  </button>
                </AdminOnly>
-               <button
-                 onClick={handleNavigateToAllMatches}
-                 className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out border-r border-white/20"
-                 title="View and Edit All Matches"
-               >
-                 <List className="w-5 h-5 mr-2" /> All Matches
-               </button>
                <button
                  onClick={handleOpenSettingsModal}
                  className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
@@ -433,6 +437,24 @@ function App() {
              />
            </ErrorBoundary>
          )}
+
+         {/* Admin Page Content */}
+         {currentPage === 'admin' && (
+           <AdminOnly>
+             <ErrorBoundary fallbackTitle="Error loading admin page">
+               <AdminPage
+                 allTeams={allTeams}
+                 allMatches={allMatches}
+                 allPlayers={allPlayers}
+                 loadingTeams={loading}
+                 loadingMatches={loadingAllMatches}
+                 matchesError={allMatchesError}
+                 onRefreshTeams={handleRefreshTeams}
+                 onRefreshMatches={handleRefreshAllMatches}
+               />
+             </ErrorBoundary>
+           </AdminOnly>
+         )}
       </main>
 
       {/* Modals */}
@@ -462,7 +484,7 @@ function App() {
         <BottomNav
           onNewMatchup={() => handleGenerateNewMatch()}
           onAddMatch={handleOpenAddMatchModal}
-          onAllMatches={handleNavigateToAllMatches}
+          onAdmin={handleNavigateToAdmin}
           onSettings={handleOpenSettingsModal}
           onBackToMain={handleNavigateToMain}
           canGenerateNewMatch={canGenerateNewMatch}

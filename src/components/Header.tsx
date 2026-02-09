@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Volleyball, LogOut, User, Menu, X } from 'lucide-react';
+import { Volleyball, LogOut, User, Menu, X, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { UserInfo, AuthenticatedOnly } from './RoleBasedComponents';
+import { UserInfo, AuthenticatedOnly, AdminOnly } from './RoleBasedComponents';
 
-const Header: React.FC = () => {
-  const { signOut, isAuthenticated, user } = useAuth();
+interface HeaderProps {
+  onNavigateToAdmin?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onNavigateToAdmin }) => {
+  const { signOut, isAuthenticated, user, isAdmin } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleSignOut = async () => {
@@ -58,7 +62,20 @@ const Header: React.FC = () => {
                   <div className="md:hidden px-4 py-2 border-b border-gray-200">
                     <UserInfo />
                   </div>
-                  
+
+                  <AdminOnly>
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onNavigateToAdmin?.();
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                    >
+                      <Shield className="w-4 h-4" />
+                      <span>Admin Dashboard</span>
+                    </button>
+                  </AdminOnly>
+
                   <button
                     onClick={handleSignOut}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
