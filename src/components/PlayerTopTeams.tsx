@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem, Team } from '../types';
 import { Shield } from 'lucide-react';
 import { TeamLogo } from './TeamLogo';
+import PlayerBadge from './PlayerBadge';
 
 interface PlayerTopTeamsProps {
   allPlayers: Player[];
@@ -230,9 +231,12 @@ const PlayerTopTeams: React.FC<PlayerTopTeamsProps> = ({
                 key={playerStat.playerId}
                 className="bg-white rounded-lg shadow-sm border border-brand-light p-4"
               >
-                <h3 className="text-lg font-semibold text-gray-800 mb-3 text-center border-b border-brand-light pb-2">
-                  {playerStat.playerName}
-                </h3>
+                <div className="mb-3 flex justify-center border-b border-brand-light pb-2">
+                  <PlayerBadge
+                    player={{ id: playerStat.playerId, name: playerStat.playerName, avatar_url: (allPlayers.find(p => p.id === playerStat.playerId)?.avatar_url || null) }}
+                    size="sm"
+                  />
+                </div>
                 <div className="space-y-3">
                   {playerStat.topTeams.map((team, index) => (
                     <div

@@ -3,6 +3,7 @@ import { Team, Player } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { X, Save, UserPlus, Trash2 } from 'lucide-react';
 import TeamLogo from "./TeamLogo.tsx";
+import PlayerBadge from './PlayerBadge';
 
 type MatchSaveAction = 'next' | 'rematch';
 
@@ -556,7 +557,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                 <ul className="space-y-1 text-sm">
                   {team1Players.map(p => (
                     <li key={p.id} className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded-sm">
-                      <span>{p.name}</span>
+                      <PlayerBadge player={p} size="xs" />
                       <button
                         onClick={() => handleRemovePlayer(1, p.id)}
                         className="text-red-500 hover:text-red-700 disabled:opacity-50" // Keep remove red
@@ -607,7 +608,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
                 <ul className="space-y-1 text-sm">
                   {team2Players.map(p => (
                     <li key={p.id} className="flex justify-between items-center bg-gray-100 px-2 py-1 rounded-sm">
-                      <span>{p.name}</span>
+                      <PlayerBadge player={p} size="xs" />
                       <button
                         onClick={() => handleRemovePlayer(2, p.id)}
                         className="text-red-500 hover:text-red-700 disabled:opacity-50" // Keep remove red

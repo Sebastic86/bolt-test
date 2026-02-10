@@ -17,6 +17,7 @@ export interface Team {
 export interface Player {
   id: string;
   name: string;
+  avatar_url?: string | null;
   created_at: string;
 }
 

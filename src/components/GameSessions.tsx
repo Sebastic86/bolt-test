@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Player, MatchHistoryItem } from '../types';
 import { Shield, ChevronDown, ChevronUp } from 'lucide-react';
 import { TeamLogo } from './TeamLogo';
+import PlayerBadge from './PlayerBadge';
 
 interface GameSessionsProps {
   allMatches: MatchHistoryItem[];
@@ -218,7 +219,9 @@ const GameSessions: React.FC<GameSessionsProps> = ({
                             {match.team1_players.length > 0 ? (
                               <ul className="space-y-1">
                                 {match.team1_players.map(p => (
-                                  <li key={p.id}>{p.name}</li>
+                                  <li key={p.id}>
+                                    <PlayerBadge player={p} size="xs" />
+                                  </li>
                                 ))}
                               </ul>
                             ) : <span className="italic">No players recorded</span>}
@@ -230,7 +233,9 @@ const GameSessions: React.FC<GameSessionsProps> = ({
                             {match.team2_players.length > 0 ? (
                               <ul className="space-y-1">
                                 {match.team2_players.map(p => (
-                                  <li key={p.id}>{p.name}</li>
+                                  <li key={p.id}>
+                                    <PlayerBadge player={p} size="xs" />
+                                  </li>
                                 ))}
                               </ul>
                             ) : <span className="italic">No players recorded</span>}

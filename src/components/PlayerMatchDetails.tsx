@@ -1,5 +1,6 @@
 import React from 'react';
 import { MatchHistoryItem } from '../types';
+import PlayerBadge from './PlayerBadge';
 
 interface PlayerMatchDetailsProps {
   playerId: string;
@@ -141,19 +142,15 @@ const PlayerMatchDetails: React.FC<PlayerMatchDetailsProps> = ({
                         <div className="text-sm text-gray-600">
                           <strong>Teammates:</strong>
                         </div>
-                        <div className="mt-1">
+                        <div className="mt-1 flex flex-wrap gap-1 justify-center">
                           {playerTeam.players.length > 0 ? (
                             playerTeam.players.map((player, idx) => (
-                              <span 
-                                key={player.id} 
-                                className={`text-xs px-2 py-1 rounded-full mr-1 mb-1 inline-block ${
-                                  player.id === playerId 
-                                    ? 'bg-blue-200 text-blue-900 font-semibold' 
-                                    : 'bg-blue-100 text-blue-800'
-                                }`}
+                              <div
+                                key={player.id}
+                                className={player.id === playerId ? 'ring-2 ring-blue-500 rounded-full' : ''}
                               >
-                                {player.name}
-                              </span>
+                                <PlayerBadge player={player} size="xs" />
+                              </div>
                             ))
                           ) : (
                             <span className="text-xs text-gray-500">No players recorded</span>
@@ -186,12 +183,10 @@ const PlayerMatchDetails: React.FC<PlayerMatchDetailsProps> = ({
                         <div className="text-sm text-gray-600">
                           <strong>Players:</strong>
                         </div>
-                        <div className="mt-1">
+                        <div className="mt-1 flex flex-wrap gap-1 justify-center">
                           {opponent.players.length > 0 ? (
                             opponent.players.map((player, idx) => (
-                              <span key={player.id} className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full mr-1 mb-1 inline-block">
-                                {player.name}
-                              </span>
+                              <PlayerBadge key={player.id} player={player} size="xs" />
                             ))
                           ) : (
                             <span className="text-xs text-gray-500">No players recorded</span>

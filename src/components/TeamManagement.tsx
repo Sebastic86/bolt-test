@@ -4,6 +4,7 @@ import { Team } from '../types';
 import { searchTeams } from '../services/teamService';
 import { TeamLogo } from './TeamLogo';
 import EditTeamFullModal from './EditTeamFullModal';
+import { supabase } from '../lib/supabaseClient';
 
 interface TeamManagementProps {
   allTeams: Team[];
@@ -17,30 +18,67 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ allTeams, onRefresh }) 
   const [filteredTeams, setFilteredTeams] = useState<Team[]>(allTeams);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<string>('FC26');
+  const [availableVersions, setAvailableVersions] = useState<string[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState<boolean>(false);
+  const [minRating, setMinRating] = useState<number>(0);
 
-  // Filter teams locally
+  // Fetch available versions
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredTeams(allTeams);
-      return;
+    const fetchVersions = async () => {
+      setVersionsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('teams')
+          .select('version')
+          .order('version');
+        if (error) throw error;
+        const versions = Array.from(new Set((data || []).map((item: any) => item.version)));
+        setAvailableVersions(versions);
+      } catch (err) {
+        console.error('[TeamManagement] Error fetching versions:', err);
+        setAvailableVersions(['FC25', 'FC26']);
+      } finally {
+        setVersionsLoading(false);
+      }
+    };
+    fetchVersions();
+  }, []);
+
+  // Filter teams by version
+  const versionFilteredTeams = useMemo(() => {
+    if (selectedVersion === 'All') return allTeams;
+    return allTeams.filter(team => team.version === selectedVersion);
+  }, [selectedVersion, allTeams]);
+
+  // Filter teams locally by search query and rating
+  useEffect(() => {
+    let filtered = versionFilteredTeams;
+
+    // Apply rating filter
+    if (minRating > 0) {
+      filtered = filtered.filter(team => team.rating >= minRating);
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = allTeams.filter(team => {
-      if (filterBy === 'name') {
-        return team.name.toLowerCase().includes(query);
-      } else if (filterBy === 'league') {
-        return team.league.toLowerCase().includes(query);
-      } else {
-        return (
-          team.name.toLowerCase().includes(query) ||
-          team.league.toLowerCase().includes(query)
-        );
-      }
-    });
+    // Apply search query filter
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(team => {
+        if (filterBy === 'name') {
+          return team.name.toLowerCase().includes(query);
+        } else if (filterBy === 'league') {
+          return team.league.toLowerCase().includes(query);
+        } else {
+          return (
+            team.name.toLowerCase().includes(query) ||
+            team.league.toLowerCase().includes(query)
+          );
+        }
+      });
+    }
 
     setFilteredTeams(filtered);
-  }, [searchQuery, filterBy, allTeams]);
+  }, [searchQuery, filterBy, versionFilteredTeams, minRating]);
 
   const handleEditTeam = (team: Team) => {
     setSelectedTeam(team);
@@ -84,14 +122,35 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ allTeams, onRefresh }) 
             {filteredTeams.length} of {allTeams.length} teams
           </p>
         </div>
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium disabled:opacity-50 transition"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label htmlFor="version-filter-teams" className="text-sm font-medium text-gray-700">
+              Version:
+            </label>
+            <select
+              id="version-filter-teams"
+              value={selectedVersion}
+              onChange={(e) => setSelectedVersion(e.target.value)}
+              disabled={versionsLoading}
+              className="px-3 py-1.5 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="All">All Versions</option>
+              {availableVersions.map((version) => (
+                <option key={version} value={version}>
+                  {version}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className="flex items-center px-4 py-2 bg-brand-dark text-white rounded-md hover:bg-brand-medium disabled:opacity-50 transition"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -115,6 +174,18 @@ const TeamManagement: React.FC<TeamManagementProps> = ({ allTeams, onRefresh }) 
             <option value="all">All Fields</option>
             <option value="name">Team Name</option>
             <option value="league">League</option>
+          </select>
+          <select
+            value={minRating}
+            onChange={(e) => setMinRating(Number(e.target.value))}
+            className="px-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-brand-medium"
+          >
+            <option value={0}>All Ratings</option>
+            <option value={3.0}>★ ≥3.0</option>
+            <option value={3.5}>★ ≥3.5</option>
+            <option value={4.0}>★ ≥4.0</option>
+            <option value={4.5}>★ ≥4.5</option>
+            <option value={5.0}>★ 5.0</option>
           </select>
         </div>
       </div>

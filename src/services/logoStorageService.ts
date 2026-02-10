@@ -5,25 +5,9 @@ import { supabase } from '../lib/supabaseClient';
  *
  * Downloads logo images from external URLs and uploads them to Supabase Storage.
  * Updates team records with new Supabase Storage URLs.
- *
- * Uses CORS proxy to bypass browser CORS restrictions when downloading images.
  */
 
 const STORAGE_BUCKET = 'team-logos';
-
-// CORS Proxy configuration for image downloads
-// Note: corsproxy.io blocks binary files (images), so we use allorigins.win for storage migration
-// For API calls (text/json), we still use corsproxy.io in logoService.ts
-const CORS_PROXY_URL = import.meta.env.VITE_CORS_PROXY_URL_BINARY || 'https://api.allorigins.win/raw?url=';
-
-/**
- * Wrap URL with CORS proxy to bypass CORS restrictions
- * Uses AllOrigins which supports binary content (images)
- */
-function withCorsProxy(url: string): string {
-  // AllOrigins expects the URL as a query parameter
-  return `${CORS_PROXY_URL}${encodeURIComponent(url)}`;
-}
 
 interface UploadResult {
   success: boolean;
@@ -33,15 +17,11 @@ interface UploadResult {
 
 /**
  * Download an image from a URL as a Blob
- * Uses CORS proxy to bypass browser CORS restrictions
  */
 async function downloadImageAsBlob(url: string): Promise<Blob> {
   console.log(`[logoStorageService] Downloading image from: ${url.substring(0, 60)}...`);
 
-  // Skip CORS proxy for Supabase storage URLs (they already have CORS enabled)
-  const isSupabaseUrl = url.includes('supabase.co/storage') || url.includes('.supabase.co/storage');
-  const proxiedUrl = isSupabaseUrl ? url : withCorsProxy(url);
-  const response = await fetch(proxiedUrl);
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);

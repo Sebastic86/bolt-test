@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { MatchHistoryItem, Player, Team } from '../types';
 import { calculatePlayerAchievements, PlayerAchievementData, Achievement } from '../utils/achievementUtils';
 import { ChevronDown, Trophy, X, Calendar, Shield, Users } from 'lucide-react';
+import PlayerBadge from './PlayerBadge';
 
 interface PlayerAchievementsProps {
   allMatches: MatchHistoryItem[];
@@ -126,12 +127,9 @@ const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({ match, onClose })
                   match.team1_players.map((player) => (
                     <div
                       key={player.id}
-                      className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2"
+                      className="bg-blue-50 border border-blue-200 rounded-lg p-3"
                     >
-                      <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
-                        {player.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-sm font-medium text-gray-800">{player.name}</span>
+                      <PlayerBadge player={player} size="sm" />
                     </div>
                   ))
                 ) : (
@@ -151,12 +149,9 @@ const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({ match, onClose })
                   match.team2_players.map((player) => (
                     <div
                       key={player.id}
-                      className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2"
+                      className="bg-red-50 border border-red-200 rounded-lg p-3"
                     >
-                      <div className="w-8 h-8 bg-red-200 rounded-full flex items-center justify-center text-red-700 font-bold text-sm">
-                        {player.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-sm font-medium text-gray-800">{player.name}</span>
+                      <PlayerBadge player={player} size="sm" />
                     </div>
                   ))
                 ) : (
@@ -470,9 +465,12 @@ const PlayerAchievementCard: React.FC<PlayerAchievementCardProps> = ({
             <Trophy className="w-5 h-5 text-brand-dark" />
           </div>
           <div className="min-w-0">
-            <h4 className="font-semibold text-gray-800 text-sm truncate">
-              {player.playerName}
-            </h4>
+            <div className="mb-1">
+              <PlayerBadge
+                player={{ id: player.playerId, name: player.playerName, avatar_url: null }}
+                size="xs"
+              />
+            </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span>{player.totalMatches} matches</span>
               {streak.isHotStreak && (

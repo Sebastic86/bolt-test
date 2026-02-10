@@ -4,6 +4,7 @@ import { Player, MatchHistoryItem } from '../types';
 import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Award, Plus } from 'lucide-react';
 import { AdminOnly } from './RoleBasedComponents'; // Import Shield and Award
 import { TeamLogo } from './TeamLogo';
+import PlayerBadge from './PlayerBadge';
 
 interface MatchHistoryProps {
   matchesToday: MatchHistoryItem[];
@@ -482,7 +483,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               <ul className="space-y-1">
                                   {match.team1_players.map(p => (
                                       <li key={p.id} className="flex items-center justify-between">
-                                          <span>{p.name}</span>
+                                          <PlayerBadge player={p} size="xs" />
                                           {editingPlayersMatchId === match.id && (
                                               <button
                                                   onClick={() => handleMovePlayerToTeam(p.id, match.id, 2)}
@@ -504,7 +505,7 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({
                               <ul className="space-y-1">
                                   {match.team2_players.map(p => (
                                       <li key={p.id} className="flex items-center justify-between">
-                                          <span>{p.name}</span>
+                                          <PlayerBadge player={p} size="xs" />
                                           {editingPlayersMatchId === match.id && (
                                               <button
                                                   onClick={() => handleMovePlayerToTeam(p.id, match.id, 1)}

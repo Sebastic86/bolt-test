@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
+import PlayerBadge from './PlayerBadge';
 
 interface PlayerWinMatrixProps {
   allPlayers: Player[];
@@ -212,9 +213,11 @@ const PlayerWinMatrix: React.FC<PlayerWinMatrixProps> = ({
                     <th
                       key={player.id}
                       scope="col"
-                      className="px-3 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[100px]"
+                      className="px-3 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]"
                     >
-                      {player.name}
+                      <div className="flex justify-center">
+                        <PlayerBadge player={player} size="xs" />
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -223,7 +226,7 @@ const PlayerWinMatrix: React.FC<PlayerWinMatrixProps> = ({
                 {activePlayers.map((rowPlayer, rowIndex) => (
                   <tr key={rowPlayer.id} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'}>
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 z-10" style={{backgroundColor: rowIndex % 2 === 0 ? 'white' : '#f0f9ff'}}>
-                      {rowPlayer.name}
+                      <PlayerBadge player={rowPlayer} size="xs" />
                     </td>
                     {activePlayers.map((colPlayer) => {
                       if (rowPlayer.id === colPlayer.id) {

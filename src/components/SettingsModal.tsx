@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, User, Edit3, Check, RefreshCw } from 'lucide-react';
+import { X, Save, User, Edit3, Check, RefreshCw, Upload, Trash } from 'lucide-react';
 import { Player } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { AdminOnly } from './RoleBasedComponents';
+import PlayerBadge from './PlayerBadge';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ interface EditingPlayerState {
     isLoading: boolean;
     error: string | null;
     success: boolean;
+    uploadingAvatar: boolean;
   };
 }
 
@@ -98,6 +100,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           isEditing: false,
           isLoading: false,
           error: null,
+          uploadingAvatar: false,
           success: false,
         };
       });
@@ -230,6 +233,119 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             });
         }, 2000);
      }
+  };
+
+  const handleAvatarUpload = async (playerId: string, file: File) => {
+    console.log(`[SettingsModal] Uploading avatar for player ${playerId}`);
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setEditingPlayers(prev => ({
+        ...prev,
+        [playerId]: { ...prev[playerId], error: 'Please select an image file' },
+      }));
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setEditingPlayers(prev => ({
+        ...prev,
+        [playerId]: { ...prev[playerId], error: 'File size must be less than 5MB' },
+      }));
+      return;
+    }
+
+    setEditingPlayers(prev => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], uploadingAvatar: true, error: null },
+    }));
+
+    try {
+      // Create a unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${playerId}-${Date.now()}.${fileExt}`;
+      const filePath = `player-avatars/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update player record with avatar URL
+      const { error: updateError } = await supabase
+        .from('players')
+        .update({ avatar_url: publicUrl })
+        .eq('id', playerId);
+
+      if (updateError) throw updateError;
+
+      console.log(`[SettingsModal] Avatar uploaded successfully for player ${playerId}`);
+
+      setEditingPlayers(prev => ({
+        ...prev,
+        [playerId]: { ...prev[playerId], uploadingAvatar: false, success: true },
+      }));
+
+      // Trigger re-fetch of players to update UI
+      window.location.reload(); // Simple refresh to update all player data
+    } catch (error) {
+      console.error('[SettingsModal] Error uploading avatar:', error);
+      setEditingPlayers(prev => ({
+        ...prev,
+        [playerId]: {
+          ...prev[playerId],
+          uploadingAvatar: false,
+          error: 'Failed to upload avatar'
+        },
+      }));
+    }
+  };
+
+  const handleRemoveAvatar = async (playerId: string) => {
+    console.log(`[SettingsModal] Removing avatar for player ${playerId}`);
+
+    setEditingPlayers(prev => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], uploadingAvatar: true, error: null },
+    }));
+
+    try {
+      // Update player record to remove avatar URL
+      const { error: updateError } = await supabase
+        .from('players')
+        .update({ avatar_url: null })
+        .eq('id', playerId);
+
+      if (updateError) throw updateError;
+
+      console.log(`[SettingsModal] Avatar removed successfully for player ${playerId}`);
+
+      setEditingPlayers(prev => ({
+        ...prev,
+        [playerId]: { ...prev[playerId], uploadingAvatar: false, success: true },
+      }));
+
+      // Trigger re-fetch of players to update UI
+      window.location.reload(); // Simple refresh to update all player data
+    } catch (error) {
+      console.error('[SettingsModal] Error removing avatar:', error);
+      setEditingPlayers(prev => ({
+        ...prev,
+        [playerId]: {
+          ...prev[playerId],
+          uploadingAvatar: false,
+          error: 'Failed to remove avatar'
+        },
+      }));
+    }
   };
 
 
@@ -386,59 +502,103 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               {allPlayers.length === 0 ? (
                   <p className="text-xs sm:text-sm text-gray-500">No players found.</p>
               ) : (
-                  <ul className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-60 overflow-y-auto pr-1 sm:pr-2">
+                  <ul className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto pr-1 sm:pr-2">
                       {allPlayers.map(player => {
-                          const state = editingPlayers[player.id] || { currentName: player.name, isEditing: false, isLoading: false, error: null, success: false };
+                          const state = editingPlayers[player.id] || { currentName: player.name, isEditing: false, isLoading: false, error: null, success: false, uploadingAvatar: false };
                           const originalName = player.name;
 
                           return (
-                              <li key={player.id} className="flex items-center space-x-2 sm:space-x-3 p-2 border rounded-md">
-                                  <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
-                                  <div className="grow min-w-0">
-                                      {state.isEditing ? (
-                                          <input
-                                              type="text"
-                                              value={state.currentName}
-                                              onChange={(e) => handlePlayerNameChange(player.id, e.target.value)}
-                                              className={`w-full px-2 py-1 border rounded-md text-xs sm:text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-hidden focus:ring-1 focus:ring-brand-medium`}
-                                              disabled={state.isLoading}
-                                          />
-                                      ) : (
-                                          <span className="text-xs sm:text-sm font-medium text-gray-800 truncate">{state.currentName}</span>
-                                      )}
-                                       {state.error && <p className="text-xs text-red-600 mt-1">{state.error}</p>}
-                                       {state.success && <p className="text-xs text-green-600 mt-1 flex items-center"><Check className="w-3 h-3 mr-1"/> Saved!</p>}
-                                  </div>
-                                  <div className="shrink-0 flex items-center space-x-1">
-                                      {state.isEditing ? (
-                                          <>
-                                              <button
-                                                  onClick={() => handleSavePlayerName(player.id)}
-                                                  className="p-1 text-brand-dark hover:text-brand-medium disabled:opacity-50"
-                                                  disabled={state.isLoading || state.currentName.trim() === originalName || !state.currentName.trim()}
-                                                  title="Save Name"
-                                              >
-                                                  {state.isLoading ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
-                                              </button>
+                              <li key={player.id} className="flex flex-col space-y-2 p-3 border rounded-md bg-gray-50">
+                                  <div className="flex items-center space-x-2 sm:space-x-3">
+                                      {/* Avatar Display */}
+                                      <div className="shrink-0">
+                                          <PlayerBadge player={player} size="sm" />
+                                      </div>
+
+                                      <div className="grow min-w-0">
+                                          {state.isEditing ? (
+                                              <input
+                                                  type="text"
+                                                  value={state.currentName}
+                                                  onChange={(e) => handlePlayerNameChange(player.id, e.target.value)}
+                                                  className={`w-full px-2 py-1 border rounded-md text-xs sm:text-sm ${state.error ? 'border-red-500' : 'border-gray-300'} focus:outline-hidden focus:ring-1 focus:ring-brand-medium`}
+                                                  disabled={state.isLoading}
+                                              />
+                                          ) : (
+                                              <span className="text-xs sm:text-sm font-medium text-gray-800 truncate block">{state.currentName}</span>
+                                          )}
+                                      </div>
+
+                                      <div className="shrink-0 flex items-center space-x-1">
+                                          {state.isEditing ? (
+                                              <>
+                                                  <button
+                                                      onClick={() => handleSavePlayerName(player.id)}
+                                                      className="p-1 text-brand-dark hover:text-brand-medium disabled:opacity-50"
+                                                      disabled={state.isLoading || state.currentName.trim() === originalName || !state.currentName.trim()}
+                                                      title="Save Name"
+                                                  >
+                                                      {state.isLoading ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                                                  </button>
+                                                  <button
+                                                      onClick={() => toggleEditPlayer(player.id)}
+                                                      className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                                                      disabled={state.isLoading}
+                                                      title="Cancel Edit"
+                                                  >
+                                                      <X className="w-4 h-4" />
+                                                  </button>
+                                              </>
+                                          ) : (
                                               <button
                                                   onClick={() => toggleEditPlayer(player.id)}
-                                                  className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                                                  disabled={state.isLoading}
-                                                  title="Cancel Edit"
+                                                  className="p-1 text-blue-600 hover:text-blue-800"
+                                                  title="Edit Name"
                                               >
-                                                  <X className="w-4 h-4" />
+                                                  <Edit3 className="w-4 h-4" />
                                               </button>
-                                          </>
-                                      ) : (
+                                          )}
+                                      </div>
+                                  </div>
+
+                                  {/* Avatar Upload Controls */}
+                                  <div className="flex items-center space-x-2 pl-1">
+                                      <label className="cursor-pointer">
+                                          <input
+                                              type="file"
+                                              accept="image/*"
+                                              className="hidden"
+                                              onChange={(e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (file) handleAvatarUpload(player.id, file);
+                                              }}
+                                              disabled={state.uploadingAvatar}
+                                          />
+                                          <span className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50">
+                                              {state.uploadingAvatar ? (
+                                                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                              ) : (
+                                                  <Upload className="w-3 h-3 mr-1" />
+                                              )}
+                                              {player.avatar_url ? 'Change Avatar' : 'Upload Avatar'}
+                                          </span>
+                                      </label>
+
+                                      {player.avatar_url && (
                                           <button
-                                              onClick={() => toggleEditPlayer(player.id)}
-                                              className="p-1 text-blue-600 hover:text-blue-800" // Keep edit icon blue for distinction
-                                              title="Edit Name"
+                                              onClick={() => handleRemoveAvatar(player.id)}
+                                              className="inline-flex items-center px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                                              disabled={state.uploadingAvatar}
+                                              title="Remove Avatar"
                                           >
-                                              <Edit3 className="w-4 h-4" />
+                                              <Trash className="w-3 h-3 mr-1" />
+                                              Remove
                                           </button>
                                       )}
                                   </div>
+
+                                  {state.error && <p className="text-xs text-red-600">{state.error}</p>}
+                                  {state.success && <p className="text-xs text-green-600 flex items-center"><Check className="w-3 h-3 mr-1"/> Saved!</p>}
                               </li>
                           );
                       })}

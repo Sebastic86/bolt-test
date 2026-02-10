@@ -163,41 +163,62 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-brand-light">
-              {filteredStandings.map((player, index) => (
-                <tr 
-                  key={player.playerId} 
-                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'} hover:bg-blue-50 cursor-pointer transition-colors duration-150`}
-                  onClick={() => setSelectedPlayer({ id: player.playerId, name: player.playerName })}
-                >
-                  <td className="px-1 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
-                    {index + 1}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {player.playerName}
-                  </td>
-                  <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
+              {filteredStandings.map((player, index) => {
+                // Find the full player object to get avatar
+                const fullPlayer = (allPlayers || []).find(p => p.id === player.playerId);
+                const avatarUrl = fullPlayer?.avatar_url;
+
+                // Create background style with avatar on left 30% with diagonal cut
+                const bgColor = index % 2 === 0 ? 'rgb(255, 255, 255)' : 'rgb(240, 249, 255)';
+                const backgroundStyle: React.CSSProperties = avatarUrl ? {
+                  backgroundImage: `
+                    linear-gradient(115deg, transparent 28%, ${bgColor} 32%),
+                    linear-gradient(to right, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.5) 100%),
+                    url(${avatarUrl})
+                  `,
+                  backgroundSize: '100% 100%, 30% 100%, cover',
+                  backgroundPosition: 'center, left center, left center',
+                  backgroundRepeat: 'no-repeat, no-repeat, no-repeat',
+                  backgroundColor: bgColor,
+                } : {};
+
+                return (
+                  <tr
+                    key={player.playerId}
+                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'} hover:brightness-95 cursor-pointer transition-all duration-150 relative`}
+                    style={backgroundStyle}
+                    onClick={() => setSelectedPlayer({ id: player.playerId, name: player.playerName })}
+                  >
+                    <td className="px-1 py-4 whitespace-nowrap text-base font-bold text-gray-900 text-center relative z-10">
+                      {index + 1}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 relative z-10" style={{ textShadow: '0 1px 2px rgba(255, 255, 255, 0.8)' }}>
+                      {player.playerName}
+                    </td>
+                  <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold text-gray-800 text-center relative z-10">
                     {player.points}
                   </td>
-                  <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
+                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
                     {player.matchesPlayed > 0 ? `${((player.points / player.matchesPlayed) * 100).toFixed(1)}%` : '-'}
                   </td>
-                  <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
+                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
                     {player.goalsFor}
                   </td>
-                  <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
+                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
                     {player.goalsAgainst}
                   </td>
-                   <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
-                    {player.goalDifference >= 0 ? `+${player.goalDifference}` : player.goalDifference} {/* Display calculated difference with sign */}
+                   <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
+                    {player.goalDifference >= 0 ? `+${player.goalDifference}` : player.goalDifference}
                   </td>
-                  <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
-                    {player.matchesPlayed} {/* Display total matches played */}
+                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
+                    {player.matchesPlayed}
                   </td>
-                  <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700 text-center">
-                    {player.matchesPlayed > 0 ? (player.totalOverallRating / player.matchesPlayed).toFixed(1) : '-'} {/* Display average OVR or dash */}
+                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
+                    {player.matchesPlayed > 0 ? (player.totalOverallRating / player.matchesPlayed).toFixed(1) : '-'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

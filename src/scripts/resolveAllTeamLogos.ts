@@ -3,8 +3,8 @@
  *
  * This script fetches and saves logo URLs for all teams in the database.
  * Uses the centralized logoService which includes:
- * - CORS proxy for TheSportsDB API
- * - API-Sports as backup
+ * - API-Sports as primary provider (paid subscription)
+ * - TheSportsDB as fallback
  * - Special character normalization
  * - Comprehensive error handling
  *
@@ -17,7 +17,7 @@
  *
  * The script will:
  * - Fetch all teams from database
- * - For each team, resolve logo via logoService (CORS proxy + backup API)
+ * - For each team, resolve logo via logoService (API-Sports primary, TheSportsDB fallback)
  * - Save resolved URL back to database
  * - Skip teams that already have resolvedLogoUrl
  */
@@ -29,8 +29,8 @@ import { getTeamLogoUrl } from '../services/logoService';
  * Resolve and save logos for all teams
  *
  * Uses the centralized logoService.ts which automatically:
- * - Uses CORS proxy for TheSportsDB API
- * - Falls back to API-Sports if TheSportsDB fails
+ * - Uses API-Sports as primary provider (paid subscription)
+ * - Falls back to TheSportsDB if API-Sports fails
  * - Handles special characters
  * - Caches results
  *
@@ -42,7 +42,7 @@ export async function resolveAllTeamLogos(
   delayMs = 500
 ): Promise<{ success: number; failed: number; skipped: number }> {
   console.log('[resolveAllTeamLogos] Starting bulk logo resolution...');
-  console.log('[resolveAllTeamLogos] Using CORS proxy + API-Sports backup');
+  console.log('[resolveAllTeamLogos] Using API-Sports (primary) + TheSportsDB (fallback)');
 
   const stats = { success: 0, failed: 0, skipped: 0 };
 
@@ -78,8 +78,8 @@ export async function resolveAllTeamLogos(
 
       try {
         // Use centralized logoService which handles:
-        // - CORS proxy for TheSportsDB
-        // - API-Sports backup
+        // - API-Sports (primary)
+        // - TheSportsDB (fallback)
         // - Special character normalization
         // - Caching
         const logoUrl = await getTeamLogoUrl(
@@ -90,8 +90,17 @@ export async function resolveAllTeamLogos(
           null // Don't use existing resolvedLogoUrl (we're resolving it now)
         );
 
-        if (logoUrl && !logoUrl.includes('assets/logos')) {
+        if (logoUrl && !logoUrl.includes('assets/logos') && !logoUrl.includes('undefined')) {
           // Logo found from API (not local fallback)
+          // Validate URL before saving
+          try {
+            new URL(logoUrl); // This will throw if URL is invalid
+          } catch {
+            console.error(`  ❌ Invalid URL returned for ${team.name}: ${logoUrl}`);
+            stats.failed++;
+            continue;
+          }
+
           const { error: updateError } = await supabase
             .from('teams')
             .update({ resolvedLogoUrl: logoUrl })
@@ -103,6 +112,7 @@ export async function resolveAllTeamLogos(
           } else {
             const source = logoUrl.includes('thesportsdb') ? 'TheSportsDB' :
                           logoUrl.includes('api-football') ? 'API-Sports' :
+                          logoUrl.includes('api-sports') ? 'API-Sports' :
                           logoUrl.includes('supabase') ? 'Supabase Storage' : 'API';
             console.log(`  ✅ Found via ${source}`);
             console.log(`  💾 Saved to database: ${logoUrl.substring(0, 60)}...`);
@@ -144,8 +154,8 @@ export async function resolveAllTeamLogos(
  * Resolve logo for a single team
  *
  * Uses the centralized logoService.ts which automatically:
- * - Uses CORS proxy for TheSportsDB API
- * - Falls back to API-Sports if TheSportsDB fails
+ * - Uses API-Sports as primary provider (paid subscription)
+ * - Falls back to TheSportsDB if API-Sports fails
  * - Handles special characters
  * - Caches results
  */
@@ -176,8 +186,16 @@ export async function resolveTeamLogo(teamId: string): Promise<boolean> {
       null // Don't use existing resolvedLogoUrl
     );
 
-    if (logoUrl && !logoUrl.includes('assets/logos')) {
+    if (logoUrl && !logoUrl.includes('assets/logos') && !logoUrl.includes('undefined')) {
       // Logo found from API (not local fallback)
+      // Validate URL before saving
+      try {
+        new URL(logoUrl); // This will throw if URL is invalid
+      } catch {
+        console.error(`[resolveTeamLogo] Invalid URL returned: ${logoUrl}`);
+        return false;
+      }
+
       const { error: updateError } = await supabase
         .from('teams')
         .update({ resolvedLogoUrl: logoUrl })
@@ -190,6 +208,7 @@ export async function resolveTeamLogo(teamId: string): Promise<boolean> {
 
       const source = logoUrl.includes('thesportsdb') ? 'TheSportsDB' :
                     logoUrl.includes('api-football') ? 'API-Sports' :
+                    logoUrl.includes('api-sports') ? 'API-Sports' :
                     logoUrl.includes('supabase') ? 'Supabase Storage' : 'API';
       console.log(`[resolveTeamLogo] ✅ Success! Found via ${source}`);
       console.log(`[resolveTeamLogo] Saved: ${logoUrl}`);

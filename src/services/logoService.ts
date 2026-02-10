@@ -9,15 +9,6 @@ const THESPORTSDB_API_BASE = 'https://www.thesportsdb.com/api/v1/json/3';
 const CACHE_KEY_PREFIX = 'team_logo_';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
-// CORS Proxy configuration
-const CORS_PROXY_URL = import.meta.env.VITE_CORS_PROXY_URL || 'https://corsproxy.io/?';
-
-/**
- * Wrap URL with CORS proxy to bypass CORS restrictions
- */
-function withCorsProxy(url: string): string {
-  return `${CORS_PROXY_URL}${encodeURIComponent(url)}`;
-}
 
 /**
  * Normalize team name for API searches by converting special characters to ASCII
@@ -133,13 +124,12 @@ async function saveResolvedLogoToDatabase(
 }
 
 /**
- * Fetch team data from TheSportsDB API by team ID
- * Uses CORS proxy to bypass browser CORS restrictions
+ * Fetch team data from TheSportsDB API by team ID (fallback only)
  */
 async function fetchTeamByIdFromAPI(teamId: string): Promise<string | null> {
   try {
     const apiUrl = `${THESPORTSDB_API_BASE}/lookupteam.php?id=${teamId}`;
-    const response = await fetch(withCorsProxy(apiUrl));
+    const response = await fetch(apiUrl);
 
     if (!response.ok) {
       console.warn(`[logoService] TheSportsDB API request failed: ${response.status}`);
@@ -155,27 +145,20 @@ async function fetchTeamByIdFromAPI(teamId: string): Promise<string | null> {
 
     return null;
   } catch (error) {
-    // Check if it's a CORS error
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('CORS') || errorMessage.includes('NetworkError')) {
-      console.error('[logoService] CORS error fetching team by ID. Consider using API-Sports as backup.');
-    } else {
-      console.error('[logoService] Error fetching team by ID:', error);
-    }
+    console.error('[logoService] Error fetching team by ID:', error);
     return null;
   }
 }
 
 /**
- * Fetch team data from TheSportsDB API by team name
+ * Fetch team data from TheSportsDB API by team name (fallback only)
  * Tries both original name and normalized name for better matching
- * Uses CORS proxy to bypass browser CORS restrictions
  */
 async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> {
   try {
     // First try with original name
     const apiUrl = `${THESPORTSDB_API_BASE}/searchteams.php?t=${encodeURIComponent(teamName)}`;
-    let response = await fetch(withCorsProxy(apiUrl));
+    let response = await fetch(apiUrl);
 
     if (!response.ok) {
       console.warn(`[logoService] TheSportsDB API request failed: ${response.status}`);
@@ -195,7 +178,7 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
       console.log(`[logoService] Trying normalized name: "${teamName}" -> "${normalizedName}"`);
 
       const normalizedUrl = `${THESPORTSDB_API_BASE}/searchteams.php?t=${encodeURIComponent(normalizedName)}`;
-      response = await fetch(withCorsProxy(normalizedUrl));
+      response = await fetch(normalizedUrl);
 
       if (response.ok) {
         data = await response.json();
@@ -208,13 +191,7 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
 
     return null;
   } catch (error) {
-    // Check if it's a CORS error
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('CORS') || errorMessage.includes('NetworkError')) {
-      console.error('[logoService] CORS error fetching team by name. Consider using API-Sports as backup.');
-    } else {
-      console.error('[logoService] Error fetching team by name:', error);
-    }
+    console.error('[logoService] Error fetching team by name:', error);
     return null;
   }
 }
@@ -225,17 +202,17 @@ async function fetchTeamByNameFromAPI(teamName: string): Promise<string | null> 
  * Resolution order:
  * 1. Check resolvedLogoUrl from database (instant!)
  * 2. Check browser cache
- * 3. Try API-Sports (primary - paid subscription with better reliability)
- * 4. Try TheSportsDB API by team ID (with CORS proxy - fallback)
- * 5. Try TheSportsDB API by team name (with CORS proxy - fallback)
+ * 3. Try API-Sports (primary - paid subscription)
+ * 4. Try TheSportsDB API by team ID (fallback)
+ * 5. Try TheSportsDB API by team name (fallback)
  * 6. Fallback to local logoUrl
  * 7. Return empty string (will trigger onError handler in components)
  *
  * When a logo is found via API, it's automatically saved to the database
  * for permanent storage and faster future loads.
  *
- * API-Sports is now the primary provider (paid subscription).
- * TheSportsDB serves as free fallback with CORS proxy.
+ * API-Sports is the primary provider with paid subscription.
+ * TheSportsDB serves as fallback.
  *
  * @param teamId - Database team ID (for saving resolved URL)
  * @param apiTeamId - TheSportsDB team ID (optional)
@@ -335,17 +312,21 @@ export async function getTeamLogoUrl(
   // Fallback to local logo
   if (fallbackLogoUrl) {
     try {
+      // Construct the local path properly
       const localPath = new URL(`../assets/logos/${fallbackLogoUrl}`, import.meta.url).href;
+      console.log('[logoService] Using local fallback logo:', localPath);
       if (cacheKey) {
         setCachedLogo(cacheKey, localPath);
       }
       return localPath;
     } catch (error) {
       console.error('[logoService] Error loading local fallback logo:', error);
+      console.error('[logoService] Fallback URL was:', fallbackLogoUrl);
     }
   }
 
   // No logo available
+  console.warn('[logoService] No logo found for team:', { teamId, apiTeamId, apiTeamName, fallbackLogoUrl });
   return '';
 }
 
