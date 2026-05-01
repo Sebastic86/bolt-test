@@ -33,7 +33,7 @@ import {ArrowLeft, Dices, List, PlusSquare, Settings} from 'lucide-react';
 
 
 function App() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isNormalUser, user } = useAuth();
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -271,7 +271,7 @@ function App() {
                >
                  <Dices className="w-5 h-5 mr-2" /> New Matchup
                </button>
-               <AdminOnly>
+               {(isAdmin || isNormalUser) && (
                  <button
                    onClick={handleOpenAddMatchModal}
                    className="flex items-center justify-center px-5 py-2.5 bg-brand-dark text-white font-semibold hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed border-r border-white/20"
@@ -280,7 +280,7 @@ function App() {
                  >
                    <PlusSquare className="w-5 h-5 mr-2" /> Add Match
                  </button>
-               </AdminOnly>
+               )}
                <button
                  onClick={handleOpenSettingsModal}
                  className="p-2.5 bg-brand-dark text-white hover:bg-brand-medium focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-brand-dark transition duration-150 ease-in-out"
@@ -434,6 +434,7 @@ function App() {
                error={allMatchesError}
                onRefresh={handleRefreshAllMatches}
                allPlayers={allPlayers}
+               currentUserId={user?.id}
              />
            </ErrorBoundary>
          )}
@@ -490,6 +491,7 @@ function App() {
           canGenerateNewMatch={canGenerateNewMatch}
           hasMatch={!!match}
           isAdmin={isAdmin}
+          canAddMatch={isAdmin || isNormalUser}
           currentPage={currentPage}
         />
       )}

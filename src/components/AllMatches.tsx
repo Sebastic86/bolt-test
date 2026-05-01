@@ -4,6 +4,7 @@ import { Player, MatchHistoryItem } from '../types';
 import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Plus } from 'lucide-react';
 import { AdminOnly } from './RoleBasedComponents';
 import { TeamLogo } from './TeamLogo';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AllMatchesProps {
   allMatches: MatchHistoryItem[];
@@ -11,6 +12,7 @@ interface AllMatchesProps {
   error: string | null;
   onRefresh: () => void;
   allPlayers: Player[];
+  currentUserId?: string;
 }
 
 
@@ -40,7 +42,9 @@ const AllMatches: React.FC<AllMatchesProps> = ({
   error,
   onRefresh,
   allPlayers,
+  currentUserId,
 }) => {
+  const { isAdmin } = useAuth();
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
   const [score1Input, setScore1Input] = useState<string>('');
   const [score2Input, setScore2Input] = useState<string>('');
@@ -452,7 +456,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                       >
                           {expandedMatchId === match.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
-                      <AdminOnly>
+                      {(isAdmin || (currentUserId && match.created_by === currentUserId)) && (
                         <button
                             onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
                             className={`p-1 text-red-500 hover:text-red-700 rounded-sm hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`}
@@ -461,7 +465,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                         >
                             {isDeletingThisMatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                         </button>
-                      </AdminOnly>
+                      )}
                    </div>
                 </div>
 

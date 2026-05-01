@@ -10,6 +10,7 @@ interface BottomNavProps {
   canGenerateNewMatch: boolean;
   hasMatch: boolean;
   isAdmin: boolean;
+  canAddMatch?: boolean;
   currentPage: 'main' | 'allMatches' | 'admin';
 }
 
@@ -22,6 +23,7 @@ const BottomNav: React.FC<BottomNavProps> = ({
   canGenerateNewMatch,
   hasMatch,
   isAdmin,
+  canAddMatch,
   currentPage,
 }) => {
   if (currentPage === 'allMatches' || currentPage === 'admin') {
@@ -53,7 +55,7 @@ const BottomNav: React.FC<BottomNavProps> = ({
           <span className="text-[10px] mt-0.5 font-medium">New Match</span>
         </button>
 
-        {isAdmin && (
+        {(canAddMatch ?? isAdmin) && (
           <button
             onClick={onAddMatch}
             disabled={!hasMatch}

@@ -173,12 +173,12 @@ const PlayerStandings: React.FC<PlayerStandingsProps> = ({
                 const backgroundStyle: React.CSSProperties = avatarUrl ? {
                   backgroundImage: `
                     linear-gradient(115deg, transparent 28%, ${bgColor} 32%),
-                    linear-gradient(to right, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.5) 100%),
+                    linear-gradient(to right, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.4) 30%),
                     url(${avatarUrl})
                   `,
-                  backgroundSize: '100% 100%, 30% 100%, cover',
-                  backgroundPosition: 'center, left center, left center',
-                  backgroundRepeat: 'no-repeat, no-repeat, no-repeat',
+                  backgroundSize: '100% 100%, 30% 100%, 30% auto',
+                  backgroundPosition: 'center, left center, left top',
+                  backgroundRepeat: 'no-repeat',
                   backgroundColor: bgColor,
                 } : {};
 

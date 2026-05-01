@@ -31,6 +31,7 @@ export interface Match {
   penalties_winner: 1 | 2 | null; // 1 for team1, 2 for team2, null if no penalties
   played_at: string;
   created_at: string;
+  created_by: string | null;
 }
 
 // Represents a row from the 'match_players' table

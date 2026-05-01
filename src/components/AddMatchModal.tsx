@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Team, Player } from '../types';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import { X, Save, UserPlus, Trash2 } from 'lucide-react';
 import TeamLogo from "./TeamLogo.tsx";
 import PlayerBadge from './PlayerBadge';
@@ -46,6 +47,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
   initialTeam1Players,
   initialTeam2Players,
 }) => {
+  const { user } = useAuth();
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [team1Players, setTeam1Players] = useState<Player[]>([]);
   const [team2Players, setTeam2Players] = useState<Player[]>([]);
@@ -305,6 +307,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
           team1_score: score1,
           team2_score: score2,
           penalties_winner: finalPenaltiesWinner,
+          created_by: user?.id,
         })
         .select('id')
         .single();
