@@ -21,12 +21,40 @@ CREATE POLICY "Authenticated users can insert matches"
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
+-- Drop the original blocking delete policy
+DROP POLICY IF EXISTS "Disallow deleting matches" ON public.matches;
+
 -- Add DELETE policy: users can delete their own matches, admins can delete any
 CREATE POLICY "Users can delete own matches or admins can delete all"
   ON public.matches
   FOR DELETE
   TO authenticated
   USING (auth.uid() = created_by OR public.is_admin());
+
+-- Allow users to update their own matches (add/edit score), admins can update any
+-- Drop the old admin-only update policy first
+DROP POLICY IF EXISTS "Admins can update matches" ON public.matches;
+
+CREATE POLICY "Users can update own matches or admins can update all"
+  ON public.matches
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = created_by OR public.is_admin())
+  WITH CHECK (auth.uid() = created_by OR public.is_admin());
+
+-- Allow users to update match_players for their own matches (move players between teams)
+-- Admins can update any match_players
+CREATE POLICY "Users can update own match players or admins can update all"
+  ON public.match_players
+  FOR UPDATE
+  TO authenticated
+  USING (
+    public.is_admin() OR
+    EXISTS (
+      SELECT 1 FROM public.matches
+      WHERE id = match_id AND created_by = auth.uid()
+    )
+  );
 
 -- Drop old admin-only INSERT policy for match_players
 DROP POLICY IF EXISTS "Admins can insert match players" ON public.match_players;

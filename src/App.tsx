@@ -327,7 +327,7 @@ function App() {
              {!loading && !initError && (
                <ErrorBoundary fallbackTitle="Error loading today's matches">
                  <CollapsibleSection title="Today's Matches" storageKey="section-todayMatches" badge={matchesToday.length} defaultOpen={true}>
-                   <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} hideTitle />
+                   <MatchHistory matchesToday={matchesToday} loading={loadingHistory} error={historyError} onRefresh={handleManualRefreshHistory} allPlayers={allPlayers} hideTitle currentUserId={user?.id} />
                  </CollapsibleSection>
                </ErrorBoundary>
              )}

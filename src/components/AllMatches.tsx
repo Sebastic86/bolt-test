@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Player, MatchHistoryItem } from '../types';
-import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Shield, Plus } from 'lucide-react';
-import { AdminOnly } from './RoleBasedComponents';
+import { Save, RefreshCw, ChevronDown, ChevronUp, X, Trash2, Plus } from 'lucide-react';
 import { TeamLogo } from './TeamLogo';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -44,7 +43,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
   allPlayers,
   currentUserId,
 }) => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated } = useAuth();
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
   const [score1Input, setScore1Input] = useState<string>('');
   const [score2Input, setScore2Input] = useState<string>('');
@@ -294,6 +293,9 @@ const AllMatches: React.FC<AllMatchesProps> = ({
             // Use brand colors for background, keep yellow highlight distinct
             const highlightClasses = shouldHighlight ? 'border-yellow-400 border-2 shadow-lg bg-yellow-50' : 'border-brand-light bg-brand-lighter';
             const isDeletingThisMatch = deletingMatchId === match.id;
+            const isOwner = !!(currentUserId && match.created_by === currentUserId);
+            const canEdit = isAuthenticated;
+            const canDelete = isAdmin || isOwner;
 
             return (
               <li key={match.id} className={`rounded-lg shadow-sm p-4 border transition-all duration-200 ${highlightClasses} ${isDeletingThisMatch ? 'opacity-50' : ''}`}>
@@ -403,7 +405,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                               </button>
                           </>
                       ) : (
-                          <AdminOnly>
+                          canEdit && (
                             <button
                                 onClick={() => handleEditScoreClick(match)}
                                 className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-sm hover:bg-blue-200 disabled:opacity-50"
@@ -412,21 +414,19 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                             >
                                 {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                             </button>
-                          </AdminOnly>
+                          )
                       )}
                       {/* Edit Players Button - only shown when match is expanded */}
-                      <AdminOnly>
-                        {expandedMatchId === match.id && editingPlayersMatchId !== match.id && (
-                            <button
-                                onClick={() => handleEditPlayersClick(match.id)}
-                                className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-sm hover:bg-green-200 disabled:opacity-50"
-                                disabled={savingScore || savingPlayers || loading || !!deletingMatchId}
-                                title="Edit Player Teams"
-                            >
-                                Edit Players
-                            </button>
-                        )}
-                      </AdminOnly>
+                      {canEdit && expandedMatchId === match.id && editingPlayersMatchId !== match.id && (
+                          <button
+                              onClick={() => handleEditPlayersClick(match.id)}
+                              className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-sm hover:bg-green-200 disabled:opacity-50"
+                              disabled={savingScore || savingPlayers || loading || !!deletingMatchId}
+                              title="Edit Player Teams"
+                          >
+                              Edit Players
+                          </button>
+                      )}
                       {/* Save/Cancel Players Buttons - shown when editing players */}
                       {editingPlayersMatchId === match.id && (
                           <>
@@ -456,7 +456,7 @@ const AllMatches: React.FC<AllMatchesProps> = ({
                       >
                           {expandedMatchId === match.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
-                      {(isAdmin || (currentUserId && match.created_by === currentUserId)) && (
+                      {canDelete && (
                         <button
                             onClick={() => handleDeleteMatch(match.id, match.team1_name, match.team2_name)}
                             className={`p-1 text-red-500 hover:text-red-700 rounded-sm hover:bg-red-100 disabled:opacity-50 ${isDeletingThisMatch ? 'animate-pulse' : ''}`}
