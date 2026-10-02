@@ -7,8 +7,11 @@ import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
 import { MilestoneWatcher } from './components/MilestoneWatcher';
+import { registerServiceWorker } from './lib/installApp';
 import App from './App.tsx';
 import './index.css';
+
+registerServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

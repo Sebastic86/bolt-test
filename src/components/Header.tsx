@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Volleyball, LogOut, User, Shield } from 'lucide-react';
+import { Volleyball, LogOut, User, Shield, Smartphone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserInfo, AuthenticatedOnly, AdminOnly } from './RoleBasedComponents';
+import { useInstallFlow } from './install/useInstallFlow';
 
 const Header: React.FC = () => {
   const { signOut, user } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const install = useInstallFlow();
 
   const handleSignOut = async () => {
     try {
@@ -51,6 +53,19 @@ const Header: React.FC = () => {
                 </Link>
               </AdminOnly>
 
+              {install.canInstall && (
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    void install.start();
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <Smartphone className="h-4 w-4" />
+                  <span>Install app</span>
+                </button>
+              )}
+
               <button
                 onClick={handleSignOut}
                 className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
@@ -71,6 +86,7 @@ const Header: React.FC = () => {
           tabIndex={-1}
         />
       )}
+      {install.sheet}
     </header>
   );
 };

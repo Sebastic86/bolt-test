@@ -19,6 +19,7 @@ import { LoadingState, ErrorState } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { getFilterWarning, getStatDifferences } from '../utils/matchDisplay';
 import NightBanner from '../components/night/NightBanner';
+import { InstallAppCard } from '../components/install/InstallApp';
 import JokerSheet from '../components/night/JokerSheet';
 import PredictionPanel from '../components/night/PredictionPanel';
 import { useActiveNightQuery, useJokersQuery } from '../queries/nights';
@@ -87,6 +88,8 @@ export default function DashboardPage() {
 
       {!initialLoading && !initialError && teams.length > 0 && (
         <>
+          <InstallAppCard />
+
           {activeNightQuery.isSuccess && (
             <ErrorBoundary fallbackTitle="Error loading game night">
               <NightBanner night={night} nightMatches={nightMatches} players={players} teams={teams} />
