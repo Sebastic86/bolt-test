@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { calculateTeamStandings } from './teamStatsUtils';
-import { MatchHistoryItem, Team } from '../types';
+import { calculateTeamStandings, topTeamsByPercentage } from './teamStatsUtils';
+import { MatchHistoryItem, Team, TeamStanding } from '../types';
 
 function makeTeam(id: string): Team {
   return {
@@ -99,5 +99,41 @@ describe('calculateTeamStandings', () => {
 
     const result = calculateTeamStandings([match], [teamB]);
     expect(result.find(t => t.teamId === 'b')!.totalMatches).toBe(0);
+  });
+});
+
+describe('topTeamsByPercentage', () => {
+  function standing(teamId: string, totalMatches: number, totalWins: number, totalLosses: number): TeamStanding {
+    return {
+      teamId, teamName: teamId, logoUrl: '', totalMatches, totalWins, totalLosses,
+      winPercentage: totalMatches > 0 ? (totalWins / totalMatches) * 100 : 0,
+      lossPercentage: totalMatches > 0 ? (totalLosses / totalMatches) * 100 : 0,
+    };
+  }
+
+  const standings = [
+    standing('unplayed', 0, 0, 0),
+    standing('perfect-1', 1, 1, 0),
+    standing('perfect-3', 3, 3, 0),
+    standing('half', 4, 2, 2),
+    standing('winless', 2, 0, 2),
+  ];
+
+  it('excludes teams without matches and sorts by win %, then matches played', () => {
+    expect(topTeamsByPercentage(standings, 'win').map(t => t.teamId)).toEqual(['perfect-3', 'perfect-1', 'half', 'winless']);
+  });
+
+  it('sorts by loss % for the loss leaderboard', () => {
+    expect(topTeamsByPercentage(standings, 'loss').map(t => t.teamId)).toEqual(['winless', 'half', 'perfect-3', 'perfect-1']);
+  });
+
+  it('caps the result at the limit', () => {
+    expect(topTeamsByPercentage(standings, 'win', 2)).toHaveLength(2);
+  });
+
+  it('does not mutate the input array', () => {
+    const copy = [...standings];
+    topTeamsByPercentage(standings, 'win');
+    expect(standings).toEqual(copy);
   });
 });

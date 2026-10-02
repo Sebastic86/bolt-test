@@ -5,16 +5,35 @@ import { TeamLogo } from './TeamLogo';
 import { Card } from './ui';
 import { AdminOnly } from './RoleBasedComponents';
 import { ratingTier } from '../utils/ratingTier';
+import { formatStatDifference, StatDifferences } from '../utils/matchDisplay';
 
 interface TeamCardProps {
   team: Team;
+  /** This team's rating minus the opponent's, per stat — rendered as +n / −n under each value. */
+  differences?: StatDifferences;
   onEdit?: () => void;
 }
 
-const TeamCard: React.FC<TeamCardProps> = ({ team, onEdit }) => {
-  const att = ratingTier(team.attackRating);
-  const mid = ratingTier(team.midfieldRating);
-  const def = ratingTier(team.defendRating);
+const diffColor = (diff: number) =>
+  diff > 0 ? 'text-(--color-green-mid)' : diff < 0 ? 'text-red-600' : 'text-gray-400';
+
+const describeDiff = (diff: number) =>
+  diff > 0 ? `${diff} higher than opponent` : diff < 0 ? `${-diff} lower than opponent` : 'equal to opponent';
+
+const Diff: React.FC<{ value: number | undefined; className?: string }> = ({ value, className = '' }) =>
+  value === undefined ? null : (
+    <span className={`text-[11px] font-black tabular-nums ${diffColor(value)} ${className}`}>
+      <span aria-hidden="true">{formatStatDifference(value)}</span>
+      <span className="sr-only">{describeDiff(value)}</span>
+    </span>
+  );
+
+const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
+  const tiles = [
+    { label: 'ATT', value: team.attackRating, diff: differences?.attack },
+    { label: 'MID', value: team.midfieldRating, diff: differences?.midfield },
+    { label: 'DEF', value: team.defendRating, diff: differences?.defend },
+  ];
 
   return (
     <Card hard className="relative mx-auto flex w-full max-w-md items-center gap-3 p-4">
@@ -22,24 +41,24 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onEdit }) => {
         {onEdit && (
           <button
             onClick={onEdit}
-            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center border border-(--color-ink) bg-white text-(--color-ink)"
+            className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink)"
             aria-label={`Edit ${team.name}`}
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-4 w-4" />
           </button>
         )}
       </AdminOnly>
 
       <TeamLogo team={team} size="lg" />
 
-      <div className="min-w-0 flex-1 pr-8">
-        <div className="flex items-baseline gap-1.5">
+      <div className="min-w-0 flex-1">
+        <div className={`flex items-baseline gap-1.5 ${onEdit ? 'pr-10' : ''}`}>
           <span className="truncate text-base font-black uppercase tracking-wide text-(--color-ink)">
             {team.name}
           </span>
           <span className="flex-none text-xs font-bold text-gray-500">({team.version})</span>
         </div>
-        <div className="truncate text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <div className={`truncate text-xs font-semibold uppercase tracking-wide text-gray-500 ${onEdit ? 'pr-10' : ''}`}>
           {team.league}
         </div>
 
@@ -51,18 +70,24 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onEdit }) => {
           <span className="bg-(--color-ink) px-2 py-0.5 text-xs font-black text-white">
             OVR {team.overallRating}
           </span>
+          <Diff value={differences?.overall} className="text-xs" />
         </div>
 
         <div className="mt-2 grid grid-cols-3 gap-1.5">
-          <div className="border py-1 text-center text-[11px] font-bold" style={{ background: att.bg, color: att.fg, borderColor: att.bg }}>
-            ATT {team.attackRating}
-          </div>
-          <div className="border py-1 text-center text-[11px] font-bold" style={{ background: mid.bg, color: mid.fg, borderColor: mid.bg }}>
-            MID {team.midfieldRating}
-          </div>
-          <div className="border py-1 text-center text-[11px] font-bold" style={{ background: def.bg, color: def.fg, borderColor: def.bg }}>
-            DEF {team.defendRating}
-          </div>
+          {tiles.map(tile => {
+            const tier = ratingTier(tile.value);
+            return (
+              <div key={tile.label} className="flex min-w-0 flex-col items-stretch">
+                <div
+                  className="border py-1 text-center text-[11px] font-bold"
+                  style={{ background: tier.bg, color: tier.fg, borderColor: tier.bg }}
+                >
+                  {tile.label} {tile.value}
+                </div>
+                {tile.diff !== undefined && <Diff value={tile.diff} className="mt-0.5 text-center" />}
+              </div>
+            );
+          })}
         </div>
       </div>
     </Card>

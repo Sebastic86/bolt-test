@@ -146,3 +146,13 @@ export function clearLogoCache(): void {
     console.error('[logoService] Error clearing cache:', error);
   }
 }
+
+/**
+ * Hashed asset URL for a legacy bundled crest filename stored in teams.logoUrl
+ * (e.g. "arsenal.png"), or null if there is no such bundled file. Used by the
+ * admin storage migration to upload bundled crests into the `team-logos` bucket.
+ */
+export function getBundledLogoUrl(logoUrl?: string | null): string | null {
+  if (!logoUrl) return null;
+  return BUNDLED_LOGOS[`../assets/logos/${logoUrl.split('/').pop()}`] ?? null;
+}

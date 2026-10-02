@@ -27,6 +27,8 @@ export function combineMatchData(
       team2_name: team2?.name ?? 'Unknown Team',
       team2_logoUrl: team2?.logoUrl ?? '',
       team2_version: team2?.version ?? '',
+      team1_resolvedLogoUrl: team1?.resolvedLogoUrl ?? null,
+      team2_resolvedLogoUrl: team2?.resolvedLogoUrl ?? null,
       team1_players: playersInMatch
         .filter(mp => mp.team_number === 1)
         .map(mp => playerMap.get(mp.player_id))

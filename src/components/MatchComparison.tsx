@@ -16,10 +16,16 @@ const STATS: { label: string; key: 'overallRating' | 'attackRating' | 'midfieldR
 
 const MAX_STAT = 99;
 
+/**
+ * Mirrored stat bars for the current matchup. Bars grow out from the
+ * center label whenever the matchup changes (CSS keyframes, re-triggered by
+ * keying the rows on the team ids); prefers-reduced-motion disables the
+ * grow — see .animate-bar-grow-* in index.css.
+ */
 const MatchComparison: React.FC<MatchComparisonProps> = ({ team1, team2 }) => {
   return (
     <Card hard className="mx-auto w-full max-w-md p-4">
-      <div className="space-y-2.5">
+      <div key={`${team1.id}|${team2.id}`} className="space-y-2.5">
         {STATS.map(stat => {
           const v1 = team1[stat.key];
           const v2 = team2[stat.key];
@@ -35,13 +41,13 @@ const MatchComparison: React.FC<MatchComparisonProps> = ({ team1, team2 }) => {
               </span>
               <div className="flex flex-1 items-center gap-0.5">
                 <div className="flex flex-1 justify-end">
-                  <div className={`h-4 ${isHigher1 ? 'bg-(--color-green-mid)' : 'bg-gray-200'}`} style={{ width: `${pct1}%` }} />
+                  <div className={`animate-bar-grow-left h-4 ${isHigher1 ? 'bg-(--color-green-mid)' : 'bg-gray-200'}`} style={{ width: `${pct1}%` }} />
                 </div>
                 <span className="w-8 flex-none text-center text-[10px] font-black text-(--color-ink)">
                   {stat.label}
                 </span>
                 <div className="flex flex-1 justify-start">
-                  <div className={`h-4 ${isHigher2 ? 'bg-(--color-green-mid)' : 'bg-gray-200'}`} style={{ width: `${pct2}%` }} />
+                  <div className={`animate-bar-grow-right h-4 ${isHigher2 ? 'bg-(--color-green-mid)' : 'bg-gray-200'}`} style={{ width: `${pct2}%` }} />
                 </div>
               </div>
               <span className={`w-6 flex-none text-left text-xs font-black tabular-nums ${isHigher2 ? 'text-(--color-green-mid)' : 'text-gray-400'}`}>

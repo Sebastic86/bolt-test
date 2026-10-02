@@ -94,6 +94,15 @@ describe('combineMatchData', () => {
     expect(r2.team2_players).toEqual([]);
   });
 
+  it('carries each team\'s persisted resolvedLogoUrl through (null when unknown/missing)', () => {
+    const m = match('m1', 'a', 'missing-team');
+    const a = { ...team('a'), resolvedLogoUrl: 'https://cdn.example.com/a.png' };
+    const [result] = combineMatchData([m], [], [a], []);
+
+    expect(result.team1_resolvedLogoUrl).toBe('https://cdn.example.com/a.png');
+    expect(result.team2_resolvedLogoUrl).toBeNull();
+  });
+
   it('returns an empty array for an empty matches list', () => {
     expect(combineMatchData([], [], [], [])).toEqual([]);
   });

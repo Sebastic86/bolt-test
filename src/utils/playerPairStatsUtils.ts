@@ -80,3 +80,26 @@ export function calculatePlayerPairStandings(players: Player[], matches: MatchHi
       return b.winPercentage - a.winPercentage;
     });
 }
+
+/** Order-independent key for a pair of player ids. */
+export function pairKey(id1: string, id2: string): string {
+  return id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`;
+}
+
+/** Lookup map from pairKey(...) to the pair's standing, for the N×N grid view. */
+export function indexPairStandings(pairs: PlayerPairStanding[]): Map<string, PlayerPairStanding> {
+  return new Map(pairs.map(p => [pairKey(p.player1.id, p.player2.id), p]));
+}
+
+/**
+ * Players who appear in at least one of the given matches, sorted by name —
+ * the rows/columns of the old app's head-to-head matrix.
+ */
+export function getActivePlayers(players: Player[], matches: MatchHistoryItem[]): Player[] {
+  const ids = new Set<string>();
+  matches.forEach(m => {
+    m.team1_players.forEach(p => ids.add(p.id));
+    m.team2_players.forEach(p => ids.add(p.id));
+  });
+  return players.filter(p => ids.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+}

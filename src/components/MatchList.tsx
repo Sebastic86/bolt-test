@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, ChevronDown, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import { MatchHistoryItem, Player } from '../types';
-import { TeamBadge } from './TeamBadge';
+import { TeamLogo } from './TeamLogo';
+import { PlayerBadge } from './PlayerBadge';
 import { LoadingState, ErrorState, Select } from './ui';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -10,6 +11,15 @@ import {
   useMoveMatchPlayerMutation,
   useUpdateMatchScoreMutation,
 } from '../queries/matches';
+import {
+  formatDateTimeEuropean,
+  formatTimeEuropean,
+  getHighlightedMatchIds,
+  getMatchResultForSide,
+  getPerspectiveSide,
+  MatchPerspective,
+  MatchResult,
+} from '../utils/matchDisplay';
 
 interface MatchListProps {
   matches: MatchHistoryItem[];
@@ -21,40 +31,48 @@ interface MatchListProps {
   /** Show the "(FC26)" version suffix next to team names — used on the All Matches page, not the Today's Matches section. */
   showTeamVersion?: boolean;
   emptyMessage?: string;
+  /**
+   * Show each match from one team's/player's point of view: a Win / Loss /
+   * Win (P) / Loss (P) badge per match, the selected team's row marked and
+   * the selected player highlighted. Used by MatchDetailsSheet.
+   */
+  perspective?: MatchPerspective | null;
+  /** Gold-highlight the biggest win in this list ("match of the day"). Default true. */
+  highlightBiggestWin?: boolean;
+  /** Show only HH:mm instead of the full date (lists that are already a single day, e.g. a game session). */
+  timeOnly?: boolean;
+  /** Always show each side's players under the team name. Defaults to on when a perspective is set. */
+  showPlayersInline?: boolean;
 }
 
-const formatDateTimeEuropean = (isoString: string): string => {
-  try {
-    return new Date(isoString).toLocaleString('en-GB', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: false,
-    });
-  } catch {
-    return 'Invalid date';
-  }
+const BUTTON_BASE = 'flex h-10 items-center justify-center border-2 border-(--color-ink) text-xs font-bold uppercase tracking-wide disabled:opacity-50';
+
+/** Crest data for list rows — deliberately no id/apiTeamId/apiTeamName, so a long list never triggers logo API lookups (see TeamLogo). */
+const listCrest = (name: string, resolvedLogoUrl: string | null | undefined, logoUrl: string) => ({ name, resolvedLogoUrl, logoUrl });
+
+const RESULT_STYLES: Record<MatchResult, string> = {
+  Win: 'border-(--color-green-mid) bg-(--color-green-mid) text-white',
+  'Win (P)': 'border-(--color-green-mid) bg-white text-(--color-green-mid)',
+  Loss: 'border-red-600 bg-red-600 text-white',
+  'Loss (P)': 'border-red-600 bg-white text-red-600',
+  Draw: 'border-gray-400 bg-white text-gray-600',
+  'No Score': 'border-gray-300 bg-white text-gray-400',
 };
 
-function useHighlightedMatchIds(matches: MatchHistoryItem[]): Set<string> {
-  return useMemo(() => {
-    const completed = matches.filter(m => m.team1_score !== null && m.team2_score !== null);
-    if (completed.length === 0) return new Set();
+const ResultBadge: React.FC<{ result: MatchResult }> = ({ result }) => (
+  <span className={`flex-none border-2 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-wide ${RESULT_STYLES[result]}`}>
+    {result}
+  </span>
+);
 
-    let maxDiff = -1;
-    completed.forEach(m => {
-      const diff = Math.abs(m.team1_score! - m.team2_score!);
-      if (diff > maxDiff) maxDiff = diff;
-    });
-    const withMaxDiff = completed.filter(m => Math.abs(m.team1_score! - m.team2_score!) === maxDiff);
-    if (withMaxDiff.length <= 1) return new Set(withMaxDiff.map(m => m.id));
-
-    let maxGoals = -1;
-    withMaxDiff.forEach(m => {
-      const goals = m.team1_score! + m.team2_score!;
-      if (goals > maxGoals) maxGoals = goals;
-    });
-    return new Set(withMaxDiff.filter(m => m.team1_score! + m.team2_score! === maxGoals).map(m => m.id));
-  }, [matches]);
-}
+const PlayerChip: React.FC<{ player: Player; highlighted: boolean; size?: 'xs' | 'sm' }> = ({ player, highlighted, size = 'xs' }) => (
+  <span
+    className={`inline-flex min-w-0 max-w-full items-center ${highlighted ? 'bg-green-100 px-1 ring-2 ring-(--color-green-mid)' : ''}`}
+  >
+    <PlayerBadge player={player} size={size} />
+    {highlighted && <span className="sr-only"> (selected player)</span>}
+  </span>
+);
 
 const MatchList: React.FC<MatchListProps> = ({
   matches,
@@ -64,6 +82,10 @@ const MatchList: React.FC<MatchListProps> = ({
   currentUserId,
   showTeamVersion = false,
   emptyMessage = 'No matches recorded.',
+  perspective = null,
+  highlightBiggestWin = true,
+  timeOnly = false,
+  showPlayersInline,
 }) => {
   const { isAdmin, isAuthenticated } = useAuth();
   const updateScore = useUpdateMatchScoreMutation();
@@ -79,7 +101,12 @@ const MatchList: React.FC<MatchListProps> = ({
   const [editingPlayersMatchId, setEditingPlayersMatchId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
 
-  const highlightedMatchIds = useHighlightedMatchIds(matches);
+  const highlightedMatchIds = useMemo(
+    () => (highlightBiggestWin ? getHighlightedMatchIds(matches) : new Set<string>()),
+    [matches, highlightBiggestWin]
+  );
+  const playersInline = showPlayersInline ?? perspective !== null;
+  const highlightPlayerId = perspective?.kind === 'player' ? perspective.playerId : null;
 
   const handleEditScoreClick = (match: MatchHistoryItem) => {
     setEditingScoreMatchId(match.id);
@@ -120,9 +147,7 @@ const MatchList: React.FC<MatchListProps> = ({
   };
 
   const handleDelete = (match: MatchHistoryItem) => {
-    const label = showTeamVersion
-      ? `${match.team1_name} (${match.team1_version || 'FC26'}) vs ${match.team2_name} (${match.team2_version || 'FC26'})`
-      : `${match.team1_name} vs ${match.team2_name}`;
+    const label = `${teamLabel(match.team1_name, match.team1_version)} vs ${teamLabel(match.team2_name, match.team2_version)}`;
     if (!window.confirm(`Are you sure you want to delete the match: ${label}? This action cannot be undone.`)) return;
 
     deleteMatch.mutate(match.id, { onError: () => alert('Failed to delete match.') });
@@ -164,7 +189,9 @@ const MatchList: React.FC<MatchListProps> = ({
     return players.filter(p => !inMatch.has(p.id));
   };
 
-  const teamLabel = (name: string, version: string) => (showTeamVersion ? `${name} (${version || 'FC26'})` : name);
+  function teamLabel(name: string, version: string) {
+    return showTeamVersion ? `${name} (${version || 'FC26'})` : name;
+  }
 
   if (loading && matches.length === 0) return <LoadingState label="Loading matches..." />;
   if (error) return <ErrorState message={error} />;
@@ -179,60 +206,94 @@ const MatchList: React.FC<MatchListProps> = ({
         const canDelete = isAdmin || isOwner;
         const isEditingScore = editingScoreMatchId === match.id;
         const isExpanded = expandedMatchId === match.id;
+        const isEditingPlayers = editingPlayersMatchId === match.id;
         const isDeleting = deleteMatch.isPending && deleteMatch.variables === match.id;
+        const perspectiveSide = perspective ? getPerspectiveSide(match, perspective) : null;
+        const result = perspectiveSide ? getMatchResultForSide(match, perspectiveSide) : null;
+        const markedSide = perspective?.kind === 'team' ? perspectiveSide : null;
+
+        const sides = [
+          {
+            side: 1 as const,
+            label: teamLabel(match.team1_name, match.team1_version),
+            crest: listCrest(match.team1_name, match.team1_resolvedLogoUrl, match.team1_logoUrl),
+            score: match.team1_score,
+            players: match.team1_players,
+          },
+          {
+            side: 2 as const,
+            label: teamLabel(match.team2_name, match.team2_version),
+            crest: listCrest(match.team2_name, match.team2_resolvedLogoUrl, match.team2_logoUrl),
+            score: match.team2_score,
+            players: match.team2_players,
+          },
+        ];
 
         return (
           <div
             key={match.id}
-            className={`border-2 bg-white p-3 ${isHighlighted ? 'border-yellow-400 bg-yellow-50' : 'border-(--color-ink)'} ${isDeleting ? 'opacity-50' : ''}`}
+            className={`border-2 p-3 ${isHighlighted ? 'border-yellow-400 bg-yellow-50' : 'border-(--color-ink) bg-white'} ${isDeleting ? 'opacity-50' : ''}`}
           >
-            <div className="mb-1.5 text-right text-[10px] font-bold uppercase tracking-wide text-gray-400">
-              {formatDateTimeEuropean(match.played_at)}
+            <div className="mb-1.5 flex min-h-5 items-center gap-1.5">
+              {result && <ResultBadge result={result} />}
+              {isHighlighted && (
+                <span className="flex-none bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-wide text-(--color-ink)">
+                  Biggest win
+                </span>
+              )}
+              <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                {timeOnly ? formatTimeEuropean(match.played_at) : formatDateTimeEuropean(match.played_at)}
+              </span>
             </div>
 
-            <div className="flex items-center gap-2 py-0.5">
-              <TeamBadge name={match.team1_name} size="sm" />
-              <span className="min-w-0 flex-1 truncate text-sm font-bold uppercase text-(--color-ink)">
-                {teamLabel(match.team1_name, match.team1_version)}
-              </span>
-              <span className="flex-none text-base font-black tabular-nums text-(--color-ink)">
-                {match.team1_score ?? '-'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 py-0.5">
-              <TeamBadge name={match.team2_name} size="sm" />
-              <span className="min-w-0 flex-1 truncate text-sm font-bold uppercase text-(--color-ink)">
-                {teamLabel(match.team2_name, match.team2_version)}
-              </span>
-              <span className="flex-none text-base font-black tabular-nums text-(--color-ink)">
-                {match.team2_score ?? '-'}
-              </span>
-            </div>
+            {sides.map(s => (
+              <div
+                key={s.side}
+                className={`flex items-center gap-2 py-0.5 ${markedSide === s.side ? '-ml-1.5 border-l-4 border-(--color-green-mid) pl-0.5' : ''}`}
+              >
+                <TeamLogo team={s.crest} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold uppercase text-(--color-ink)">{s.label}</div>
+                  {playersInline && s.players.length > 0 && (
+                    <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-1">
+                      {s.players.map(p => (
+                        <PlayerChip key={p.id} player={p} highlighted={p.id === highlightPlayerId} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className={`flex-none text-base font-black tabular-nums ${isHighlighted ? 'text-yellow-700' : 'text-(--color-ink)'}`}>
+                  {s.score ?? '-'}
+                </span>
+              </div>
+            ))}
             {match.team1_score !== null && match.team1_score === match.team2_score && match.penalties_winner && (
-              <div className="mt-1 text-[10px] text-gray-500">
-                Pen: {match.penalties_winner === 1 ? teamLabel(match.team1_name, match.team1_version) : teamLabel(match.team2_name, match.team2_version)}
+              <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                Won on penalties: {match.penalties_winner === 1 ? sides[0].label : sides[1].label}
               </div>
             )}
 
             {isEditingScore && (
-              <div className="mt-2 flex items-center justify-center gap-2 border-2 border-(--color-ink) bg-gray-50 p-2">
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2 border-2 border-(--color-ink) bg-gray-50 p-2">
                 <input
-                  type="number" min="0" value={score1Input}
+                  type="number" inputMode="numeric" min="0" value={score1Input}
                   onChange={e => setScore1Input(e.target.value)}
-                  className="h-9 w-11 border-2 border-(--color-ink) text-center text-base font-bold"
+                  className="h-10 w-12 border-2 border-(--color-ink) text-center text-base font-bold"
                   disabled={updateScore.isPending}
+                  aria-label={`${sides[0].label} score`}
                 />
                 <span className="font-bold text-gray-400">-</span>
                 <input
-                  type="number" min="0" value={score2Input}
+                  type="number" inputMode="numeric" min="0" value={score2Input}
                   onChange={e => setScore2Input(e.target.value)}
-                  className="h-9 w-11 border-2 border-(--color-ink) text-center text-base font-bold"
+                  className="h-10 w-12 border-2 border-(--color-ink) text-center text-base font-bold"
                   disabled={updateScore.isPending}
+                  aria-label={`${sides[1].label} score`}
                 />
                 <button
                   onClick={() => handleSaveScore(match.id)}
                   disabled={updateScore.isPending}
-                  className="flex h-9 w-9 flex-none items-center justify-center border-2 border-(--color-ink) bg-(--color-green-mid) text-white disabled:opacity-50"
+                  className="flex h-10 w-10 flex-none items-center justify-center border-2 border-(--color-ink) bg-(--color-green-mid) text-white disabled:opacity-50"
                   aria-label="Save score"
                 >
                   <Save className="h-4 w-4" />
@@ -240,28 +301,26 @@ const MatchList: React.FC<MatchListProps> = ({
                 <button
                   onClick={handleCancelEditScore}
                   disabled={updateScore.isPending}
-                  className="flex h-9 w-9 flex-none items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink) disabled:opacity-50"
+                  className="flex h-10 w-10 flex-none items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink) disabled:opacity-50"
                   aria-label="Cancel"
                 >
                   <X className="h-4 w-4" />
                 </button>
 
                 {score1Input && score2Input && parseInt(score1Input, 10) === parseInt(score2Input, 10) && (
-                  <div className="w-full pt-2 text-center text-xs">
-                    <p className="mb-1 font-semibold text-gray-600">Penalties winner:</p>
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => setPenaltiesWinner(1)}
-                        className={`border px-2 py-1 text-xs ${penaltiesWinner === 1 ? 'border-(--color-ink) bg-(--color-ink) text-white' : 'border-gray-300 bg-white text-gray-700'}`}
-                      >
-                        {teamLabel(match.team1_name, match.team1_version)}
-                      </button>
-                      <button
-                        onClick={() => setPenaltiesWinner(2)}
-                        className={`border px-2 py-1 text-xs ${penaltiesWinner === 2 ? 'border-(--color-ink) bg-(--color-ink) text-white' : 'border-gray-300 bg-white text-gray-700'}`}
-                      >
-                        {teamLabel(match.team2_name, match.team2_version)}
-                      </button>
+                  <div className="w-full pt-1 text-center text-xs">
+                    <p className="mb-1 font-bold uppercase tracking-wide text-gray-600">Penalties winner</p>
+                    <div className="flex gap-2">
+                      {sides.map(s => (
+                        <button
+                          key={s.side}
+                          onClick={() => setPenaltiesWinner(s.side)}
+                          aria-pressed={penaltiesWinner === s.side}
+                          className={`h-10 min-w-0 flex-1 truncate border-2 px-2 text-xs font-bold ${penaltiesWinner === s.side ? 'border-(--color-ink) bg-(--color-ink) text-white' : 'border-gray-300 bg-white text-gray-700'}`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -272,23 +331,23 @@ const MatchList: React.FC<MatchListProps> = ({
               {!isEditingScore && canEditScore && (
                 <button
                   onClick={() => handleEditScoreClick(match)}
-                  className="h-8 flex-1 border-2 border-(--color-ink) bg-(--color-ink) text-xs font-bold uppercase tracking-wide text-white"
+                  className={`${BUTTON_BASE} flex-1 bg-(--color-ink) text-white`}
                 >
                   {match.team1_score !== null ? 'Edit Score' : 'Add Score'}
                 </button>
               )}
-              {isExpanded && canEditScore && editingPlayersMatchId !== match.id && (
+              {isExpanded && canEditScore && !isEditingPlayers && (
                 <button
                   onClick={() => handleEditPlayersClick(match.id)}
-                  className="h-8 flex-1 border-2 border-(--color-ink) bg-white text-xs font-bold uppercase tracking-wide text-(--color-ink)"
+                  className={`${BUTTON_BASE} flex-1 bg-white text-(--color-ink)`}
                 >
                   Edit Players
                 </button>
               )}
-              {editingPlayersMatchId === match.id && (
+              {isEditingPlayers && (
                 <button
                   onClick={handleCancelEditPlayers}
-                  className="flex h-8 flex-1 items-center justify-center gap-1 border-2 border-(--color-ink) bg-white text-xs font-bold uppercase tracking-wide text-(--color-ink)"
+                  className={`${BUTTON_BASE} flex-1 gap-1 bg-white text-(--color-ink)`}
                 >
                   <Save className="h-3.5 w-3.5" />
                   Done
@@ -296,8 +355,9 @@ const MatchList: React.FC<MatchListProps> = ({
               )}
               <button
                 onClick={() => setExpandedMatchId(isExpanded ? null : match.id)}
-                className="flex h-8 w-8 flex-none items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink)"
+                className="ml-auto flex h-10 w-10 flex-none items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink)"
                 aria-label={isExpanded ? 'Collapse players' : 'Expand players'}
+                aria-expanded={isExpanded}
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
               </button>
@@ -305,7 +365,7 @@ const MatchList: React.FC<MatchListProps> = ({
                 <button
                   onClick={() => handleDelete(match)}
                   disabled={isDeleting}
-                  className="flex h-8 w-8 flex-none items-center justify-center border-2 border-red-600 text-red-600 disabled:opacity-50"
+                  className="flex h-10 w-10 flex-none items-center justify-center border-2 border-red-600 bg-white text-red-600 disabled:opacity-50"
                   aria-label="Delete match"
                 >
                   {isDeleting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -313,59 +373,50 @@ const MatchList: React.FC<MatchListProps> = ({
               )}
             </div>
 
-            {isExpanded && (() => {
-              const isEditingPlayers = editingPlayersMatchId === match.id;
-              return (
-                <div className="mt-2 grid grid-cols-2 gap-3 border-t-2 border-(--color-ink) pt-2 text-xs">
-                  <div>
-                    <strong className="mb-1 block font-black uppercase tracking-wide text-(--color-ink)">
-                      {teamLabel(match.team1_name, match.team1_version)}
-                    </strong>
-                    {match.team1_players.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {match.team1_players.map(p => (
-                          <span key={p.id} className="flex items-center gap-1 border border-(--color-ink) bg-gray-50 px-2 py-0.5">
-                            {p.name}
-                            {isEditingPlayers && (
-                              <button
-                                onClick={() => handleMovePlayer(match.id, p.id, 2)}
-                                disabled={movePlayer.isPending}
-                                className="text-(--color-ink) disabled:opacity-50"
-                                aria-label={`Move ${p.name} to ${teamLabel(match.team2_name, match.team2_version)}`}
-                              >
-                                <ArrowRight className="h-3 w-3" />
-                              </button>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    ) : <span className="italic text-gray-400">No players recorded</span>}
-                  </div>
-                  <div>
-                    <strong className="mb-1 block font-black uppercase tracking-wide text-(--color-ink)">
-                      {teamLabel(match.team2_name, match.team2_version)}
-                    </strong>
-                    {match.team2_players.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {match.team2_players.map(p => (
-                          <span key={p.id} className="flex items-center gap-1 border border-(--color-ink) bg-gray-50 px-2 py-0.5">
-                            {isEditingPlayers && (
-                              <button
-                                onClick={() => handleMovePlayer(match.id, p.id, 1)}
-                                disabled={movePlayer.isPending}
-                                className="text-(--color-ink) disabled:opacity-50"
-                                aria-label={`Move ${p.name} to ${teamLabel(match.team1_name, match.team1_version)}`}
-                              >
-                                <ArrowLeft className="h-3 w-3" />
-                              </button>
-                            )}
-                            {p.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : <span className="italic text-gray-400">No players recorded</span>}
-                  </div>
-                  {isEditingPlayers && (
+            {isExpanded && (
+              <div className="mt-2 grid grid-cols-2 gap-3 border-t-2 border-(--color-ink) pt-2 text-xs">
+                {sides.map(s => {
+                  const otherSide = s.side === 1 ? sides[1] : sides[0];
+                  const MoveIcon = s.side === 1 ? ArrowRight : ArrowLeft;
+                  return (
+                    <div key={s.side} className="min-w-0">
+                      <strong className="mb-1 block truncate font-black uppercase tracking-wide text-(--color-ink)">
+                        {s.label}
+                      </strong>
+                      {s.players.length > 0 ? (
+                        <ul className="space-y-1">
+                          {s.players.map(p => (
+                            <li key={p.id} className={`flex min-w-0 items-center gap-1 ${s.side === 2 && isEditingPlayers ? 'flex-row-reverse justify-end' : ''}`}>
+                              <span className="min-w-0 flex-1">
+                                <PlayerChip player={p} highlighted={p.id === highlightPlayerId} size="sm" />
+                              </span>
+                              {isEditingPlayers && (
+                                <button
+                                  onClick={() => handleMovePlayer(match.id, p.id, otherSide.side)}
+                                  disabled={movePlayer.isPending}
+                                  className="flex h-10 w-10 flex-none items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink) disabled:opacity-50"
+                                  aria-label={`Move ${p.name} to ${otherSide.label}`}
+                                >
+                                  <MoveIcon className="h-4 w-4" />
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <span className="italic text-gray-400">No players recorded</span>}
+                    </div>
+                  );
+                })}
+                {isEditingPlayers && (() => {
+                  const available = getAvailablePlayersForMatch(match);
+                  if (available.length === 0) {
+                    return (
+                      <p className="col-span-2 border-t border-dashed border-(--color-ink) pt-2 text-center italic text-gray-500">
+                        All players are already in this match.
+                      </p>
+                    );
+                  }
+                  return (
                     <div className="col-span-2 flex flex-col gap-2 border-t border-dashed border-(--color-ink) pt-2">
                       <Select
                         value={selectedPlayerId}
@@ -373,33 +424,28 @@ const MatchList: React.FC<MatchListProps> = ({
                         aria-label="Player to add to this match"
                       >
                         <option value="">Add a player…</option>
-                        {getAvailablePlayersForMatch(match).map(p => (
+                        {available.map(p => (
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </Select>
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleAddPlayer(match, 1)}
-                          disabled={!selectedPlayerId || addPlayer.isPending}
-                          className="flex h-8 flex-1 items-center justify-center gap-1 border-2 border-(--color-ink) bg-white text-xs font-bold uppercase tracking-wide text-(--color-ink) disabled:opacity-50"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          To {teamLabel(match.team1_name, match.team1_version)}
-                        </button>
-                        <button
-                          onClick={() => handleAddPlayer(match, 2)}
-                          disabled={!selectedPlayerId || addPlayer.isPending}
-                          className="flex h-8 flex-1 items-center justify-center gap-1 border-2 border-(--color-ink) bg-white text-xs font-bold uppercase tracking-wide text-(--color-ink) disabled:opacity-50"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          To {teamLabel(match.team2_name, match.team2_version)}
-                        </button>
+                        {sides.map(s => (
+                          <button
+                            key={s.side}
+                            onClick={() => handleAddPlayer(match, s.side)}
+                            disabled={!selectedPlayerId || addPlayer.isPending}
+                            className={`${BUTTON_BASE} min-w-0 flex-1 gap-1 bg-white px-1 text-(--color-ink)`}
+                          >
+                            <Plus className="h-3.5 w-3.5 flex-none" />
+                            <span className="truncate">To {s.label}</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })()}
+                  );
+                })()}
+              </div>
+            )}
           </div>
         );
       })}

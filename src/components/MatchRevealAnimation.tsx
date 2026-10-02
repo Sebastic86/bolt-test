@@ -1,86 +1,97 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Team } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { Card } from './ui';
 
 interface MatchRevealAnimationProps {
   teams: [Team, Team];
+  /** Pool the slots cycle through while spinning — pass the FILTERED teams, so the spin only shows plausible picks. */
   allTeams: Team[];
   onAnimationComplete: () => void;
 }
 
 type Phase = 'spinning' | 'landing-1' | 'landing-2' | 'complete';
 
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /**
  * Slot-machine reveal for a freshly-generated matchup: both slots cycle
  * through random teams, slot 1 slows and locks onto the real team1 first,
  * then slot 2 does the same for team2. Stacked vertically (not old app's
  * side-by-side) to match this app's mobile-first matchup layout.
+ *
+ * With prefers-reduced-motion the slots show the final teams straight away
+ * and the reveal completes after a short pause — no cycling.
  */
 const MatchRevealAnimation: React.FC<MatchRevealAnimationProps> = ({ teams, allTeams, onAnimationComplete }) => {
-  const [phase, setPhase] = useState<Phase>('spinning');
-  const [displayTeam1, setDisplayTeam1] = useState<Team>(allTeams[0] ?? teams[0]);
-  const [displayTeam2, setDisplayTeam2] = useState<Team>(allTeams[0] ?? teams[1]);
+  const [reducedMotion] = useState(prefersReducedMotion);
+  const [phase, setPhase] = useState<Phase>(reducedMotion ? 'complete' : 'spinning');
+  const [displayTeam1, setDisplayTeam1] = useState<Team>(reducedMotion ? teams[0] : (allTeams[0] ?? teams[0]));
+  const [displayTeam2, setDisplayTeam2] = useState<Team>(reducedMotion ? teams[1] : (allTeams[0] ?? teams[1]));
 
-  const getRandomTeam = useCallback(() => {
-    if (allTeams.length === 0) return teams[0];
-    return allTeams[Math.floor(Math.random() * allTeams.length)];
-  }, [allTeams, teams]);
-
+  // Refs so the timer effect below can stay keyed to the target matchup
+  // only, yet always read the latest pool/callback.
+  const poolRef = useRef(allTeams);
   const onAnimationCompleteRef = useRef(onAnimationComplete);
-  onAnimationCompleteRef.current = onAnimationComplete;
+  useEffect(() => {
+    poolRef.current = allTeams;
+    onAnimationCompleteRef.current = onAnimationComplete;
+  });
 
   useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const intervals: ReturnType<typeof setInterval>[] = [];
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const intervals = new Set<ReturnType<typeof setInterval>>();
+    const after = (ms: number, fn: () => void) => {
+      const id = setTimeout(() => { timers.delete(id); fn(); }, ms);
+      timers.add(id);
+    };
+    const every = (ms: number, fn: () => void) => {
+      const id = setInterval(fn, ms);
+      intervals.add(id);
+      return () => { clearInterval(id); intervals.delete(id); };
+    };
+    const randomTeam = (fallback: Team) => {
+      const pool = poolRef.current;
+      return pool.length === 0 ? fallback : pool[Math.floor(Math.random() * pool.length)];
+    };
 
-    const spin1 = setInterval(() => setDisplayTeam1(getRandomTeam()), 80);
-    const spin2 = setInterval(() => setDisplayTeam2(getRandomTeam()), 80);
-    intervals.push(spin1, spin2);
+    if (reducedMotion) {
+      after(600, () => onAnimationCompleteRef.current());
+    } else {
+      const stopSpin1 = every(80, () => setDisplayTeam1(randomTeam(teams[0])));
+      const stopSpin2 = every(80, () => setDisplayTeam2(randomTeam(teams[1])));
 
-    timers.push(setTimeout(() => {
-      setPhase('landing-1');
-      clearInterval(spin1);
-      let count = 0;
-      const slow = setInterval(() => {
-        count++;
-        if (count >= 4) {
-          clearInterval(slow);
-          setDisplayTeam1(teams[0]);
-        } else {
-          setDisplayTeam1(getRandomTeam());
-        }
-      }, 200);
-      intervals.push(slow);
-    }, 1200));
+      const land = (stopSpin: () => void, setDisplay: (t: Team) => void, target: Team) => {
+        stopSpin();
+        let count = 0;
+        const stopSlow = every(200, () => {
+          count++;
+          if (count >= 4) {
+            stopSlow();
+            setDisplay(target);
+          } else {
+            setDisplay(randomTeam(target));
+          }
+        });
+      };
 
-    timers.push(setTimeout(() => {
-      setPhase('landing-2');
-      clearInterval(spin2);
-      let count = 0;
-      const slow = setInterval(() => {
-        count++;
-        if (count >= 4) {
-          clearInterval(slow);
-          setDisplayTeam2(teams[1]);
-        } else {
-          setDisplayTeam2(getRandomTeam());
-        }
-      }, 200);
-      intervals.push(slow);
-    }, 2000));
+      after(1200, () => { setPhase('landing-1'); land(stopSpin1, setDisplayTeam1, teams[0]); });
+      after(2000, () => { setPhase('landing-2'); land(stopSpin2, setDisplayTeam2, teams[1]); });
+      after(3200, () => setPhase('complete'));
+      after(3800, () => onAnimationCompleteRef.current());
+    }
 
-    timers.push(setTimeout(() => setPhase('complete'), 3200));
-    timers.push(setTimeout(() => onAnimationCompleteRef.current(), 3800));
-
+    // Every pending timeout and interval — including the "slow down"
+    // intervals created mid-sequence — is cleared on unmount.
     return () => {
       timers.forEach(clearTimeout);
       intervals.forEach(clearInterval);
+      timers.clear();
+      intervals.clear();
     };
-    // Deliberately keyed only to the target matchup — re-running this effect
-    // on every getRandomTeam identity change would restart the whole sequence.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teams]);
+  }, [teams, reducedMotion]);
 
   const isLanded1 = phase !== 'spinning';
   const isLanded2 = phase === 'landing-2' || phase === 'complete';
@@ -109,7 +120,13 @@ const RevealSlot: React.FC<{ team: Team; settled: boolean; spinning: boolean }> 
     hard={settled}
     className={`flex min-h-[104px] flex-col items-center justify-center gap-1.5 p-4 transition-opacity duration-150 ${spinning ? 'opacity-60 blur-[1px]' : 'opacity-100'} ${settled ? 'animate-reveal-land animate-reveal-glow' : ''}`}
   >
-    <TeamLogo team={team} size="lg" />
+    {/* While cycling, crest data only (no ids/API names) so flicking through
+        the pool every 80ms never fires logo API lookups; the settled team
+        gets full resolution. */}
+    <TeamLogo
+      team={settled ? team : { name: team.name, resolvedLogoUrl: team.resolvedLogoUrl, logoUrl: team.logoUrl }}
+      size="lg"
+    />
     <span className="max-w-full truncate text-center text-sm font-black uppercase tracking-wide text-(--color-ink)">
       {team.name}
     </span>

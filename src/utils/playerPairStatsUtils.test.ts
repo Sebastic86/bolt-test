@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePlayerPairStandings } from './playerPairStatsUtils';
+import { calculatePlayerPairStandings, getActivePlayers, indexPairStandings, pairKey } from './playerPairStatsUtils';
 import { MatchHistoryItem, Player } from '../types';
 
 function makePlayer(id: string, name = id): Player {
@@ -80,5 +80,32 @@ describe('calculatePlayerPairStandings', () => {
     const result = calculatePlayerPairStandings([p1, p2, p3, p4], [m1, m2, m3]);
     expect(result[0].totalMatches).toBe(2);
     expect(result[1].totalMatches).toBe(1);
+  });
+});
+
+describe('pairKey / indexPairStandings', () => {
+  it('produces the same key regardless of argument order', () => {
+    expect(pairKey('a', 'b')).toBe(pairKey('b', 'a'));
+  });
+
+  it('looks up a pair standing from either player order', () => {
+    const p1 = makePlayer('p1');
+    const p2 = makePlayer('p2');
+    const match = makeMatch({ team1_id: 'a', team2_id: 'b', team1_players: [p2, p1], team2_players: [], team1_score: 3, team2_score: 1 });
+
+    const index = indexPairStandings(calculatePlayerPairStandings([p1, p2], [match]));
+    expect(index.get(pairKey('p2', 'p1'))?.wins).toBe(1);
+    expect(index.get(pairKey('p1', 'p2'))?.totalMatches).toBe(1);
+  });
+});
+
+describe('getActivePlayers', () => {
+  it('returns only players appearing in the matches, sorted by name', () => {
+    const zoe = makePlayer('z', 'Zoe');
+    const al = makePlayer('a', 'Al');
+    const idle = makePlayer('i', 'Idle');
+    const match = makeMatch({ team1_id: 'a', team2_id: 'b', team1_players: [zoe], team2_players: [al], team1_score: 1, team2_score: 0 });
+
+    expect(getActivePlayers([zoe, idle, al], [match]).map(p => p.name)).toEqual(['Al', 'Zoe']);
   });
 });

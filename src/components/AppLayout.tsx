@@ -38,6 +38,11 @@ export interface AppLayoutContextValue {
   pendingMatch: [Team, Team] | null;
   /** Teams passing the current rating/version/nation filters, minus teams already played today — what EditTeamModal should offer. */
   availableTeamsForEdit: Team[];
+  /** Teams passing the current rating/version/nation filters (played today or not) — the reveal animation's spin pool. */
+  filteredTeams: Team[];
+  /** Current matchup filter settings — for the dashboard's "filter can't produce a matchup" banners. */
+  filterSettings: { minRating: number; maxRating: number; excludeNations: boolean; selectedVersion: string };
+  openSettings: () => void;
   handleGenerateNewMatch: (excludeTeamIds?: string[]) => void;
   handleAnimationComplete: () => void;
   handleUpdateTeam: (team: Team, slot: 0 | 1) => void;
@@ -132,6 +137,9 @@ const AppLayout: React.FC = () => {
     isAnimating,
     pendingMatch,
     availableTeamsForEdit,
+    filteredTeams,
+    filterSettings: { minRating, maxRating, excludeNations, selectedVersion },
+    openSettings: handleOpenSettingsModal,
     handleGenerateNewMatch,
     handleAnimationComplete,
     handleUpdateTeam,

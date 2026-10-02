@@ -49,3 +49,37 @@ export async function deleteTeamLogo(teamId: string): Promise<void> {
     )
   );
 }
+
+/**
+ * Uploads raw image bytes (e.g. a downloaded or bundled crest) as `<teamId>.<ext>`
+ * and removes any stale copy stored under a different extension. Returns the
+ * public URL. Admin-only per storage RLS.
+ */
+export async function uploadTeamLogoBlob(teamId: string, blob: Blob, contentType: string): Promise<string> {
+  if (blob.size > MAX_FILE_SIZE) {
+    throw new Error(`File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB.`);
+  }
+  if (!ALLOWED_TYPES.includes(contentType)) {
+    throw new Error(`Unsupported image type: ${contentType || 'unknown'}.`);
+  }
+
+  const extension = MIME_TO_EXTENSION[contentType] || 'png';
+  const fileName = `${teamId}.${extension}`;
+
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(fileName, blob, { contentType, upsert: true });
+
+  if (error) {
+    console.error('[teamUploadService] Upload error:', error);
+    throw new Error(error.message);
+  }
+
+  const stale = ['png', 'jpg', 'svg', 'webp']
+    .filter(ext => ext !== extension)
+    .map(ext => `${teamId}.${ext}`);
+  await supabase.storage.from(STORAGE_BUCKET).remove(stale);
+
+  const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName);
+  return publicUrl;
+}

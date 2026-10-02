@@ -53,6 +53,9 @@ export interface MatchHistoryItem extends Match {
   team2_version: string;
   team1_players: Player[];
   team2_players: Player[];
+  /** Team's persisted crest URL (teams.resolvedLogoUrl) — lets match lists show crests without any logo API calls. */
+  team1_resolvedLogoUrl?: string | null;
+  team2_resolvedLogoUrl?: string | null;
 }
 
 // Type for player standings data

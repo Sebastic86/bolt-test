@@ -73,3 +73,28 @@
 .animate-reveal-glow {
   animation: reveal-glow 0.7s ease-in-out 2;
 }
+
+/* MatchComparison stat bars growing out from the center label. The left
+   (team 1) bar is right-aligned so it grows leftward from its right edge. */
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.animate-bar-grow-left {
+  transform-origin: right center;
+  animation: bar-grow 0.7s ease-out both;
+}
+.animate-bar-grow-right {
+  transform-origin: left center;
+  animation: bar-grow 0.7s ease-out both;
+}
+
+/* Respect the OS "reduce motion" setting for the matchup animations. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-bar-grow-left,
+  .animate-bar-grow-right,
+  .animate-reveal-land,
+  .animate-reveal-glow {
+    animation: none;
+  }
+}

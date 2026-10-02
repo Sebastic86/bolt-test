@@ -56,3 +56,17 @@ export function calculateTeamStandings(matches: MatchHistoryItem[], teams: Team[
     lossPercentage: stats.totalMatches > 0 ? (stats.totalLosses / stats.totalMatches) * 100 : 0,
   }));
 }
+
+/**
+ * Top N teams for the win% / loss% leaderboards: only teams with at least
+ * one completed match, sorted by the chosen percentage (descending), ties
+ * broken by matches played (descending). Same rules as the old app's
+ * TopWinPercentageTeams / TopLossPercentageTeams.
+ */
+export function topTeamsByPercentage(standings: TeamStanding[], mode: 'win' | 'loss', limit = 5): TeamStanding[] {
+  const pct = (t: TeamStanding) => (mode === 'win' ? t.winPercentage : t.lossPercentage);
+  return standings
+    .filter(t => t.totalMatches > 0)
+    .sort((a, b) => pct(b) - pct(a) || b.totalMatches - a.totalMatches)
+    .slice(0, limit);
+}

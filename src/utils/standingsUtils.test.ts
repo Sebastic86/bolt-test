@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateStandings } from './standingsUtils';
+import { calculateStandings, partitionStandingsByPlayed } from './standingsUtils';
 import { MatchHistoryItem, Player, Team } from '../types';
 
 function makePlayer(id: string, name = id): Player {
@@ -208,5 +208,27 @@ describe('calculateStandings', () => {
 
     const result = calculateStandings([m1, m2, m3], [p1, p2, p3], [teamA, teamB]);
     expect(result.map(s => s.playerId)).toEqual(['p1', 'p2', 'p3']);
+  });
+});
+
+describe('partitionStandingsByPlayed', () => {
+  it('keeps played players in standings order and lists unplayed players alphabetically', () => {
+    const zed = makePlayer('z', 'Zed');
+    const amy = makePlayer('a', 'Amy');
+    const p1 = makePlayer('p1', 'Winner');
+    const p2 = makePlayer('p2', 'Loser');
+    const teamA = makeTeam('a');
+    const teamB = makeTeam('b');
+    const match = makeMatch({
+      team1_id: teamA.id, team2_id: teamB.id,
+      team1_players: [p2], team2_players: [p1],
+      team1_score: 0, team2_score: 1,
+    });
+
+    const standings = calculateStandings([match], [zed, p2, amy, p1], [teamA, teamB]);
+    const { played, unplayed } = partitionStandingsByPlayed(standings);
+
+    expect(played.map(s => s.playerName)).toEqual(['Winner', 'Loser']);
+    expect(unplayed.map(s => s.playerName)).toEqual(['Amy', 'Zed']);
   });
 });
