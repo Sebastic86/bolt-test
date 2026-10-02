@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Edit3, Plus, RefreshCw, Save, Trash, Upload, X } from 'lucide-react';
 import { Player, Team } from '../types';
+import { getAvailableVersions } from '../utils/versionFilter';
 import { AdminOnly } from './RoleBasedComponents';
 import { BottomSheet, Button, Input, Select, Switch } from './ui';
 import {
@@ -19,6 +20,8 @@ interface SettingsModalProps {
   initialExcludeNations: boolean;
   initialSelectedVersion: string;
   initialMaxOvrDiff: number;
+  /** Newest version in the teams table — labelled "current season". */
+  currentSeason?: string | null;
   teams: Team[];
   players: Player[];
 }
@@ -190,6 +193,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialExcludeNations,
   initialSelectedVersion,
   initialMaxOvrDiff,
+  currentSeason,
   teams,
   players,
 }) => {
@@ -212,7 +216,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [isOpen, initialMinRating, initialMaxRating, initialExcludeNations, initialSelectedVersion, initialMaxOvrDiff]);
 
   const availableVersions = useMemo(
-    () => Array.from(new Set(teams.map(t => t.version))).sort(),
+    () => getAvailableVersions(teams),
     [teams]
   );
 
@@ -258,7 +262,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-(--color-ink)">Game Version</span>
         <Select value={selectedVersion} onChange={e => setSelectedVersion(e.target.value)}>
           {availableVersions.length === 0 && <option value={selectedVersion}>{selectedVersion}</option>}
-          {availableVersions.map(v => <option key={v} value={v}>{v}</option>)}
+          {availableVersions.map(v => (
+            <option key={v} value={v}>{v === currentSeason ? `${v} (current season)` : v}</option>
+          ))}
         </Select>
       </div>
 

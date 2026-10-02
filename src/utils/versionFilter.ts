@@ -18,7 +18,7 @@ export function getAvailableVersions(teams: Team[] | undefined, matches: MatchHi
       if (m.team2_version) versions.add(m.team2_version);
     });
   }
-  return Array.from(versions).sort();
+  return Array.from(versions).sort(compareVersions);
 }
 
 /**
@@ -29,4 +29,32 @@ export function getAvailableVersions(teams: Team[] | undefined, matches: MatchHi
 export function filterMatchesByVersion(matches: MatchHistoryItem[], version: string): MatchHistoryItem[] {
   if (version === ALL_VERSIONS) return matches;
   return matches.filter(m => m.team1_version === version && m.team2_version === version);
+}
+
+/** Trailing number of a version label ("FC27" → 27), NaN if there is none. */
+const versionNumber = (version: string) => {
+  const match = version.match(/(\d+)\s*$/);
+  return match ? Number(match[1]) : Number.NaN;
+};
+
+/** Orders versions by their number (FC9 < FC27), falling back to alphabetical. */
+export function compareVersions(a: string, b: string): number {
+  const [x, y] = [versionNumber(a), versionNumber(b)];
+  if (!Number.isNaN(x) && !Number.isNaN(y) && x !== y) return x - y;
+  return a.localeCompare(b);
+}
+
+/** The current season: the newest version among the teams (e.g. FC27), or null with no teams. */
+export function getLatestVersion(versions: string[]): string | null {
+  return versions.length > 0 ? [...versions].sort(compareVersions)[versions.length - 1] : null;
+}
+
+/**
+ * The version the generator uses. `saved` is the user's explicit choice
+ * (null = follow the current season). A saved version that no longer exists
+ * also falls back to the newest one.
+ */
+export function resolveSelectedVersion(saved: string | null, versions: string[]): string | null {
+  if (saved && (versions.length === 0 || versions.includes(saved))) return saved;
+  return getLatestVersion(versions) ?? saved;
 }

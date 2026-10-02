@@ -28,7 +28,7 @@ interface MatchListProps {
   /** All players — needed to offer "add an unlisted player to this match". */
   players: Player[];
   currentUserId?: string;
-  /** Show the "(FC26)" version suffix next to team names — used on the All Matches page, not the Today's Matches section. */
+  /** Show the "(FC27)" version suffix next to team names — used on the All Matches page, not the Today's Matches section. */
   showTeamVersion?: boolean;
   emptyMessage?: string;
   /**
@@ -192,7 +192,7 @@ const MatchList: React.FC<MatchListProps> = ({
   };
 
   function teamLabel(name: string, version: string) {
-    return showTeamVersion ? `${name} (${version || 'FC26'})` : name;
+    return showTeamVersion && version ? `${name} (${version})` : name;
   }
 
   if (loading && matches.length === 0) return <LoadingState label="Loading matches..." />;

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { BottomSheet, Button, Input } from './ui';
-import { useCreateTeamMutation } from '../queries/teams';
+import { useCreateTeamMutation, useTeamsQuery } from '../queries/teams';
+import { getAvailableVersions, getLatestVersion } from '../utils/versionFilter';
 
 interface CreateTeamModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ type FormState = {
 const DEFAULT_FORM: FormState = {
   name: '',
   league: '',
-  version: 'FC26',
+  version: '', // filled with the current season when the sheet opens
   rating: '4',
   overallRating: '75',
   attackRating: '75',
@@ -46,12 +47,17 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose }) =>
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [error, setError] = useState<string | null>(null);
   const createTeam = useCreateTeamMutation();
+  // New teams default to the current season (newest version, e.g. FC27).
+  const teamsQuery = useTeamsQuery();
+  const currentSeason = getLatestVersion(getAvailableVersions(teamsQuery.data ?? [])) ?? '';
 
   useEffect(() => {
     if (isOpen) {
-      setForm(DEFAULT_FORM);
+      setForm({ ...DEFAULT_FORM, version: currentSeason });
       setError(null);
     }
+    // Reset only when the sheet opens, not when teams refetch while it is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const update = (field: keyof FormState, value: string) => setForm(prev => ({ ...prev, [field]: value }));
@@ -87,7 +93,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose }) =>
       {
         name,
         league,
-        version: form.version.trim() || 'FC26',
+        version: form.version.trim() || currentSeason,
         rating,
         overallRating,
         attackRating,

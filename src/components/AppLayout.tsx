@@ -13,6 +13,7 @@ import { usePlayersQuery } from '../queries/players';
 import { useAllMatchesQuery, useMatchesTodayQuery } from '../queries/matches';
 import { useAuth } from '../contexts/AuthContext';
 import { MatchHistoryItem, Player, Team } from '../types';
+import { getAvailableVersions, getLatestVersion, resolveSelectedVersion } from '../utils/versionFilter';
 
 export interface AppLayoutContextValue {
   teams: Team[];
@@ -73,7 +74,7 @@ const AppLayout: React.FC = () => {
 
   const settings = useSettings();
   const {
-    minRating, maxRating, excludeNations, selectedVersion, maxOvrDiff,
+    minRating, maxRating, excludeNations, savedVersion, maxOvrDiff,
     isSettingsModalOpen, handleOpenSettingsModal, handleCloseSettingsModal, handleSaveSettings,
   } = settings;
 
@@ -87,6 +88,16 @@ const AppLayout: React.FC = () => {
   const players = useMemo(() => playersQuery.data ?? [], [playersQuery.data]);
   const matchesToday = useMemo(() => matchesTodayQuery.data ?? [], [matchesTodayQuery.data]);
   const allMatches = useMemo(() => allMatchesQuery.data ?? [], [allMatchesQuery.data]);
+
+  // Current season = newest version in the teams table (FC27 now), unless
+  // the user picked another one in Settings.
+  const versions = useMemo(() => getAvailableVersions(teams), [teams]);
+  const currentSeason = getLatestVersion(versions);
+  const selectedVersion = resolveSelectedVersion(savedVersion, versions) ?? '';
+
+  // Choosing the current season stores "follow the newest", so FC28 etc. switch automatically.
+  const saveSettings: typeof handleSaveSettings = (min, max, nations, version, ovrDiff) =>
+    handleSaveSettings(min, max, nations, version === currentSeason ? null : version, ovrDiff);
 
   const filteredTeams = useMemo(() => teams.filter(team => {
     const ratingMatch = team.rating >= minRating && team.rating <= maxRating;
@@ -173,11 +184,12 @@ const AppLayout: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={handleCloseSettingsModal}
-        onSave={handleSaveSettings}
+        onSave={saveSettings}
         initialMinRating={minRating}
         initialMaxRating={maxRating}
         initialExcludeNations={excludeNations}
         initialSelectedVersion={selectedVersion}
+        currentSeason={currentSeason}
         initialMaxOvrDiff={maxOvrDiff}
         teams={teams}
         players={players}
