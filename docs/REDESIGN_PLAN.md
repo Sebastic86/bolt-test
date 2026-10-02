@@ -23,13 +23,11 @@ Branch: `redesign/gamenight-port` (uncommitted). Target: **mobile-first** — th
 5. Check `user_profiles` for unexpected admins.
 6. Deploy with an SPA fallback (Dockerfile/nginx provided) so `/admin` and `/matches` survive refresh.
 
-## Remaining gaps vs. old app (not yet restored)
-- Version filter on Overall standings and Head-to-Head; H2H shows a pair list instead of the N×N matrix.
-- Win/Loss result badges in team/player match-detail sheets.
-- Player avatars in match lists/standings (gamenight shows initials); crests in match lists are initials badges.
-- Filter warning banners ("only N teams match", "all teams played today").
-- TeamCard +/- stat differences; MatchComparison bar animation.
-- Admin **Dev Tools** tab (logo resolve/migrate scripts). 147 teams have neither a resolved URL nor a bundled crest.
+## Parity with old app
+All lost features restored (commit 7b01463). Deliberate differences: Head-to-Head defaults to a list (grid is a toggle);
+achievements version filter uses AND like everything else; no desktop button bar / manual refresh buttons;
+lists show initials until a crest has been resolved once. 147 teams still have no logo — use Admin → Tools.
+
 
 ## Next
 - Phase 4/5 from the original plan below: bundle splitting (660 kB main chunk), toasts instead of `alert()`,
