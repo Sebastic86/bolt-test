@@ -41,7 +41,15 @@ test('a full game night on a phone', async ({ page }) => {
     await page.getByRole('button', { name: `Pick ${homeTeam}` }).first().click();
     await expect(page.getByRole('button', { name: `Pick ${homeTeam}` })).toHaveCount(3 - i);
   }
-  await expect(page.getByText(/picked/i).first()).toBeVisible();
+  await expect(page.getByText(/all picked/i)).toBeVisible();
+
+  // Alex also calls the exact score: 5-0 (worth +3 once the result is in).
+  await page.getByRole('button', { name: /add exact score for alex/i }).click();
+  await page.getByRole('spinbutton', { name: /goals/i }).nth(0).fill('5');
+  await page.getByRole('spinbutton', { name: /goals/i }).nth(1).fill('0');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('button', { name: /alex's exact score 5–0/i })).toBeVisible();
+  await page.getByRole('heading', { name: /who wins/i }).locator('xpath=../..').screenshot({ path: 'e2e/screenshots/predictions-panel.png' });
   await shot(page, 'predictions');
 
   // Add the match: Alex + Bram vs Chris + Dani.
@@ -62,7 +70,7 @@ test('a full game night on a phone', async ({ page }) => {
   await page.getByRole('spinbutton').nth(1).fill('0');
   await page.getByRole('button', { name: 'Save score' }).click();
   await expect(page.getByText(/hammering/i)).toBeVisible();
-  await expect(page.getByText(/predictions/i).first()).toBeVisible();
+  await expect(page.getByText(/Alex called it 5-0 \(\+3\)/)).toBeVisible();
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'e2e/screenshots/toasts.png' });
 

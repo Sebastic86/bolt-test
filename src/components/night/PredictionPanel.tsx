@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Eye, EyeOff, Lock, X } from 'lucide-react';
+import { Check, Eye, EyeOff, Lock, X } from 'lucide-react';
 import { GameNight, MatchHistoryItem, Player, Prediction, Team } from '../../types';
 import { Button, Card, ErrorState, Input, LoadingState } from '../ui';
 import PlayerBadge from '../PlayerBadge';
@@ -28,6 +28,15 @@ const parseScore = (value: string): number | null => {
   return Number.isInteger(n) ? n : null;
 };
 
+/** Shared column layout for the header and every player row: name | team 1 | team 2 | score. */
+const GRID = 'grid grid-cols-[minmax(0,1fr)_2.75rem_2.75rem_3.25rem] items-center gap-1.5';
+
+const SideNumber: React.FC<{ side: number }> = ({ side }) => (
+  <span className="flex h-4 w-4 flex-none items-center justify-center bg-(--color-ink) text-[10px] font-black leading-none text-white">
+    {side}
+  </span>
+);
+
 interface PredictionRowProps {
   player: Player;
   pick: Prediction | undefined;
@@ -38,6 +47,7 @@ interface PredictionRowProps {
   canWrite: boolean;
 }
 
+/** One compact row per player: tick a column to pick the winner, tap the score chip for an exact score. */
 const PredictionRow: React.FC<PredictionRowProps> = ({ player, pick, revealed, night, match, canWrite }) => {
   const placeMutation = usePlacePredictionMutation();
   const deleteMutation = useDeletePredictionMutation();
@@ -50,6 +60,7 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ player, pick, revealed, n
   const busy = placeMutation.isPending || deleteMutation.isPending;
   const hidden = !!pick && !revealed && !editing;
   const hasScore = pick?.predicted_team1_score != null && pick?.predicted_team2_score != null;
+  const scoreLabel = hasScore ? `${pick!.predicted_team1_score}–${pick!.predicted_team2_score}` : null;
 
   const save = (draft: PickDraft) => {
     placeMutation.mutate(
@@ -88,6 +99,16 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ player, pick, revealed, n
     save(switchWinner(pick ?? null, winner));
   };
 
+  const toggleScore = () => {
+    if (!scoreOpen) {
+      // Prefill from the saved pick (it may have changed on another phone).
+      setScore1(pick?.predicted_team1_score?.toString() ?? '');
+      setScore2(pick?.predicted_team2_score?.toString() ?? '');
+    }
+    setScoreOpen(!scoreOpen);
+    setScoreHint(null);
+  };
+
   const handleSaveScore = () => {
     const s1 = parseScore(score1);
     const s2 = parseScore(score2);
@@ -98,7 +119,7 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ player, pick, revealed, n
     }
     const winner = pick?.predicted_winner ?? (s1! > s2! ? 1 : s2! > s1! ? 2 : null);
     if (winner === null) {
-      setScoreHint('A draw — first pick who wins on penalties.');
+      setScoreHint('A draw — first tick who wins on penalties.');
       return;
     }
     save(reconcilePick({ winner, team1Score: s1, team2Score: s2 }));
@@ -107,12 +128,13 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ player, pick, revealed, n
   const mutationError = placeMutation.error ?? deleteMutation.error;
 
   return (
-    <li className="flex flex-col gap-2 border-b-2 border-(--color-ink)/10 py-3 last:border-b-0">
-      <div className="flex min-h-8 items-center gap-2">
-        <PlayerBadge player={player} size="md" className="min-w-0 flex-1" />
+    <li className="border-t border-(--color-ink)/10 py-1.5 first:border-t-0">
+      <div className={GRID}>
+        <PlayerBadge player={player} size="sm" className="min-w-0" />
+
         {hidden ? (
-          <>
-            <span className="flex flex-none items-center gap-1 bg-(--color-green-bright) px-2 py-0.5 text-xs font-black uppercase tracking-wide text-(--color-ink)">
+          <div className="col-span-3 flex h-11 items-center gap-1.5">
+            <span className="flex h-full flex-1 items-center justify-center gap-1 bg-(--color-green-bright)/25 text-xs font-black uppercase tracking-wide text-(--color-ink)">
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
               Picked
             </span>
@@ -120,38 +142,15 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ player, pick, revealed, n
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="flex h-10 flex-none items-center gap-1 border-2 border-(--color-ink) bg-white px-2.5 text-xs font-bold uppercase tracking-wide text-(--color-ink)"
+                className="flex h-11 w-11 flex-none items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink)"
                 aria-label={`Change ${player.name}'s pick (reveals it)`}
               >
-                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                Change
+                <Eye className="h-4 w-4" aria-hidden="true" />
               </button>
             )}
-          </>
+          </div>
         ) : (
           <>
-            {hasScore && (
-              <span className="flex-none bg-(--color-ink) px-2 py-0.5 text-xs font-black tabular-nums text-white">
-                {pick!.predicted_team1_score}–{pick!.predicted_team2_score}
-              </span>
-            )}
-            {editing && (
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className="flex h-10 flex-none items-center gap-1 border-2 border-(--color-ink) bg-white px-2.5 text-xs font-bold uppercase tracking-wide text-(--color-ink)"
-              >
-                <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
-                Hide
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {!hidden && (
-        <>
-          <div className="grid grid-cols-2 gap-2">
             {match.map((team, i) => {
               const side = (i + 1) as 1 | 2;
               const selected = pick?.predicted_winner === side;
@@ -163,76 +162,90 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ player, pick, revealed, n
                   onClick={() => handleToggle(side)}
                   aria-pressed={selected}
                   aria-label={selected ? `${team.name} picked — tap to clear` : `Pick ${team.name}`}
-                  className={`flex h-12 min-w-0 items-center gap-1.5 border-2 border-(--color-ink) px-2 text-left disabled:cursor-not-allowed ${
-                    selected ? 'bg-(--color-green-bright) shadow-hard' : 'bg-white'
+                  className={`flex h-11 items-center justify-center border-2 disabled:cursor-not-allowed ${
+                    selected ? 'border-(--color-ink) bg-(--color-green-bright)' : 'border-gray-300 bg-white'
                   } ${!canWrite ? 'disabled:opacity-70' : 'disabled:opacity-50'}`}
                 >
-                  <TeamLogo team={{ name: team.name, resolvedLogoUrl: team.resolvedLogoUrl, logoUrl: team.logoUrl }} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-xs font-black uppercase tracking-wide text-(--color-ink)">
-                    {team.name}
-                  </span>
-                  {selected && <Check className="h-4 w-4 flex-none text-(--color-ink)" aria-hidden="true" />}
+                  {selected
+                    ? <Check className="h-5 w-5 text-(--color-ink)" strokeWidth={3} aria-hidden="true" />
+                    : <span className="h-2 w-2 bg-gray-300" aria-hidden="true" />}
                 </button>
               );
             })}
-          </div>
-
-          {canWrite && (
             <button
               type="button"
-              onClick={() => {
-                if (!scoreOpen) {
-                  // Prefill from the saved pick (it may have changed on another phone).
-                  setScore1(pick?.predicted_team1_score?.toString() ?? '');
-                  setScore2(pick?.predicted_team2_score?.toString() ?? '');
-                }
-                setScoreOpen(!scoreOpen);
-                setScoreHint(null);
-              }}
+              disabled={!canWrite || busy}
+              onClick={toggleScore}
               aria-expanded={scoreOpen}
-              className="flex h-10 items-center gap-1 self-start text-xs font-bold uppercase tracking-wide text-gray-600"
+              aria-label={scoreLabel
+                ? `${player.name}'s exact score ${scoreLabel}, tap to change`
+                : `Add exact score for ${player.name} (+${EXACT_SCORE_BONUS})`}
+              className={`flex h-11 items-center justify-center border-2 text-xs font-black tabular-nums disabled:cursor-not-allowed disabled:opacity-50 ${
+                scoreLabel ? 'border-(--color-ink) bg-(--color-ink) text-white' : 'border-dashed border-gray-400 bg-white text-gray-500'
+              }`}
             >
-              {scoreOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              Exact score (+{EXACT_SCORE_BONUS})
+              {scoreLabel ?? `+${EXACT_SCORE_BONUS}`}
             </button>
-          )}
+          </>
+        )}
+      </div>
 
-          {canWrite && scoreOpen && (
-            <div className="flex flex-col gap-2 border-2 border-(--color-ink) bg-gray-50 p-2.5">
-              <div className="flex items-end gap-2">
-                {[
-                  { team: match[0], value: score1, set: setScore1 },
-                  { team: match[1], value: score2, set: setScore2 },
-                ].map(({ team, value, set }, i) => (
-                  <React.Fragment key={team.id}>
-                    {i === 1 && <span className="pb-2.5 text-base font-black text-(--color-ink)" aria-hidden="true">–</span>}
-                    <label className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="truncate text-[11px] font-black uppercase tracking-wide text-gray-600">{team.name}</span>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        min={0}
-                        max={MAX_PREDICTED_SCORE}
-                        value={value}
-                        onChange={e => set(e.target.value)}
-                        className="text-center text-base! font-black tabular-nums"
-                      />
-                    </label>
-                  </React.Fragment>
-                ))}
-              </div>
-              {scoreHint && <p className="text-xs font-bold text-red-600">{scoreHint}</p>}
-              <p className="text-[11px] text-gray-500">The score sets the winner; on a draw your pick is the penalty winner.</p>
-              <Button onClick={handleSaveScore} disabled={busy} className="w-full">
-                {placeMutation.isPending ? 'Saving…' : 'Save score'}
-              </Button>
-            </div>
-          )}
-        </>
+      {canWrite && scoreOpen && !hidden && (
+        <div className="mt-1.5 flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              min={0}
+              max={MAX_PREDICTED_SCORE}
+              value={score1}
+              onChange={e => setScore1(e.target.value)}
+              aria-label={`${match[0].name} goals`}
+              className="h-11! w-16 text-center text-base! font-black tabular-nums"
+            />
+            <span className="text-base font-black text-(--color-ink)" aria-hidden="true">–</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              min={0}
+              max={MAX_PREDICTED_SCORE}
+              value={score2}
+              onChange={e => setScore2(e.target.value)}
+              aria-label={`${match[1].name} goals`}
+              className="h-11! w-16 text-center text-base! font-black tabular-nums"
+            />
+            <Button onClick={handleSaveScore} disabled={busy} className="h-11 flex-1 px-2">
+              {placeMutation.isPending ? 'Saving…' : 'Save'}
+            </Button>
+            <button
+              type="button"
+              onClick={toggleScore}
+              className="flex h-11 w-11 flex-none items-center justify-center border-2 border-(--color-ink) bg-white"
+              aria-label="Close score"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <p className={`text-[11px] ${scoreHint ? 'font-bold text-red-600' : 'text-gray-500'}`}>
+            {scoreHint ?? 'The score sets the winner; on a draw your tick is the penalty winner.'}
+          </p>
+        </div>
       )}
 
-      {mutationError && <ErrorState message={errorText(mutationError, 'Could not save the pick.')} />}
+      {editing && !hidden && (
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="mt-1 flex h-9 items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-gray-600"
+        >
+          <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+          Hide pick again
+        </button>
+      )}
+
+      {mutationError && <ErrorState className="mt-1.5" message={errorText(mutationError, 'Could not save the pick.')} />}
     </li>
   );
 };
@@ -262,10 +275,15 @@ const PredictionPanel: React.FC<PredictionPanelProps> = ({ night, players, match
     <Card className="p-3">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-black uppercase tracking-wide text-(--color-ink)">Who wins?</h2>
-        <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
-          {WINNER_POINTS} pt winner · +{EXACT_SCORE_BONUS} exact score
+        <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+          {revealed
+            ? <><Eye className="h-3.5 w-3.5" aria-hidden="true" /> All picked</>
+            : <><EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> {pickedCount}/{players.length} picked</>}
         </span>
       </div>
+      <p className="mt-0.5 text-[11px] text-gray-500">
+        {revealed ? 'Picks revealed.' : 'Hidden until everyone has picked.'} {WINNER_POINTS} pt for the winner, +{EXACT_SCORE_BONUS} for the exact score.
+      </p>
 
       {predictionsQuery.isLoading ? (
         <LoadingState label="Loading picks..." />
@@ -273,14 +291,6 @@ const PredictionPanel: React.FC<PredictionPanelProps> = ({ night, players, match
         <ErrorState className="mt-2" message={errorText(predictionsQuery.error, 'Could not load picks.')} />
       ) : (
         <>
-          <p className="mt-1 flex items-center gap-1 text-xs font-bold text-gray-600">
-            {revealed ? (
-              <><Eye className="h-3.5 w-3.5" aria-hidden="true" /> Everyone picked — picks revealed</>
-            ) : (
-              <><EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> {pickedCount}/{players.length} picked · revealed when everyone has picked</>
-            )}
-          </p>
-
           {lockedMatch && (
             <p className="mt-2 flex items-center gap-1.5 border-2 border-(--color-ink) bg-yellow-50 px-2 py-1.5 text-xs font-bold text-(--color-ink)">
               <Lock className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
@@ -288,7 +298,26 @@ const PredictionPanel: React.FC<PredictionPanelProps> = ({ night, players, match
             </p>
           )}
 
-          <ul className="mt-1">
+          {/* Column headers: crests over their tick columns, names spelled out underneath. */}
+          <div className={`${GRID} mt-2 border-b-2 border-(--color-ink) pb-1.5`} aria-hidden="true">
+            <span className="text-[10px] font-black uppercase tracking-wide text-gray-500">Player</span>
+            {match.map((team, i) => (
+              <span key={team.id} className="flex flex-col items-center gap-0.5" title={team.name}>
+                <TeamLogo team={{ name: team.name, resolvedLogoUrl: team.resolvedLogoUrl, logoUrl: team.logoUrl }} size="sm" />
+                <SideNumber side={i + 1} />
+              </span>
+            ))}
+            <span className="text-center text-[10px] font-black uppercase tracking-wide text-gray-500">Score</span>
+          </div>
+          {/* Crests can share initials (FC Barcelona / FC Bayern) — the numbers tie names to columns. */}
+          <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-(--color-ink)">
+            <SideNumber side={1} />
+            <span className="min-w-0 truncate">{match[0].name}</span>
+            <SideNumber side={2} />
+            <span className="min-w-0 truncate">{match[1].name}</span>
+          </p>
+
+          <ul className="mt-0.5">
             {players.map(player => (
               <PredictionRow
                 key={`${match[0].id}|${match[1].id}|${player.id}`}
