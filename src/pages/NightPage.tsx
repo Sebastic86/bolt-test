@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { AlertTriangle, Moon, Share2, Ticket } from 'lucide-react';
+import { AlertTriangle, Moon, Share2, Ticket, Trash2 } from 'lucide-react';
 import { useAppLayoutContext } from '../components/AppLayout';
 import MatchList from '../components/MatchList';
 import PlayerBadge from '../components/PlayerBadge';
 import NightRecapSheet from '../components/night/NightRecapSheet';
+import DeleteNightSheet from '../components/night/DeleteNightSheet';
 import NightTable from '../components/night/NightTable';
 import PastNights from '../components/night/PastNights';
 import PredictionLeaderboard from '../components/night/PredictionLeaderboard';
@@ -57,6 +58,15 @@ export default function NightPage() {
 
   const activeNight = activeQuery.data ?? null;
 
+  // Deleting: admins, or whoever started the night (enforced by RLS too).
+  const canDeleteNight = useCallback(
+    (night: GameNight) => isAdmin || (canEdit && !!user?.id && night.started_by === user.id),
+    [isAdmin, canEdit, user?.id]
+  );
+  const [deletingNight, setDeletingNight] = useState<GameNight | null>(null);
+  const closeDelete = useCallback(() => setDeletingNight(null), []);
+  const deletingJokersQuery = useJokersQuery(deletingNight?.id);
+
   let content: React.ReactNode;
   if (activeQuery.isLoading) {
     content = <LoadingState label="Loading game night..." />;
@@ -85,6 +95,7 @@ export default function NightPage() {
         ending={endMutation.isPending}
         endError={endMutation.error ? errorText(endMutation.error) : null}
         onRecap={() => setRecapNight(activeNight)}
+        onDelete={canDeleteNight(activeNight) ? () => setDeletingNight(activeNight) : undefined}
       />
     );
   } else {
@@ -104,7 +115,15 @@ export default function NightPage() {
           {nightsQuery.isLoading && <LoadingState label="Loading nights..." />}
           {nightsQuery.error && <ErrorState message={`Couldn't load past nights: ${errorText(nightsQuery.error)}`} />}
           {nightsQuery.isSuccess && (
-            <PastNights nights={nights} allMatches={allMatches} players={players} teams={teams} onOpen={setRecapNight} />
+            <PastNights
+              nights={nights}
+              allMatches={allMatches}
+              players={players}
+              teams={teams}
+              onOpen={setRecapNight}
+              onDelete={setDeletingNight}
+              canDelete={canDeleteNight}
+            />
           )}
         </section>
       </div>
@@ -115,6 +134,14 @@ export default function NightPage() {
     <div className="mx-auto w-full max-w-md p-4">
       {content}
       <NightRecapSheet isOpen={recapNight !== null} onClose={closeRecap} data={recapData} />
+      <DeleteNightSheet
+        night={deletingNight}
+        title={deletingNight ? formatNightTitle(deletingNight.version, getNightNumber(nights, deletingNight.id)) : ''}
+        matchCount={deletingNight ? getNightMatches(allMatches, deletingNight.id).length : 0}
+        predictionCount={deletingNight ? predictions.filter(p => p.game_night_id === deletingNight.id).length : 0}
+        jokerCount={deletingJokersQuery.data?.length ?? 0}
+        onClose={closeDelete}
+      />
     </div>
   );
 }
@@ -140,6 +167,8 @@ interface ActiveNightProps {
   ending: boolean;
   endError: string | null;
   onRecap: () => void;
+  /** Present when the user may delete this night. */
+  onDelete?: () => void;
 }
 
 /** "20:14", or "Fri 23/10/2026 20:14" when the night didn't start today. */
@@ -151,7 +180,7 @@ function formatSince(iso: string): string {
 
 function ActiveNight({
   night, nights, allMatches, players, teams, predictions, predictionsError, canEdit, currentUserId,
-  loadingMatches, matchesError, onEnd, ending, endError, onRecap,
+  loadingMatches, matchesError, onEnd, ending, endError, onRecap, onDelete,
 }: ActiveNightProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const closeConfirm = useCallback(() => setConfirmOpen(false), []);
@@ -316,6 +345,17 @@ function ActiveNight({
           <Moon className="h-4 w-4" />
           End night
         </Button>
+      )}
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex h-11 w-full items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wide text-red-600"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete this night
+        </button>
       )}
 
       <BottomSheet

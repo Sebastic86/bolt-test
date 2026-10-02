@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as nightService from '../services/nightService';
+import { matchKeys } from './matches';
 
 export const nightKeys = {
   all: ['nights'] as const,
@@ -74,4 +75,15 @@ export function useDeletePredictionMutation() {
 export function useJokerMutation() {
   const invalidate = useInvalidateNights();
   return useMutation({ mutationFn: nightService.spendJoker, onSuccess: invalidate });
+}
+
+export function useDeleteNightMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: nightService.deleteNight,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: nightKeys.all });
+      queryClient.invalidateQueries({ queryKey: matchKeys.all });
+    },
+  });
 }

@@ -139,3 +139,37 @@ export async function spendJoker(input: {
   if (error) fail('Error using joker', error);
   return data;
 }
+
+export interface DeleteNightResult {
+  deletedMatches: number;
+}
+
+/**
+ * Deletes a night (its predictions and jokers cascade). Its matches are kept and
+ * unlinked, unless deleteMatches is set — then they are deleted first.
+ * RLS: admins, or whoever started the night.
+ */
+export async function deleteNight(input: { nightId: string; deleteMatches: boolean }): Promise<DeleteNightResult> {
+  let deletedMatches = 0;
+  if (input.deleteMatches) {
+    const { data, error } = await supabase
+      .from('matches')
+      .delete()
+      .eq('game_night_id', input.nightId)
+      .select('id');
+    if (error) fail('Error deleting the night\'s matches', error);
+    deletedMatches = data?.length ?? 0;
+  }
+
+  const { data, error } = await supabase
+    .from('game_nights')
+    .delete()
+    .eq('id', input.nightId)
+    .select('id');
+  if (error) fail('Error deleting night', error);
+  // RLS filters a forbidden delete down to 0 rows instead of erroring.
+  if (!data || data.length === 0) {
+    throw new Error('Only an admin or the person who started this night can delete it.');
+  }
+  return { deletedMatches };
+}

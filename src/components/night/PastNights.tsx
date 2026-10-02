@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRight, Trophy } from 'lucide-react';
+import { ChevronRight, Trash2, Trophy } from 'lucide-react';
 import { GameNight, MatchHistoryItem, Player, Team } from '../../types';
 import { calculateNightSummary, getNightMatches, getNightNumber } from '../../utils/nightStats';
 import { formatNightTitle, formatRecapDate } from '../../utils/recapData';
@@ -11,9 +11,12 @@ interface PastNightsProps {
   players: Player[];
   teams: Team[];
   onOpen: (night: GameNight) => void;
+  /** Shows a delete button on nights the user may delete. */
+  onDelete?: (night: GameNight) => void;
+  canDelete?: (night: GameNight) => boolean;
 }
 
-const PastNights: React.FC<PastNightsProps> = ({ nights, allMatches, players, teams, onOpen }) => {
+const PastNights: React.FC<PastNightsProps> = ({ nights, allMatches, players, teams, onOpen, onDelete, canDelete }) => {
   const rows = useMemo(
     () => nights
       .filter(n => n.ended_at !== null)
@@ -39,11 +42,11 @@ const PastNights: React.FC<PastNightsProps> = ({ nights, allMatches, players, te
   return (
     <ul className="space-y-2">
       {rows.map(row => (
-        <li key={row.night.id}>
+        <li key={row.night.id} className="flex gap-2">
           <button
             type="button"
             onClick={() => onOpen(row.night)}
-            className="flex min-h-14 w-full items-center gap-3 border-2 border-(--color-ink) bg-white p-3 text-left"
+            className="flex min-h-14 min-w-0 flex-1 items-center gap-3 border-2 border-(--color-ink) bg-white p-3 text-left"
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black uppercase tracking-wide text-(--color-ink)">{row.title}</p>
@@ -59,6 +62,16 @@ const PastNights: React.FC<PastNightsProps> = ({ nights, allMatches, players, te
             </div>
             <ChevronRight className="h-5 w-5 flex-none text-(--color-ink)" />
           </button>
+          {onDelete && canDelete?.(row.night) && (
+            <button
+              type="button"
+              onClick={() => onDelete(row.night)}
+              className="flex w-12 flex-none items-center justify-center border-2 border-red-600 bg-white text-red-600"
+              aria-label={`Delete ${row.title}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </li>
       ))}
     </ul>
