@@ -21,7 +21,7 @@ createRoot(document.getElementById('root')!).render(
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+      {import.meta.env.DEV && import.meta.env.MODE !== 'mock' && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   </StrictMode>,
 );

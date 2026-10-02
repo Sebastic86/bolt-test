@@ -11,7 +11,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "dev:mock": "vite --mode mock",
+    "mock:snapshot": "node scripts/mock-snapshot.mjs",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
@@ -24,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.1.3",
     "@tanstack/react-query-devtools": "^5.102.8",
     "@testing-library/jest-dom": "^7.0.1",

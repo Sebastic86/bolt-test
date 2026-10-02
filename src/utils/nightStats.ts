@@ -42,6 +42,10 @@ export interface NightSummary {
   table: NightPlayerLine[];
   /** Top of the table — null until a scored match exists. */
   playerOfTheNight: NightPlayerLine | null;
+  /** Everyone level with the top on points, GD and GF (co-players of the night). */
+  playersOfTheNight: NightPlayerLine[];
+  /** "Alex" or "Alex & Bram" — null until someone has won. */
+  playerOfTheNightName: string | null;
   biggestWin: MatchHistoryItem | null;
   /** Penalty shoot-outs tonight. */
   penaltyCount: number;
@@ -71,6 +75,11 @@ export function calculateNightSummary(
     .filter(s => s.matchesPlayed > 0)
     .map(s => ({ ...s, wins: wins.get(s.playerId) ?? 0, losses: losses.get(s.playerId) ?? 0 }));
 
+  const top = table[0];
+  const tiedAtTop = top && top.points > 0
+    ? table.filter(l => l.points === top.points && l.goalDifference === top.goalDifference && l.goalsFor === top.goalsFor)
+    : [];
+
   let biggestWin: MatchHistoryItem | null = null;
   let biggestMargin = 0;
   for (const match of scored) {
@@ -86,6 +95,8 @@ export function calculateNightSummary(
     totalGoals: scored.reduce((sum, m) => sum + m.team1_score! + m.team2_score!, 0),
     table,
     playerOfTheNight: table.length > 0 && table[0].points > 0 ? table[0] : null,
+    playersOfTheNight: tiedAtTop,
+    playerOfTheNightName: tiedAtTop.length > 0 ? joinNames(tiedAtTop.map(l => l.playerName)) : null,
     biggestWin,
     penaltyCount: scored.filter(m => m.penalties_winner !== null && m.team1_score === m.team2_score).length,
   };
@@ -110,4 +121,9 @@ export function getNightPlayers(night: Pick<GameNight, 'player_ids'>, players: P
   const ids = new Set(night.player_ids ?? []);
   const tonight = players.filter(p => ids.has(p.id));
   return tonight.length > 0 ? tonight : players;
+}
+
+/** "Alex", "Alex & Bram", "Alex, Bram & Chris". */
+export function joinNames(names: string[]): string {
+  return names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
 }

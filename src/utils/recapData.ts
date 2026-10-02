@@ -42,6 +42,8 @@ export interface RecapData {
   title: string;
   subtitle: string;
   playerOfTheNight: RecapTableRow | null;
+  /** "Alex" or "Alex & Bram" when tied at the top. */
+  playerOfTheNightName: string | null;
   table: RecapTableRow[];
   biggestWin: RecapBiggestWin | null;
   predictionChampion: RecapPredictionChampion | null;
@@ -110,6 +112,7 @@ export function buildRecapData({ title, subtitle, matches, players, teams, predi
     title,
     subtitle,
     playerOfTheNight: potn ? table.find(r => r.playerId === potn.playerId) ?? null : null,
+    playerOfTheNightName: summary.playerOfTheNightName,
     table,
     biggestWin,
     predictionChampion,

@@ -101,7 +101,7 @@ export function drawRecapCard(ctx: RecapContext, data: RecapData): void {
   text(ctx, 'PLAYER OF THE NIGHT', PAD + 36, y + 54, { size: 28, color: GREEN_MID });
   const potn = data.playerOfTheNight;
   if (potn) {
-    text(ctx, upper(potn.name), PAD + 36, y + 118, { size: 60, color: INK, maxWidth: innerW - SHADOW - 72 });
+    text(ctx, upper(data.playerOfTheNightName ?? potn.name), PAD + 36, y + 118, { size: 60, color: INK, maxWidth: innerW - SHADOW - 72 });
     text(
       ctx,
       `${potn.wins}W  ${potn.losses}L  ·  ${potn.points} PTS  ·  GD ${potn.gd}`,

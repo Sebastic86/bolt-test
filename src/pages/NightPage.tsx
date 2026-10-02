@@ -179,7 +179,7 @@ function ActiveNight({
   // Evaluated on render; the page re-renders on every realtime match update anyway.
   const stale = isNightStale(night);
   const potn = summary.playerOfTheNight;
-  const potnPlayer = potn ? players.find(p => p.id === potn.playerId) ?? { id: potn.playerId, name: potn.playerName } : null;
+
   const unscored = nightMatches.filter(m => m.team1_score === null || m.team2_score === null).length;
 
   return (
@@ -223,11 +223,20 @@ function ActiveNight({
 
       {/* Player of the night */}
       <section>
-        <SectionTitle>Player of the night</SectionTitle>
+        <SectionTitle>{summary.playersOfTheNight.length > 1 ? 'Players of the night' : 'Player of the night'}</SectionTitle>
         <Card hard className="p-3">
-          {potn && potnPlayer ? (
+          {potn ? (
             <>
-              <PlayerBadge player={potnPlayer} size="md" className="max-w-full text-base uppercase tracking-wide" />
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {summary.playersOfTheNight.map(line => (
+                  <PlayerBadge
+                    key={line.playerId}
+                    player={players.find(p => p.id === line.playerId) ?? { id: line.playerId, name: line.playerName }}
+                    size="md"
+                    className="max-w-full text-base uppercase tracking-wide"
+                  />
+                ))}
+              </div>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
                 <Stat label="W-L" value={`${potn.wins}-${potn.losses}`} />
                 <Stat label="Pts" value={potn.points} highlight />

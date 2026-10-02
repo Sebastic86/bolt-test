@@ -91,7 +91,7 @@ const NightRecapSheet: React.FC<NightRecapSheetProps> = ({ isOpen, onClose, data
           <p className="text-xs font-black uppercase tracking-wide text-(--color-green-mid)">Player of the night</p>
           {potn ? (
             <>
-              <p className="truncate text-2xl font-black uppercase tracking-wide text-(--color-ink)">{potn.name}</p>
+              <p className="truncate text-2xl font-black uppercase tracking-wide text-(--color-ink)">{data.playerOfTheNightName ?? potn.name}</p>
               <p className="text-xs font-bold uppercase tracking-wide text-gray-500 tabular-nums">
                 {potn.wins}W {potn.losses}L · {potn.points} pts · GD {potn.gd}
               </p>

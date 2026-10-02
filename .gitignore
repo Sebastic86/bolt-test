@@ -43,3 +43,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# mock mode snapshot of real data (npm run mock:snapshot)
+src/mock/seed.local.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/e2e/screenshots/

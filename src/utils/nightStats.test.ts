@@ -90,3 +90,16 @@ describe('getNightPlayers', () => {
     expect(getNightPlayers({ player_ids: ['gone'] }, players)).toEqual(players);
   });
 });
+
+describe('players of the night', () => {
+  it('shares the title when the top is level on points, GD and GF', () => {
+    const summary = calculateNightSummary([makeMatch([ana, bob], [cas, dan], 5, 0)], players, teams);
+    expect(summary.playersOfTheNight.map(l => l.playerId).sort()).toEqual(['ana', 'bob']);
+    expect(summary.playerOfTheNightName).toMatch(/^(ana & bob|bob & ana)$/);
+  });
+
+  it('names a single winner when there is no tie', () => {
+    const summary = calculateNightSummary([makeMatch([ana], [bob, cas], 2, 0)], players, teams);
+    expect(summary.playerOfTheNightName).toBe('ana');
+  });
+});

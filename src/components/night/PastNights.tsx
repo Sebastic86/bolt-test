@@ -26,7 +26,7 @@ const PastNights: React.FC<PastNightsProps> = ({ nights, allMatches, players, te
           title: formatNightTitle(night.version, getNightNumber(nights, night.id)),
           date: formatRecapDate(night.started_at),
           matchCount: matches.length,
-          potn: summary.playerOfTheNight?.playerName ?? null,
+          potn: summary.playerOfTheNightName,
         };
       }),
     [nights, allMatches, players, teams]

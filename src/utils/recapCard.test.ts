@@ -25,6 +25,7 @@ const data: RecapData = {
   title: 'FC27 Night #3',
   subtitle: 'Sat 24/10/2026 · 20:14–23:40',
   playerOfTheNight: { playerId: 'bob', name: 'Bob', played: 3, wins: 2, losses: 1, points: 2, gd: '+7' },
+  playerOfTheNightName: 'Bob',
   table: [
     { playerId: 'bob', name: 'Bob', played: 3, wins: 2, losses: 1, points: 2, gd: '+7' },
     { playerId: 'ana', name: 'Ana', played: 3, wins: 2, losses: 1, points: 2, gd: '-3' },

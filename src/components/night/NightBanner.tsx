@@ -67,7 +67,7 @@ const NightBanner: React.FC<NightBannerProps> = ({ night, nightMatches, players,
         {potn ? (
           <span className="min-w-0 truncate">
             <span className="uppercase tracking-wide text-gray-300">Player of the night </span>
-            {potn.playerName} · {potn.points} pts
+            {summary.playerOfTheNightName} · {potn.points} pts
           </span>
         ) : (
           <span className="text-gray-300">No results yet tonight</span>
