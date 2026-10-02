@@ -1,7 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Share2 } from 'lucide-react';
 import { MatchHistoryItem, Player } from '../types';
 import { groupMatchesIntoLocalSessions } from '../utils/matchDisplay';
+import { buildRecapData, formatSessionSubtitle } from '../utils/recapData';
+import { useTeamsQuery } from '../queries/teams';
 import MatchList from './MatchList';
+import NightRecapSheet from './night/NightRecapSheet';
 import { LoadingState, ErrorState, Select } from './ui';
 
 interface GameSessionsProps {
@@ -25,7 +29,26 @@ const GameSessions: React.FC<GameSessionsProps> = ({ allMatches, players, loadin
   const sessions = useMemo(() => groupMatchesIntoLocalSessions(allMatches), [allMatches]);
   const [selectedDate, setSelectedDate] = useState<string>('');
 
+  const [recapOpen, setRecapOpen] = useState(false);
+  const closeRecap = useCallback(() => setRecapOpen(false), []);
+  // Cached query (AppLayout loads teams too) — only used for the standings' OVR totals.
+  const { data: teams } = useTeamsQuery();
+
   const selectedSession = sessions.find(s => s.date === selectedDate);
+
+  // Recap for any day, so sessions from before game nights existed can be shared too.
+  const recapData = useMemo(
+    () => (recapOpen && selectedSession
+      ? buildRecapData({
+          title: `Game night · ${selectedSession.displayDate}`,
+          subtitle: formatSessionSubtitle(selectedSession.matches),
+          matches: selectedSession.matches,
+          players,
+          teams: teams ?? [],
+        })
+      : null),
+    [recapOpen, selectedSession, players, teams]
+  );
 
   return (
     <div>
@@ -50,9 +73,19 @@ const GameSessions: React.FC<GameSessionsProps> = ({ allMatches, players, loadin
 
           {selectedSession && (
             <>
-              <h3 className="mb-2 text-xs font-black uppercase tracking-wide text-(--color-ink)">
-                Matches from {selectedSession.displayDate}
-              </h3>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="min-w-0 truncate text-xs font-black uppercase tracking-wide text-(--color-ink)">
+                  Matches from {selectedSession.displayDate}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setRecapOpen(true)}
+                  className="flex h-10 flex-none items-center gap-1.5 border-2 border-(--color-ink) bg-white px-3 text-xs font-bold uppercase tracking-wide text-(--color-ink)"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share recap
+                </button>
+              </div>
               <MatchList
                 key={selectedSession.date}
                 matches={selectedSession.matches}
@@ -68,6 +101,8 @@ const GameSessions: React.FC<GameSessionsProps> = ({ allMatches, players, loadin
           )}
         </>
       )}
+
+      <NightRecapSheet isOpen={recapOpen && recapData !== null} onClose={closeRecap} data={recapData} />
     </div>
   );
 };

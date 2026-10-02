@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  calculateNightSummary, getJokersRemaining, getMatchWinner, getNightMatches, getNightNumber, isNightStale,
+  calculateNightSummary, getJokersRemaining, getMatchWinner, getNightMatches, getNightNumber, getNightPlayers, isNightStale,
 } from './nightStats';
 import { makeMatch, makeNight, makePlayer, makeTeam } from '../test/fixtures';
 import { NightJoker } from '../types';
@@ -80,5 +80,13 @@ describe('getJokersRemaining', () => {
     expect(left.get('ana')).toBe(0);
     expect(left.get('bob')).toBe(0);
     expect(left.get('cas')).toBe(1);
+  });
+});
+
+describe('getNightPlayers', () => {
+  it('returns the night\'s players, or everyone when the list is empty or stale', () => {
+    expect(getNightPlayers({ player_ids: ['ana', 'cas'] }, players).map(p => p.id)).toEqual(['ana', 'cas']);
+    expect(getNightPlayers({ player_ids: [] }, players)).toEqual(players);
+    expect(getNightPlayers({ player_ids: ['gone'] }, players)).toEqual(players);
   });
 });

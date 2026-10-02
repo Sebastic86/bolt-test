@@ -37,10 +37,10 @@ export async function fetchNights(): Promise<GameNight[]> {
   return data ?? [];
 }
 
-export async function startNight(input: { version: string | null; jokersPerPlayer: number }): Promise<GameNight> {
+export async function startNight(input: { version: string | null; jokersPerPlayer: number; playerIds: string[] }): Promise<GameNight> {
   const { data, error } = await supabase
     .from('game_nights')
-    .insert({ version: input.version, jokers_per_player: input.jokersPerPlayer })
+    .insert({ version: input.version, jokers_per_player: input.jokersPerPlayer, player_ids: input.playerIds })
     .select()
     .single();
   if (error) fail('Error starting night', error);

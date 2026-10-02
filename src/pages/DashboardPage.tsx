@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ChevronRight, Settings } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Settings, Sparkles } from 'lucide-react';
 import { useAppLayoutContext } from '../components/AppLayout';
 import TeamCard from '../components/TeamCard';
 import MatchComparison from '../components/MatchComparison';
@@ -18,6 +18,11 @@ import EditTeamModal from '../components/EditTeamModal';
 import { LoadingState, ErrorState } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { getFilterWarning, getStatDifferences } from '../utils/matchDisplay';
+import NightBanner from '../components/night/NightBanner';
+import JokerSheet from '../components/night/JokerSheet';
+import PredictionPanel from '../components/night/PredictionPanel';
+import { useActiveNightQuery, useJokersQuery } from '../queries/nights';
+import { getJokersRemaining, getNightMatches, getNightPlayers } from '../utils/nightStats';
 
 export default function DashboardPage() {
   const {
@@ -25,11 +30,32 @@ export default function DashboardPage() {
     matchesToday, allMatches, loadingToday, loadingAll, errorToday, errorAll,
     match, matchError, isAnimating, pendingMatch, availableTeamsForEdit,
     filteredTeams, filterSettings, openSettings,
-    handleAnimationComplete, handleUpdateTeam,
+    handleAnimationComplete, handleUpdateTeam, maxOvrDiff, canWrite,
   } = useAppLayoutContext();
   const { user, isAdmin } = useAuth();
 
   const [editingSlot, setEditingSlot] = useState<0 | 1 | null>(null);
+  const [jokerOpen, setJokerOpen] = useState(false);
+  const closeJoker = useCallback(() => setJokerOpen(false), []);
+
+  // Game night. A failing query (e.g. migration not applied yet) hides
+  // every night feature rather than breaking the dashboard.
+  const activeNightQuery = useActiveNightQuery();
+  const night = activeNightQuery.data ?? null;
+  const nightMatches = useMemo(
+    () => (night ? getNightMatches(allMatches, night.id) : []),
+    [night, allMatches]
+  );
+  // Only tonight's players predict and hold jokers.
+  const nightPlayers = useMemo(() => (night ? getNightPlayers(night, players) : players), [night, players]);
+  const jokersQuery = useJokersQuery(night?.id);
+  const jokersLeft = useMemo(() => {
+    if (!night || !jokersQuery.data) return 0;
+    let total = 0;
+    getJokersRemaining(nightPlayers, jokersQuery.data, night.jokers_per_player).forEach(n => { total += n; });
+    return total;
+  }, [night, jokersQuery.data, nightPlayers]);
+  const showNightMatchup = !!night && !!match && !isAnimating;
 
   const initialLoading = teamsLoading || playersLoading;
   const initialError = teamsError || playersError;
@@ -61,6 +87,12 @@ export default function DashboardPage() {
 
       {!initialLoading && !initialError && teams.length > 0 && (
         <>
+          {activeNightQuery.isSuccess && (
+            <ErrorBoundary fallbackTitle="Error loading game night">
+              <NightBanner night={night} nightMatches={nightMatches} players={players} teams={teams} />
+            </ErrorBoundary>
+          )}
+
           {filterWarning && (
             <div role="status" className="flex items-center gap-2 border-2 border-yellow-400 bg-yellow-50 p-2.5">
               <AlertTriangle className="h-4 w-4 flex-none text-yellow-700" aria-hidden="true" />
@@ -90,9 +122,36 @@ export default function DashboardPage() {
                   VS
                 </div>
                 <div className="h-0.5 flex-1 bg-(--color-ink)" />
+                {showNightMatchup && (
+                  <button
+                    type="button"
+                    onClick={() => setJokerOpen(true)}
+                    disabled={!canWrite || !jokersQuery.isSuccess || jokersLeft === 0}
+                    className="flex h-10 flex-none items-center gap-1.5 border-2 border-(--color-ink) bg-(--color-ink) px-2.5 text-xs font-black uppercase tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`Use a joker (${jokersLeft} left tonight)`}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-(--color-green-bright)" aria-hidden="true" />
+                    Joker
+                    <span className="bg-(--color-green-bright) px-1.5 tabular-nums text-(--color-ink)">{jokersLeft}</span>
+                  </button>
+                )}
               </div>
               <TeamCard team={match[1]} differences={differences?.[1]} onEdit={isAdmin ? () => setEditingSlot(1) : undefined} />
               <MatchComparison team1={match[0]} team2={match[1]} />
+              {showNightMatchup && night && (
+                <ErrorBoundary fallbackTitle="Error loading predictions">
+                  <PredictionPanel
+                    night={night}
+                    players={nightPlayers}
+                    match={match}
+                    nightMatches={nightMatches}
+                    canWrite={canWrite}
+                  />
+                </ErrorBoundary>
+              )}
+              {jokersQuery.isError && showNightMatchup && (
+                <ErrorState message="Could not load jokers." />
+              )}
             </>
           ) : filterWarning ? null : (
             <ErrorState message={matchError ?? 'No matchup available yet — tap New Match to generate one.'} />
@@ -187,6 +246,20 @@ export default function DashboardPage() {
           if (editingSlot !== null) handleUpdateTeam(team, editingSlot);
         }}
       />
+
+      {night && match && jokersQuery.data && (
+        <JokerSheet
+          isOpen={jokerOpen}
+          onClose={closeJoker}
+          night={night}
+          jokers={jokersQuery.data}
+          players={nightPlayers}
+          match={match}
+          pool={availableTeamsForEdit}
+          maxOvrDiff={maxOvrDiff}
+          onSwap={(team, slot) => handleUpdateTeam(team, slot, { keepOpponent: true })}
+        />
+      )}
     </div>
   );
 }

@@ -101,3 +101,13 @@ export function getJokersRemaining(
   jokers.forEach(j => used.set(j.player_id, (used.get(j.player_id) ?? 0) + 1));
   return new Map(players.map(p => [p.id, Math.max(0, jokersPerPlayer - (used.get(p.id) ?? 0))]));
 }
+
+/**
+ * Players taking part in a night (game_nights.player_ids). Falls back to
+ * everyone when the night has no list, or none of the listed players exist.
+ */
+export function getNightPlayers(night: Pick<GameNight, 'player_ids'>, players: Player[]): Player[] {
+  const ids = new Set(night.player_ids ?? []);
+  const tonight = players.filter(p => ids.has(p.id));
+  return tonight.length > 0 ? tonight : players;
+}

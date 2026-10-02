@@ -7,7 +7,7 @@ import SettingsModal from './SettingsModal';
 import AddMatchModal from './AddMatchModal';
 import { useMatchesRealtimeSync } from '../hooks/useMatchesRealtimeSync';
 import { useSettings } from '../hooks/useSettings';
-import { useMatchGenerator } from '../hooks/useMatchGenerator';
+import { UpdateTeamOptions, useMatchGenerator } from '../hooks/useMatchGenerator';
 import { useTeamsQuery } from '../queries/teams';
 import { usePlayersQuery } from '../queries/players';
 import { useAllMatchesQuery, useMatchesTodayQuery } from '../queries/matches';
@@ -45,7 +45,11 @@ export interface AppLayoutContextValue {
   openSettings: () => void;
   handleGenerateNewMatch: (excludeTeamIds?: string[]) => void;
   handleAnimationComplete: () => void;
-  handleUpdateTeam: (team: Team, slot: 0 | 1) => void;
+  handleUpdateTeam: (team: Team, slot: 0 | 1, options?: UpdateTeamOptions) => void;
+  /** Max OVR difference allowed between the two sides (settings) — the joker draw respects it. */
+  maxOvrDiff: number;
+  /** Signed-in users with a profile — RLS only lets them write matches, picks and jokers. */
+  canWrite: boolean;
 }
 
 export function useAppLayoutContext() {
@@ -143,6 +147,8 @@ const AppLayout: React.FC = () => {
     handleGenerateNewMatch,
     handleAnimationComplete,
     handleUpdateTeam,
+    maxOvrDiff,
+    canWrite: isAdmin || isNormalUser,
   };
 
   return (

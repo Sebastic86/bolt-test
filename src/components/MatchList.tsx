@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, ChevronDown, Plus, RefreshCw, Save, Trash2, X } 
 import { MatchHistoryItem, Player } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { PlayerBadge } from './PlayerBadge';
-import { LoadingState, ErrorState, Select } from './ui';
+import { LoadingState, ErrorState, Select, useToast } from './ui';
 import { useAuth } from '../contexts/AuthContext';
 import {
   useAddPlayerToMatchMutation,
@@ -92,6 +92,8 @@ const MatchList: React.FC<MatchListProps> = ({
   const deleteMatch = useDeleteMatchMutation();
   const movePlayer = useMoveMatchPlayerMutation();
   const addPlayer = useAddPlayerToMatchMutation();
+  const { toast } = useToast();
+  const showError = (title: string) => toast({ title, variant: 'error' });
 
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [editingScoreMatchId, setEditingScoreMatchId] = useState<string | null>(null);
@@ -126,11 +128,11 @@ const MatchList: React.FC<MatchListProps> = ({
     const s1 = parseInt(score1Input, 10);
     const s2 = parseInt(score2Input, 10);
     if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) {
-      alert('Please enter valid non-negative scores.');
+      showError('Please enter valid non-negative scores.');
       return;
     }
     if (s1 === s2 && penaltiesWinner === null) {
-      alert('For a draw, please select which team won on penalties.');
+      showError('For a draw, please select which team won on penalties.');
       return;
     }
 
@@ -141,7 +143,7 @@ const MatchList: React.FC<MatchListProps> = ({
           setEditingScoreMatchId(null);
           setPenaltiesWinner(null);
         },
-        onError: () => alert('Failed to save score.'),
+        onError: () => showError('Failed to save score.'),
       }
     );
   };
@@ -150,7 +152,7 @@ const MatchList: React.FC<MatchListProps> = ({
     const label = `${teamLabel(match.team1_name, match.team1_version)} vs ${teamLabel(match.team2_name, match.team2_version)}`;
     if (!window.confirm(`Are you sure you want to delete the match: ${label}? This action cannot be undone.`)) return;
 
-    deleteMatch.mutate(match.id, { onError: () => alert('Failed to delete match.') });
+    deleteMatch.mutate(match.id, { onError: () => showError('Failed to delete match.') });
   };
 
   const handleEditPlayersClick = (matchId: string) => {
@@ -166,20 +168,20 @@ const MatchList: React.FC<MatchListProps> = ({
   const handleMovePlayer = (matchId: string, playerId: string, newTeamNumber: 1 | 2) => {
     movePlayer.mutate(
       { matchId, playerId, newTeamNumber },
-      { onError: () => alert('Failed to move player.') }
+      { onError: () => showError('Failed to move player.') }
     );
   };
 
   const handleAddPlayer = (match: MatchHistoryItem, teamNumber: 1 | 2) => {
     if (!selectedPlayerId) {
-      alert('Please select a player to add.');
+      showError('Please select a player to add.');
       return;
     }
     addPlayer.mutate(
       { matchId: match.id, playerId: selectedPlayerId, teamNumber },
       {
         onSuccess: () => setSelectedPlayerId(''),
-        onError: () => alert('Failed to add player to match.'),
+        onError: () => showError('Failed to add player to match.'),
       }
     );
   };

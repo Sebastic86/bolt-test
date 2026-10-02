@@ -63,6 +63,7 @@ export function makeNight(id: string, startedAt = '2026-10-24T18:00:00Z', endedA
     started_by: null,
     version: 'FC27',
     jokers_per_player: 1,
+    player_ids: [],
     created_at: startedAt,
   };
 }

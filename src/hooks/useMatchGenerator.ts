@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Team, MatchHistoryItem } from '../types';
 import { buildMatchupStats, getSmartMatch, getSmartOpponent } from '../utils/matchupAlgorithm';
 
+export interface UpdateTeamOptions {
+  /** Keep the other side as-is instead of re-validating it against the filters. */
+  keepOpponent?: boolean;
+}
+
 interface UseMatchGeneratorOptions {
   /** Teams passing the current rating/version/nation filters. */
   filteredTeams: Team[];
@@ -103,12 +108,24 @@ export function useMatchGenerator({
     setIsAnimating(false);
   }, [pendingMatch]);
 
-  /** Swap one side of the current matchup (used by the "edit team" flow). */
-  const handleUpdateTeam = useCallback((newTeam: Team, slot: 0 | 1) => {
+  /**
+   * Swap one side of the current matchup (used by the "edit team" and joker
+   * flows). `keepOpponent` skips re-validating the other side — the joker
+   * already drew a team that fits it, and after a rematch save the opponent
+   * counts as "played today" and would otherwise be replaced too.
+   */
+  const handleUpdateTeam = useCallback((newTeam: Team, slot: 0 | 1, options: UpdateTeamOptions = {}) => {
     if (!match) return;
 
     const otherSlot = slot === 0 ? 1 : 0;
     let newOpponent = match[otherSlot];
+
+    if (options.keepOpponent && newOpponent.id !== newTeam.id) {
+      const updated: [Team, Team] = [...match];
+      updated[slot] = newTeam;
+      setMatch(updated);
+      return;
+    }
 
     const leagueOk = newTeam.league === 'Nation'
       ? newOpponent.league === 'Nation'

@@ -14,6 +14,8 @@ export function useActiveNightQuery() {
   return useQuery({
     queryKey: nightKeys.active(),
     queryFn: nightService.fetchActiveNight,
+    // Fail fast if the match_nights migration is missing instead of spinning through retries.
+    retry: 1,
   });
 }
 
@@ -22,6 +24,7 @@ export function useNightsQuery() {
   return useQuery({
     queryKey: nightKeys.list(),
     queryFn: nightService.fetchNights,
+    retry: 1,
   });
 }
 

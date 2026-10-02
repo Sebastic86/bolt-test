@@ -121,6 +121,8 @@ export interface GameNight {
   /** Game version selected when the night started (e.g. 'FC27') — used for the recap title. */
   version: string | null;
   jokers_per_player: number;
+  /** Players taking part tonight (players.id). Empty = everyone (see getNightPlayers). */
+  player_ids: string[];
   created_at: string;
 }
 

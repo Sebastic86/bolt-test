@@ -25,9 +25,13 @@ CREATE TABLE IF NOT EXISTS public.game_nights (
   started_by uuid REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
   version text,
   jokers_per_player smallint NOT NULL DEFAULT 1 CHECK (jokers_per_player BETWEEN 0 AND 5),
+  -- Who is playing tonight (players.id). Empty = everyone. Predictions reveal and jokers apply only to these players.
+  player_ids uuid[] NOT NULL DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT now(),
   CHECK (ended_at IS NULL OR ended_at >= started_at)
 );
+
+ALTER TABLE public.game_nights ADD COLUMN IF NOT EXISTS player_ids uuid[] NOT NULL DEFAULT '{}';
 
 CREATE UNIQUE INDEX IF NOT EXISTS game_nights_one_active_idx
   ON public.game_nights ((true)) WHERE ended_at IS NULL;
