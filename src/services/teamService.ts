@@ -2,14 +2,12 @@ import { supabase } from '../lib/supabaseClient';
 import { Team } from '../types';
 
 /**
- * Team Service
- *
- * Provides CRUD operations for teams
+ * Team Service — CRUD operations for the `teams` table. This is the data
+ * layer's only direct Supabase access point for teams; components go
+ * through `src/queries/teams.ts` instead of calling this (or Supabase)
+ * directly.
  */
 
-/**
- * Fetch all teams from database
- */
 export async function fetchAllTeams(): Promise<Team[]> {
   const { data, error } = await supabase
     .from('teams')
@@ -24,9 +22,6 @@ export async function fetchAllTeams(): Promise<Team[]> {
   return data || [];
 }
 
-/**
- * Fetch a single team by ID
- */
 export async function fetchTeamById(id: string): Promise<Team | null> {
   const { data, error } = await supabase
     .from('teams')
@@ -42,9 +37,6 @@ export async function fetchTeamById(id: string): Promise<Team | null> {
   return data;
 }
 
-/**
- * Create a new team
- */
 export async function createTeam(team: Omit<Team, 'id'>): Promise<Team> {
   const { data, error } = await supabase
     .from('teams')
@@ -60,9 +52,6 @@ export async function createTeam(team: Omit<Team, 'id'>): Promise<Team> {
   return data;
 }
 
-/**
- * Update an existing team
- */
 export async function updateTeam(id: string, updates: Partial<Team>): Promise<Team> {
   const { data, error } = await supabase
     .from('teams')
@@ -79,9 +68,6 @@ export async function updateTeam(id: string, updates: Partial<Team>): Promise<Te
   return data;
 }
 
-/**
- * Delete a team
- */
 export async function deleteTeam(id: string): Promise<void> {
   const { error } = await supabase
     .from('teams')
@@ -94,9 +80,6 @@ export async function deleteTeam(id: string): Promise<void> {
   }
 }
 
-/**
- * Search teams by name or league
- */
 export async function searchTeams(
   query: string,
   filterBy: 'name' | 'league' | 'all' = 'all'
@@ -107,19 +90,16 @@ export async function searchTeams(
     .order('name');
 
   if (query.trim() === '') {
-    // Return all teams if query is empty
     const { data, error } = await queryBuilder;
     if (error) throw new Error(error.message);
     return data || [];
   }
 
-  // Apply filter based on filterBy parameter
   if (filterBy === 'name') {
     queryBuilder = queryBuilder.ilike('name', `%${query}%`);
   } else if (filterBy === 'league') {
     queryBuilder = queryBuilder.ilike('league', `%${query}%`);
   } else {
-    // Search in both name and league
     queryBuilder = queryBuilder.or(`name.ilike.%${query}%,league.ilike.%${query}%`);
   }
 

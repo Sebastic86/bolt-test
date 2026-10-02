@@ -1,10 +1,27 @@
 @import 'tailwindcss';
 
+/*
+  Design tokens for the approved "Scoreboard Mono — Turf Green" direction:
+  stark black/white base, sharp corners, 2px black borders, hard offset
+  shadows (colored green instead of the classic black), two greens doing
+  the work a single accent used to.
+*/
 @theme {
-  --color-brand-dark: #328e6e;
-  --color-brand-medium: #67ae6e;
-  --color-brand-light: #90c67c;
-  --color-brand-lighter: #e1eebc;
+  --color-ink: #111111;
+  --color-green-bright: #22c55e;
+  --color-green-deep: #14532d;
+  --color-green-mid: #16a34a;
+
+  /* Flatten the card/button radius scale to 0 so rounded-sm/md/lg/xl
+     resolve sharp-cornered from this one token change, rather than hunting
+     every call site as components get rebuilt. Deliberately NOT touching
+     --radius-full: pills and circles (loading spinners, the settings
+     switch's thumb) still need to be round — only card/button corners go
+     sharp in this design. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
 @layer base {
@@ -17,31 +34,67 @@
   }
 }
 
-/* Match Reveal Animation */
-@keyframes slot-land {
-  0% { transform: scale(0.85); opacity: 0.6; }
-  50% { transform: scale(1.08); }
-  100% { transform: scale(1); opacity: 1; }
+@layer utilities {
+  /* Signature hard offset shadow for hero cards (team cards, the compare
+     panel) — deliberately green, not black. */
+  .shadow-hard {
+    box-shadow: 4px 4px 0 0 var(--color-green-deep);
+  }
 }
 
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 15px rgba(50, 142, 110, 0.25); }
-  50% { box-shadow: 0 0 35px rgba(50, 142, 110, 0.55); }
+/* Bottom-sheet slide-up entrance (used by the BottomSheet primitive). */
+@keyframes sheet-up {
+  from { transform: translateY(20px); opacity: 0.5; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.25s ease-out;
 }
 
-.slot-land-animation {
-  animation: slot-land 0.5s ease-out forwards;
-}
-
-.glow-pulse-animation {
-  animation: glow-pulse 1.5s ease-in-out 2;
-}
-
-.slot-blur {
-  filter: blur(1px);
-}
-
-/* Bottom Navigation safe area */
+/* Bottom navigation safe area (notch/home-indicator devices) */
 .bottom-nav {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Match reveal "slot machine" cycling + landing pulse (MatchRevealAnimation). */
+@keyframes reveal-land {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  55% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-reveal-land {
+  animation: reveal-land 0.45s ease-out;
+}
+
+@keyframes reveal-glow {
+  0%, 100% { box-shadow: 4px 4px 0 0 var(--color-green-deep); }
+  50% { box-shadow: 4px 4px 0 0 var(--color-green-deep), 0 0 24px rgba(34, 197, 94, 0.6); }
+}
+.animate-reveal-glow {
+  animation: reveal-glow 0.7s ease-in-out 2;
+}
+
+/* MatchComparison stat bars growing out from the center label. The left
+   (team 1) bar is right-aligned so it grows leftward from its right edge. */
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.animate-bar-grow-left {
+  transform-origin: right center;
+  animation: bar-grow 0.7s ease-out both;
+}
+.animate-bar-grow-right {
+  transform-origin: left center;
+  animation: bar-grow 0.7s ease-out both;
+}
+
+/* Respect the OS "reduce motion" setting for the matchup animations. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-bar-grow-left,
+  .animate-bar-grow-right,
+  .animate-reveal-land,
+  .animate-reveal-glow {
+    animation: none;
+  }
 }

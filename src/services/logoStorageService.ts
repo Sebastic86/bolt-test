@@ -1,257 +1,199 @@
-import { supabase } from '../lib/supabaseClient';
+import { Team } from '../types';
+import { updateTeam } from './teamService';
+import { uploadTeamLogoBlob } from './teamUploadService';
+import { getBundledLogoUrl } from './logoService';
 
 /**
- * Logo Storage Service
+ * Logo Storage Service (admin tooling) — copies team crests into the
+ * `team-logos` Supabase Storage bucket and points teams.resolvedLogoUrl at
+ * the stored copy, so crests no longer depend on third-party hosts.
  *
- * Downloads logo images from external URLs and uploads them to Supabase Storage.
- * Updates team records with new Supabase Storage URLs.
+ * Sources, in order of preference:
+ *   1. teams.resolvedLogoUrl when it's an external URL (API-Sports / TheSportsDB)
+ *   2. teams.logoUrl when it's a manually-entered http(s) URL
+ *   3. the legacy bundled crest file named by teams.logoUrl (src/assets/logos)
+ *
+ * External images are fetched directly first; if the host blocks CORS, the
+ * download is retried through a binary-capable CORS proxy (configurable via
+ * VITE_CORS_PROXY_URL_BINARY, defaulting to AllOrigins as the old app did).
+ * Only image bytes go through the proxy — never API keys.
+ *
+ * Storage writes are admin-only per RLS, so this is only used from the
+ * admin Dev Tools panel.
  */
 
-const STORAGE_BUCKET = 'team-logos';
+const CORS_PROXY_URL_BINARY: string =
+  import.meta.env.VITE_CORS_PROXY_URL_BINARY || 'https://api.allorigins.win/raw?url=';
 
-interface UploadResult {
+export type MigrationTeam = Pick<Team, 'id' | 'name' | 'logoUrl' | 'resolvedLogoUrl'>;
+
+export type LogoSourceKind = 'resolved' | 'external' | 'bundled' | 'storage';
+
+export interface LogoSource {
+  kind: LogoSourceKind;
+  url: string;
+}
+
+export interface MigrationResult {
   success: boolean;
   url?: string;
+  source?: LogoSourceKind;
   error?: string;
 }
 
-/**
- * Download an image from a URL as a Blob
- */
-async function downloadImageAsBlob(url: string): Promise<Blob> {
-  console.log(`[logoStorageService] Downloading image from: ${url.substring(0, 60)}...`);
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
-  }
-
-  const blob = await response.blob();
-
-  // Verify it's an image
-  if (!blob.type.startsWith('image/')) {
-    throw new Error(`Downloaded content is not an image: ${blob.type}`);
-  }
-
-  console.log(`[logoStorageService] Downloaded successfully: ${blob.type}, ${Math.round(blob.size / 1024)}KB`);
-  return blob;
-}
-
-/**
- * Get file extension from MIME type
- */
-function getExtensionFromMimeType(mimeType: string): string {
-  const mimeMap: { [key: string]: string } = {
-    'image/png': 'png',
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/svg+xml': 'svg',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-  };
-
-  return mimeMap[mimeType] || 'png';
-}
-
-/**
- * Upload image blob to Supabase Storage
- */
-async function uploadImageToStorage(
-  teamId: string,
-  imageBlob: Blob,
-  contentType: string
-): Promise<string> {
-  const extension = getExtensionFromMimeType(contentType);
-  const fileName = `${teamId}.${extension}`;
-
-  console.log(`[logoStorageService] Uploading ${fileName} (${Math.round(imageBlob.size / 1024)}KB)`);
-
-  // Upload to Supabase Storage
-  const { data, error } = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(fileName, imageBlob, {
-      contentType,
-      upsert: true, // Overwrite if exists
-    });
-
-  if (error) {
-    throw new Error(`Failed to upload to storage: ${error.message}`);
-  }
-
-  // Get public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from(STORAGE_BUCKET)
-    .getPublicUrl(fileName);
-
-  return publicUrl;
-}
-
-/**
- * Update team's resolvedLogoUrl in database
- */
-async function updateTeamLogoUrl(teamId: string, logoUrl: string): Promise<void> {
-  const { error } = await supabase
-    .from('teams')
-    .update({ resolvedLogoUrl: logoUrl })
-    .eq('id', teamId);
-
-  if (error) {
-    throw new Error(`Failed to update team logo URL: ${error.message}`);
-  }
-}
-
-/**
- * Main function: Download logo from URL and upload to Supabase Storage
- *
- * @param teamId - Team UUID
- * @param teamName - Team name (for logging)
- * @param sourceUrl - External URL to download from (e.g., TheSportsDB)
- * @param forceUpdate - If true, re-upload even if already in storage
- * @returns Upload result with success status and new URL
- */
-export async function migrateLogoToStorage(
-  teamId: string,
-  teamName: string,
-  sourceUrl: string,
-  forceUpdate = false
-): Promise<UploadResult> {
-  try {
-    console.log(`[logoStorageService] Migrating logo for ${teamName}...`);
-
-    // Check if already in Supabase Storage
-    if (!forceUpdate && isLogoInStorage(sourceUrl)) {
-      console.log(`[logoStorageService] Already in Supabase Storage, skipping: ${teamName}`);
-      return { success: true, url: sourceUrl };
-    }
-
-    // Step 1: Download image from source URL
-    const imageBlob = await downloadImageAsBlob(sourceUrl);
-    console.log(`[logoStorageService] Downloaded ${teamName} logo: ${imageBlob.type}, ${Math.round(imageBlob.size / 1024)}KB`);
-
-    // Step 2: Upload to Supabase Storage
-    const publicUrl = await uploadImageToStorage(teamId, imageBlob, imageBlob.type);
-    console.log(`[logoStorageService] Uploaded to storage: ${publicUrl}`);
-
-    // Step 3: Update database with new URL
-    await updateTeamLogoUrl(teamId, publicUrl);
-    console.log(`[logoStorageService] ✅ Successfully migrated ${teamName}`);
-
-    return { success: true, url: publicUrl };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[logoStorageService] ❌ Failed to migrate ${teamName}:`, errorMessage);
-    return { success: false, error: errorMessage };
-  }
-}
-
-/**
- * Check if a team's logo is already in Supabase Storage
- */
-export function isLogoInStorage(resolvedLogoUrl?: string | null): boolean {
-  if (!resolvedLogoUrl) return false;
-  return resolvedLogoUrl.includes('supabase.co/storage') ||
-         resolvedLogoUrl.includes('.supabase.co/storage') ||
-         resolvedLogoUrl.includes('/storage/v1/object/public/team-logos/');
-}
-
-/**
- * Get migration status for a specific team
- */
-export async function getTeamMigrationStatus(teamId: string): Promise<{
-  teamId: string;
-  teamName: string;
-  resolvedLogoUrl: string | null;
-  isInStorage: boolean;
-}> {
-  const { data, error } = await supabase
-    .from('teams')
-    .select('id, name, resolvedLogoUrl')
-    .eq('id', teamId)
-    .single();
-
-  if (error || !data) {
-    throw new Error(`Failed to fetch team: ${error?.message || 'Team not found'}`);
-  }
-
-  return {
-    teamId: data.id,
-    teamName: data.name,
-    resolvedLogoUrl: data.resolvedLogoUrl,
-    isInStorage: isLogoInStorage(data.resolvedLogoUrl),
-  };
-}
-
-/**
- * Delete logo from Supabase Storage
- * Useful for cleanup or re-migration
- */
-export async function deleteLogoFromStorage(teamId: string): Promise<void> {
-  // Try common extensions
-  const extensions = ['png', 'jpg', 'svg', 'webp'];
-
-  for (const ext of extensions) {
-    const fileName = `${teamId}.${ext}`;
-    const { error } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .remove([fileName]);
-
-    if (!error) {
-      console.log(`[logoStorageService] Deleted ${fileName} from storage`);
-    }
-  }
-}
-
-/**
- * Get all teams that need migration (have resolvedLogoUrl but not in storage)
- */
-export async function getTeamsNeedingMigration(): Promise<Array<{
-  id: string;
-  name: string;
-  resolvedLogoUrl: string;
-}>> {
-  const { data, error } = await supabase
-    .from('teams')
-    .select('id, name, resolvedLogoUrl')
-    .not('resolvedLogoUrl', 'is', null)
-    .not('resolvedLogoUrl', 'like', '%supabase.co/storage%')
-    .not('resolvedLogoUrl', 'like', '%/storage/v1/object/public/team-logos/%');
-
-  if (error) {
-    throw new Error(`Failed to fetch teams: ${error.message}`);
-  }
-
-  // Filter out any remaining Supabase storage URLs (for custom domains)
-  return (data || []).filter(team => !isLogoInStorage(team.resolvedLogoUrl));
-}
-
-/**
- * Get storage statistics
- */
-export async function getStorageStats(): Promise<{
+export interface StorageStats {
   totalTeams: number;
   teamsInStorage: number;
   teamsNeedingMigration: number;
+  /** Subset of teamsNeedingMigration whose only source is a bundled crest file. */
+  teamsWithBundledOnly: number;
   teamsWithoutLogos: number;
-}> {
-  // Get all teams
-  const { data: allTeams, error: allError } = await supabase
-    .from('teams')
-    .select('id, resolvedLogoUrl');
+}
 
-  if (allError || !allTeams) {
-    throw new Error(`Failed to fetch teams: ${allError?.message || 'Unknown error'}`);
+const isHttpUrl = (url?: string | null): url is string =>
+  !!url && (url.startsWith('http://') || url.startsWith('https://'));
+
+export function isLogoInStorage(url?: string | null): boolean {
+  if (!url) return false;
+  return url.includes('/storage/v1/object/public/team-logos/');
+}
+
+/** All usable sources for a team, best first. */
+export function getLogoSources(team: MigrationTeam): LogoSource[] {
+  const sources: LogoSource[] = [];
+  if (isHttpUrl(team.resolvedLogoUrl) && !isLogoInStorage(team.resolvedLogoUrl)) {
+    sources.push({ kind: 'resolved', url: team.resolvedLogoUrl });
+  }
+  if (isHttpUrl(team.logoUrl) && !isLogoInStorage(team.logoUrl)) {
+    sources.push({ kind: 'external', url: team.logoUrl });
+  }
+  const bundled = getBundledLogoUrl(team.logoUrl);
+  if (bundled) sources.push({ kind: 'bundled', url: bundled });
+  // Last resort for forced re-migration: re-upload the copy already in storage.
+  if (isLogoInStorage(team.resolvedLogoUrl)) {
+    sources.push({ kind: 'storage', url: team.resolvedLogoUrl! });
+  }
+  return sources;
+}
+
+export function needsMigration(team: MigrationTeam): boolean {
+  return !isLogoInStorage(team.resolvedLogoUrl) && getLogoSources(team).length > 0;
+}
+
+export function getStorageStats(teams: MigrationTeam[]): StorageStats {
+  let teamsInStorage = 0;
+  let teamsNeedingMigration = 0;
+  let teamsWithBundledOnly = 0;
+  let teamsWithoutLogos = 0;
+
+  for (const team of teams) {
+    if (isLogoInStorage(team.resolvedLogoUrl)) {
+      teamsInStorage++;
+      continue;
+    }
+    const sources = getLogoSources(team);
+    if (sources.length === 0) {
+      teamsWithoutLogos++;
+    } else {
+      teamsNeedingMigration++;
+      if (sources.every(s => s.kind === 'bundled')) teamsWithBundledOnly++;
+    }
   }
 
-  const totalTeams = allTeams.length;
-  const teamsInStorage = allTeams.filter(t => isLogoInStorage(t.resolvedLogoUrl)).length;
-  const teamsWithoutLogos = allTeams.filter(t => !t.resolvedLogoUrl).length;
-  const teamsNeedingMigration = totalTeams - teamsInStorage - teamsWithoutLogos;
+  return { totalTeams: teams.length, teamsInStorage, teamsNeedingMigration, teamsWithBundledOnly, teamsWithoutLogos };
+}
 
-  return {
-    totalTeams,
-    teamsInStorage,
-    teamsNeedingMigration,
-    teamsWithoutLogos,
-  };
+// --- Downloading -----------------------------------------------------------
+
+const EXTENSION_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+};
+
+/** Content-type from magic bytes (proxies often answer application/octet-stream). */
+async function sniffImageType(blob: Blob, url: string): Promise<string | null> {
+  const bytes = new Uint8Array(await blob.slice(0, 256).arrayBuffer());
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) return 'image/webp';
+  const head = new TextDecoder().decode(bytes).trimStart().toLowerCase();
+  if (head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg'))) return 'image/svg+xml';
+
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+  return (ext && blob.type.startsWith('image/') && EXTENSION_TO_MIME[ext]) || null;
+}
+
+async function fetchImage(url: string, signal?: AbortSignal): Promise<{ blob: Blob; contentType: string }> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
+
+  const blob = await response.blob();
+  const declared = blob.type.split(';')[0].trim();
+  const contentType = declared.startsWith('image/') ? declared : await sniffImageType(blob, url);
+  if (!contentType) throw new Error(`Not an image (${declared || 'unknown type'})`);
+  if (contentType === 'image/jpg') return { blob, contentType: 'image/jpeg' };
+  return { blob, contentType };
+}
+
+/**
+ * Downloads an image. Same-origin (bundled) and Supabase URLs are fetched
+ * directly; other hosts are tried directly first, then through the CORS proxy.
+ */
+async function downloadImage(source: LogoSource, signal?: AbortSignal): Promise<{ blob: Blob; contentType: string; viaProxy: boolean }> {
+  if (source.kind === 'bundled' || source.kind === 'storage') {
+    return { ...(await fetchImage(source.url, signal)), viaProxy: false };
+  }
+  try {
+    return { ...(await fetchImage(source.url, signal)), viaProxy: false };
+  } catch (directError) {
+    if (signal?.aborted) throw directError;
+    try {
+      return { ...(await fetchImage(`${CORS_PROXY_URL_BINARY}${encodeURIComponent(source.url)}`, signal)), viaProxy: true };
+    } catch (proxyError) {
+      const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+      throw new Error(`direct: ${msg(directError)}; proxy: ${msg(proxyError)}`);
+    }
+  }
+}
+
+// --- Migration -------------------------------------------------------------
+
+/**
+ * Copies a team's crest into storage and saves the new URL to
+ * teams.resolvedLogoUrl. Tries each available source until one works.
+ * Without `force`, a team already in storage is left untouched.
+ */
+export async function migrateTeamLogoToStorage(
+  team: MigrationTeam,
+  { force = false, signal }: { force?: boolean; signal?: AbortSignal } = {}
+): Promise<MigrationResult & { viaProxy?: boolean; skipped?: boolean }> {
+  if (!force && isLogoInStorage(team.resolvedLogoUrl)) {
+    return { success: true, skipped: true, url: team.resolvedLogoUrl!, source: 'storage' };
+  }
+
+  const sources = getLogoSources(team);
+  if (sources.length === 0) return { success: false, error: 'No logo source (no resolved URL or bundled crest)' };
+
+  const errors: string[] = [];
+  for (const source of sources) {
+    if (signal?.aborted) return { success: false, error: 'Cancelled' };
+    try {
+      const { blob, contentType, viaProxy } = await downloadImage(source, signal);
+      const publicUrl = await uploadTeamLogoBlob(team.id, blob, contentType);
+      // Version param busts browser/CDN caches when a re-migration overwrites the same path.
+      const url = `${publicUrl}?v=${Date.now()}`;
+      await updateTeam(team.id, { resolvedLogoUrl: url });
+      return { success: true, url, source: source.kind, viaProxy };
+    } catch (error) {
+      if (signal?.aborted) return { success: false, error: 'Cancelled' };
+      errors.push(`${source.kind}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return { success: false, error: errors.join(' | ') };
 }

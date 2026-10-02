@@ -1,9 +1,8 @@
 import { PlayerStanding, MatchHistoryItem, Player, Team } from '../types';
 
 /**
- * Calculate player standings from a set of matches.
- * This is a shared utility used by App.tsx (today + overall standings)
- * and PlayerStandings.tsx (version-filtered standings).
+ * Calculate player standings from a set of matches. Shared by the today/
+ * overall standings views and any version-filtered standings.
  */
 export function calculateStandings(
   matches: MatchHistoryItem[],
@@ -85,4 +84,21 @@ export function calculateStandings(
   });
 
   return standingsArray;
+}
+
+/**
+ * Split standings into players who have played (ranked, in standings
+ * order) and players with no matches yet. The old app listed every player
+ * in the standings table, including those on 0 matches; the overall view
+ * keeps them visible but unranked at the bottom.
+ */
+export function partitionStandingsByPlayed(standings: PlayerStanding[]): {
+  played: PlayerStanding[];
+  unplayed: PlayerStanding[];
+} {
+  const played: PlayerStanding[] = [];
+  const unplayed: PlayerStanding[] = [];
+  standings.forEach(s => (s.matchesPlayed > 0 ? played : unplayed).push(s));
+  unplayed.sort((a, b) => a.playerName.localeCompare(b.playerName));
+  return { played, unplayed };
 }
