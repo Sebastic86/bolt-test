@@ -13,6 +13,7 @@ import { MockQuery } from './query';
 import { currentUser, currentUserId, hasProfile, isAdmin } from './session';
 import { MOCK_USERS, setMockRole } from './users';
 import { mountMockPanel } from './panel';
+import sofifaTeamsPage from '../admin-tools/__fixtures__/sofifa-teams-page.html?raw';
 
 type AuthCallback = (event: string, session: unknown) => void;
 type ChangeCallback = (payload: unknown) => void;
@@ -146,10 +147,14 @@ export function createClient() {
     },
 
     functions: {
-      async invoke(name: string, options: { body?: { teamId?: string } } = {}) {
+      async invoke(name: string, options: { body?: { teamId?: string; offset?: number } } = {}) {
         if (name === 'api-sports-logo') {
           const team = options.body?.teamId ? getTable('teams').find(t => t.id === options.body?.teamId) : null;
           return { data: { logoUrl: (team?.resolvedLogoUrl as string | null) ?? null }, error: null };
+        }
+        if (name === 'sofifa-teams') {
+          if (!isAdmin()) return { data: null, error: new Error('Forbidden') };
+          return { data: { status: 200, html: options.body?.offset ? '' : sofifaTeamsPage }, error: null };
         }
         return { data: null, error: new Error(`mock: Edge Function "${name}" not found`) };
       },
