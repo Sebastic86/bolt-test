@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_VERSIONS, filterMatchesByVersion, getAvailableVersions } from './versionFilter';
+import {
+  ALL_VERSIONS, compareVersions, filterMatchesByVersion, getAvailableVersions, getLatestVersion, resolveSelectedVersion,
+} from './versionFilter';
 import { MatchHistoryItem, Team } from '../types';
 
 function makeTeam(id: string, version: string): Team {
@@ -53,5 +55,26 @@ describe('filterMatchesByVersion', () => {
 
   it('returns nothing for an unknown version', () => {
     expect(filterMatchesByVersion(matches, 'FC99')).toEqual([]);
+  });
+});
+
+describe('current season', () => {
+  it('orders versions by number, not alphabetically', () => {
+    expect(['FC27', 'FC9', 'FC26'].sort(compareVersions)).toEqual(['FC9', 'FC26', 'FC27']);
+  });
+
+  it('picks the newest version as the current season', () => {
+    expect(getLatestVersion(['FC25', 'FC27', 'FC26'])).toBe('FC27');
+    expect(getLatestVersion([])).toBeNull();
+  });
+
+  it('follows the newest version unless an existing one was chosen', () => {
+    const versions = ['FC25', 'FC26', 'FC27'];
+    expect(resolveSelectedVersion(null, versions)).toBe('FC27');
+    expect(resolveSelectedVersion('FC26', versions)).toBe('FC26');
+    expect(resolveSelectedVersion('FC24', versions)).toBe('FC27');
+    // Teams not loaded yet: keep the saved choice.
+    expect(resolveSelectedVersion('FC26', [])).toBe('FC26');
+    expect(resolveSelectedVersion(null, [])).toBeNull();
   });
 });

@@ -35,7 +35,7 @@ test('delete a past night together with its matches', async ({ page }) => {
   await page.getByRole('dialog').getByRole('button', { name: /end night/i }).click();
   await page.getByRole('dialog', { name: /recap/i }).getByRole('button', { name: /close/i }).first().click();
 
-  await page.getByRole('button', { name: /delete fc26 · night #1/i }).click();
+  await page.getByRole('button', { name: /delete fc27 · night #1/i }).click();
   const sheet = page.getByRole('dialog', { name: /delete night/i });
   await expect(sheet.getByText(/also delete the 1 match/i)).toBeVisible();
   await sheet.getByRole('checkbox').check();
