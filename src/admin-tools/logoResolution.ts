@@ -2,6 +2,9 @@ import { Team } from '../types';
 import { fetchAllTeams, searchTeams, updateTeam } from '../services/teamService';
 import { fetchTeamLogoFromApiSports, resolveTeamLogoFromApiSports } from '../services/apiSportsService';
 import { fetchTeamLogoByIdFromTheSportsDb, fetchTeamLogoByNameFromTheSportsDb } from '../services/theSportsDbService';
+import { fetchTeamLogoFromWikipedia } from '../services/wikipediaLogoService';
+import { RateLimitError } from '../services/rateLimitError';
+import { buildWikipediaSearch } from '../utils/wikipediaCrest';
 import { clearLogoCache, getBundledLogoUrl } from '../services/logoService';
 import { isLogoInStorage } from '../services/logoStorageService';
 import { fetchMatchTeamIds } from '../services/matchService';
@@ -13,8 +16,9 @@ import { RunStats, ToolContext, delay, emptyStats, errorMessage, summarize } fro
 export interface ResolveAllOptions extends LogoCandidateFilter {
   /** Re-resolve teams that already have an external resolvedLogoUrl. */
   force?: boolean;
-  /** Use API-Sports (via the api-sports-logo Edge Function; 100 requests/day). */
+  /** Use API-Sports as the last resort (via the api-sports-logo Edge Function; 100 requests/day). */
   useApiSports?: boolean;
+  /** Pause between teams — Wikipedia throttles bursts, ~1 request/s is safe. */
   delayMs?: number;
   /** Hard cap on API-Sports calls per run (free-tier quota is 100/day). */
   maxApiSportsCalls?: number;
@@ -22,12 +26,51 @@ export interface ResolveAllOptions extends LogoCandidateFilter {
   maxConsecutiveApiMisses?: number;
 }
 
+/** TheSportsDB's free key allows ~30 requests/min and a name lookup can take 2 — keep calls 4s apart. */
+const THESPORTSDB_SPACING_MS = 4000;
+
+/** A free source that can be rate limited: waits once when it answers 429, then is skipped for the run. */
+interface ThrottledSource {
+  name: string;
+  enabled: boolean;
+  /** Minimum time between calls. */
+  spacingMs: number;
+  lastCallAt: number;
+}
+
+async function callSource<T>(ctx: ToolContext, source: ThrottledSource, lookup: () => Promise<T | null>): Promise<T | null> {
+  for (let attempt = 0; source.enabled && !ctx.signal.aborted; attempt++) {
+    const wait = source.lastCallAt + source.spacingMs - Date.now();
+    if (wait > 0) await delay(wait, ctx.signal);
+    if (ctx.signal.aborted) return null;
+    source.lastCallAt = Date.now();
+    try {
+      return await lookup();
+    } catch (error) {
+      if (!(error instanceof RateLimitError)) throw error;
+      if (attempt > 0) {
+        source.enabled = false;
+        ctx.log('warn', `${source.name} is still rate limiting — skipping it for the rest of this run.`);
+        return null;
+      }
+      const seconds = Math.min(error.retryAfterSeconds ?? 60, 120);
+      ctx.log('warn', `${source.name} rate limit hit — waiting ${seconds}s…`);
+      await delay(seconds * 1000, ctx.signal);
+    }
+  }
+  return null;
+}
+
 /**
  * Resolves crests for every team matching the version / minimum-star filter
- * (API-Sports via the Edge Function first, then TheSportsDB by id / name) and
- * saves them to teams.resolvedLogoUrl. Most-played teams go first so the
- * API-Sports quota is spent where it matters. Sequential with a delay to stay
- * friendly to the API-Sports quota.
+ * and saves them to teams.resolvedLogoUrl. Sources, cheapest first:
+ *
+ *   1. Wikipedia — free, no key; the crest of the club / national-team article
+ *   2. TheSportsDB — free key, by id then name (throttled to its ~30/min limit)
+ *   3. API-Sports — via the Edge Function, 100 requests/day, so last
+ *
+ * Most-played teams go first. A rate limit (429) is waited out once and then
+ * that source is skipped for the run — it never counts as "no logo found".
  *
  * Force mode re-resolves external URLs too, but never touches teams whose
  * crest is already hosted in our Supabase Storage (that would undo the
@@ -37,7 +80,7 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
   const {
     force = false,
     useApiSports = true,
-    delayMs = 400,
+    delayMs = 1000,
     maxApiSportsCalls = 100,
     maxConsecutiveApiMisses = 5,
     version,
@@ -59,8 +102,11 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
   const played = candidates.filter(t => usage.has(t.id)).length;
   ctx.log('info', `${teams.length} team(s) in scope (${versionLabel}, ${ratingLabel}).`);
   ctx.log('info', `${candidates.length} team(s) to resolve (${played} played before — most-played first), ${stats.skipped} skipped (${force ? 'already in storage' : 'already resolved'}).`);
-  if (useApiSports) ctx.log('info', `API-Sports enabled — at most ${maxApiSportsCalls} call(s) this run.`);
+  ctx.log('info', `Sources: Wikipedia → TheSportsDB${useApiSports ? ` → API-Sports (max ${maxApiSportsCalls} calls)` : ''}.`);
 
+  const wikipedia: ThrottledSource = { name: 'Wikipedia', enabled: true, spacingMs: 0, lastCallAt: 0 };
+  const theSportsDb: ThrottledSource = { name: 'TheSportsDB', enabled: true, spacingMs: THESPORTSDB_SPACING_MS, lastCallAt: 0 };
+  const foundVia: Record<string, number> = {};
   let apiSportsEnabled = useApiSports;
   let apiCalls = 0;
   let consecutiveMisses = 0;
@@ -75,13 +121,38 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
     const previous = team.resolvedLogoUrl ?? null;
 
     try {
-      // The Edge Function returns an existing resolvedLogoUrl as-is, so clear it first when forcing.
-      if (force && previous) await updateTeam(team.id, { resolvedLogoUrl: null });
-
       let url: string | null = null;
       let source = '';
+      let detail = '';
 
-      if (apiSportsEnabled) {
+      try {
+        const crest = await callSource(ctx, wikipedia, () =>
+          fetchTeamLogoFromWikipedia(team.name, team.league, { signal: ctx.signal })
+        );
+        if (crest) {
+          url = crest.url;
+          source = 'Wikipedia';
+          detail = ` (${crest.title})`;
+        }
+      } catch (error) {
+        if (!ctx.signal.aborted) ctx.log('warn', `${team.name} — Wikipedia: ${errorMessage(error)}`);
+      }
+
+      const apiTeamId = team.apiTeamId;
+      if (!url && apiTeamId) {
+        url = await callSource(ctx, theSportsDb, () => fetchTeamLogoByIdFromTheSportsDb(apiTeamId, { throwOnRateLimit: true }));
+        if (url) source = 'TheSportsDB';
+      }
+      if (!url) {
+        url = await callSource(ctx, theSportsDb, () =>
+          fetchTeamLogoByNameFromTheSportsDb(team.apiTeamName || team.name, { throwOnRateLimit: true })
+        );
+        if (url) source = 'TheSportsDB';
+      }
+
+      if (!url && apiSportsEnabled && !ctx.signal.aborted) {
+        // The Edge Function returns an existing resolvedLogoUrl as-is, so clear it first when forcing.
+        if (force && previous) await updateTeam(team.id, { resolvedLogoUrl: null });
         apiCalls++;
         url = await resolveTeamLogoFromApiSports(team.id);
         if (url) {
@@ -89,30 +160,27 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
           consecutiveMisses = 0;
         } else if (++consecutiveMisses >= maxConsecutiveApiMisses) {
           apiSportsEnabled = false;
-          ctx.log('warn', `API-Sports missed ${consecutiveMisses} times in a row (quota exhausted?) — continuing with TheSportsDB only.`);
+          ctx.log('warn', `API-Sports missed ${consecutiveMisses} times in a row (quota exhausted?) — not using it for the rest of this run.`);
         }
         if (apiSportsEnabled && apiCalls >= maxApiSportsCalls) {
           apiSportsEnabled = false;
-          ctx.log('warn', `Reached ${maxApiSportsCalls} API-Sports calls — continuing with TheSportsDB only.`);
+          ctx.log('warn', `Reached ${maxApiSportsCalls} API-Sports calls — not using it for the rest of this run.`);
         }
-      }
-
-      if (!url && team.apiTeamId) {
-        url = await fetchTeamLogoByIdFromTheSportsDb(team.apiTeamId);
-        if (url) source = 'TheSportsDB (id)';
-      }
-      if (!url) {
-        url = await fetchTeamLogoByNameFromTheSportsDb(team.apiTeamName || team.name);
-        if (url) source = 'TheSportsDB (name)';
       }
 
       if (url) {
         // API-Sports results are already persisted by the Edge Function.
         if (source !== 'API-Sports') await updateTeam(team.id, { resolvedLogoUrl: url });
         stats.success++;
-        ctx.log('success', `${team.name}${playedSuffix(usage, team)} — ${source}`, url);
+        foundVia[source] = (foundVia[source] ?? 0) + 1;
+        ctx.log('success', `${team.name}${playedSuffix(usage, team)} — ${source}${detail}`, url);
       } else {
         if (force && previous) await updateTeam(team.id, { resolvedLogoUrl: previous });
+        // Cancelled mid-lookup: not a miss.
+        if (ctx.signal.aborted) {
+          stats.cancelled = true;
+          break;
+        }
         stats.failed++;
         const bundledHint = getBundledLogoUrl(team.logoUrl) ? ' (bundled crest available — run storage migration)' : '';
         ctx.log('warn', `${team.name}${playedSuffix(usage, team)} — no logo found${bundledHint}`);
@@ -129,6 +197,8 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
     if (i < candidates.length - 1) await delay(delayMs, ctx.signal);
   }
 
+  const bySource = Object.entries(foundVia).map(([name, count]) => `${name} ${count}`).join(', ');
+  if (bySource) ctx.log('info', `Found via: ${bySource}.`);
   if (useApiSports) ctx.log('info', `API-Sports calls used: ${apiCalls}.`);
   summarize(ctx, 'Resolve logos', stats);
   return stats;
@@ -226,13 +296,26 @@ export async function testTeamLogo(ctx: ToolContext, query: string, { useApiSpor
   const bundled = getBundledLogoUrl(team.logoUrl);
   if (bundled) ctx.log('info', `Bundled crest: ${team.logoUrl}`, bundled);
 
-  if (team.apiTeamId) {
-    const byId = await fetchTeamLogoByIdFromTheSportsDb(team.apiTeamId);
-    ctx.log(byId ? 'success' : 'warn', `TheSportsDB by id: ${byId ?? 'no result'}`, byId ?? undefined);
+  try {
+    const crest = await fetchTeamLogoFromWikipedia(team.name, team.league, { signal: ctx.signal });
+    const search = buildWikipediaSearch(team.name, team.league);
+    if (crest) ctx.log('success', `Wikipedia "${search}" → ${crest.title}: ${crest.url}`, crest.url);
+    else ctx.log('warn', `Wikipedia "${search}": no matching article with a crest`);
+  } catch (error) {
+    ctx.log('warn', `Wikipedia: ${errorMessage(error)}`);
   }
 
-  const byName = await fetchTeamLogoByNameFromTheSportsDb(searchName);
-  ctx.log(byName ? 'success' : 'warn', `TheSportsDB "${searchName}": ${byName ?? 'no result'}`, byName ?? undefined);
+  try {
+    if (team.apiTeamId) {
+      const byId = await fetchTeamLogoByIdFromTheSportsDb(team.apiTeamId, { throwOnRateLimit: true });
+      ctx.log(byId ? 'success' : 'warn', `TheSportsDB by id: ${byId ?? 'no result'}`, byId ?? undefined);
+    }
+
+    const byName = await fetchTeamLogoByNameFromTheSportsDb(searchName, { throwOnRateLimit: true });
+    ctx.log(byName ? 'success' : 'warn', `TheSportsDB "${searchName}": ${byName ?? 'no result'}`, byName ?? undefined);
+  } catch (error) {
+    ctx.log('warn', `TheSportsDB: ${errorMessage(error)} — try again in a minute.`);
+  }
 
   if (useApiSports) {
     const apiSports = await fetchTeamLogoFromApiSports(searchName);

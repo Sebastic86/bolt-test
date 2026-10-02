@@ -254,7 +254,7 @@ const DevToolsPanel: React.FC = () => {
         <SectionTitle
           icon={<RefreshCw className="h-4 w-4" />}
           title="Logo resolution"
-          hint="Finds crests via API-Sports (server-side, 100 requests/day) then TheSportsDB, and saves them to the team. Most-played teams go first."
+          hint="Finds crests via Wikipedia, then TheSportsDB, then API-Sports (100 requests/day) as a last resort, and saves them to the team. Most-played teams go first (~1 team/s)."
         />
         <div className="mb-3 grid grid-cols-2 gap-2">
           <label className="text-xs font-bold text-(--color-ink)">
@@ -286,7 +286,7 @@ const DevToolsPanel: React.FC = () => {
         <label className="mb-3 flex items-center justify-between gap-3 border-2 border-gray-200 px-3 py-2">
           <span className="text-xs font-bold text-(--color-ink)">
             Use API-Sports
-            <span className="block font-normal text-gray-500">Max 100 calls per run; stops after 5 misses in a row.</span>
+            <span className="block font-normal text-gray-500">Last resort only. Max 100 calls per run; stops after 5 misses in a row.</span>
           </span>
           <Switch checked={useApiSports} onChange={setUseApiSports} disabled={busy} label="Use API-Sports" />
         </label>
