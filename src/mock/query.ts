@@ -71,6 +71,10 @@ function canModify(table: TableName, row: Row, op: 'update' | 'delete'): boolean
       return isAdmin();
     case 'matches':
       return isAdmin() || (hasProfile() && row.created_by === uid);
+    case 'game_nights':
+      // 20261004090000_night_delete_policy.sql: admins or the night's starter.
+      if (op === 'delete') return isAdmin() || (hasProfile() && row.started_by === uid);
+      return hasProfile();
     case 'match_players': {
       if (op === 'delete') return false; // no delete policy — cascade only
       const match = getTable('matches').find(m => m.id === row.match_id);
