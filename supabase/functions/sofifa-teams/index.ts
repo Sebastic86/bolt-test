@@ -9,6 +9,10 @@
 //
 // The URL is built here from a fixed base, so this is not an open proxy.
 // No secrets needed (uses the SUPABASE_URL / SUPABASE_ANON_KEY the edge runtime provides).
+//
+// Deploy (self-hosted Supabase): copy this file to <supabase dir>/volumes/functions/sofifa-teams/index.ts
+// on the server — the edge runtime serves /functions/v1/<name> from that folder. Until it's there, every
+// call fails with "worker boot error: failed to read path".
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const SOFIFA_TEAMS_URL = 'https://sofifa.com/teams?type=all&oal=50&hl=en-US';
