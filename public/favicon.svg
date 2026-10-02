@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#111111" rx="96"/>
+  <rect x="108" y="94" width="344" height="344" fill="#14532d"/>
+  <rect x="84" y="70" width="344" height="344" fill="#22c55e" stroke="#111111" stroke-width="10"/>
+  <text x="256" y="242" dominant-baseline="central" text-anchor="middle"
+    font-family="Arial Black, 'Segoe UI Black', system-ui, sans-serif" font-weight="900"
+    font-size="165" letter-spacing="-4" fill="#111111">FC</text>
+  <rect x="0" y="472" width="512" height="14" fill="#22c55e"/>
+</svg>
