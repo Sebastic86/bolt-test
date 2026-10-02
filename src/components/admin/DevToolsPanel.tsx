@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ClipboardList,
   Database,
+  Download,
   FlaskConical,
   HardDrive,
   List,
@@ -30,9 +32,10 @@ import {
   migrateAllLogosToStorage,
   testTeamStorageMigration,
 } from '../../admin-tools/storageMigration';
+import { updateTeamData } from '../../admin-tools/teamDataUpdate';
 
 /**
- * Admin Dev Tools — logo resolution, apiTeamName backfill and Supabase
+ * Admin Dev Tools — team data update from SoFIFA, logo resolution, apiTeamName backfill and Supabase
  * Storage migration. Lazy-loaded from AdminPage so none of this ships in the
  * main bundle. Every tool reports into the on-screen log (not the console)
  * and long runs can be cancelled.
@@ -248,6 +251,36 @@ const DevToolsPanel: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Team data update */}
+      <Card className="p-3">
+        <SectionTitle
+          icon={<Download className="h-4 w-4" />}
+          title="Team data"
+          hint="Pulls OVR/ATT/MID/DEF and league for every team of the newest game version from SoFIFA's latest roster update — the same numbers as in the game. Updates existing teams and adds missing ones; logos are left alone and nothing is deleted."
+        />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <ToolButton
+            icon={<ClipboardList className="h-4 w-4" />}
+            disabled={busy}
+            onClick={() => run('Preview team data update', ctx => updateTeamData(ctx), { mutates: false })}
+          >
+            Preview update
+          </ToolButton>
+          <ToolButton
+            variant="outline"
+            icon={<Download className="h-4 w-4" />}
+            disabled={busy}
+            onClick={() =>
+              confirmThen('Fetch the latest SoFIFA data and write the changes to the teams table?', () =>
+                run('Update team data', ctx => updateTeamData(ctx, { apply: true }))
+              )
+            }
+          >
+            Apply update
+          </ToolButton>
+        </div>
+      </Card>
 
       {/* Logo resolution */}
       <Card className="p-3">
