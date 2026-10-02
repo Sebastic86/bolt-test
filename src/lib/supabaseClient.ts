@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Team, Player, Match, MatchPlayer, UserProfile } from '../types';
+import { Team, Player, Match, MatchPlayer, UserProfile, GameNight, Prediction, NightJoker } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -51,6 +51,25 @@ interface Database {
         // per 003_rls.sql's "update own match's players" policy — there is
         // no delete policy (cascade-only) and no other column is mutable.
         Update: Partial<Pick<MatchPlayer, 'team_number'>>;
+        Relationships: [];
+      };
+      // supabase/migrations/20261003090000_match_nights.sql
+      game_nights: {
+        Row: Flatten<GameNight>;
+        Insert: Partial<Omit<GameNight, 'id' | 'created_at'>>;
+        Update: Partial<Pick<GameNight, 'ended_at' | 'jokers_per_player'>>;
+        Relationships: [];
+      };
+      predictions: {
+        Row: Flatten<Prediction>;
+        Insert: Omit<Prediction, 'id' | 'created_at' | 'created_by' | 'match_id'>;
+        Update: Partial<Pick<Prediction, 'predicted_winner' | 'predicted_team1_score' | 'predicted_team2_score'>>;
+        Relationships: [];
+      };
+      night_jokers: {
+        Row: Flatten<NightJoker>;
+        Insert: Omit<NightJoker, 'id' | 'used_at' | 'created_by'>;
+        Update: Record<string, never>;
         Relationships: [];
       };
       user_profiles: {

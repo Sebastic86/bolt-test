@@ -32,6 +32,8 @@ export interface Match {
   played_at: string;
   created_at: string;
   created_by: string | null;
+  /** Set by a DB trigger to the active game night when the match is inserted. */
+  game_night_id?: string | null;
 }
 
 // Represents a row from the 'match_players' table
@@ -106,4 +108,46 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+}
+
+// --- Match nights -----------------------------------------------------------
+
+/** A row from `game_nights`. At most one night has ended_at === null (the active night). */
+export interface GameNight {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  started_by: string | null;
+  /** Game version selected when the night started (e.g. 'FC27') — used for the recap title. */
+  version: string | null;
+  jokers_per_player: number;
+  created_at: string;
+}
+
+/** A row from `predictions` — a player's pick for a matchup during a night. */
+export interface Prediction {
+  id: string;
+  game_night_id: string;
+  player_id: string;
+  /** Same orientation as the matchup / saved match (team1 = left card). */
+  team1_id: string;
+  team2_id: string;
+  predicted_winner: 1 | 2;
+  predicted_team1_score: number | null;
+  predicted_team2_score: number | null;
+  /** Set by a DB trigger when the matchup is saved as a match. */
+  match_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** A row from `night_jokers` — one joker spent by a player during a night. */
+export interface NightJoker {
+  id: string;
+  game_night_id: string;
+  player_id: string;
+  replaced_team_id: string | null;
+  chosen_team_id: string | null;
+  used_at: string;
+  created_by: string | null;
 }
