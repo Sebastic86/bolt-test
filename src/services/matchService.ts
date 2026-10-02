@@ -124,6 +124,18 @@ export async function createMatch(input: CreateMatchInput): Promise<string> {
   return newMatchId;
 }
 
+/** Just the team ids of every match — enough to count how often each team is played. */
+export async function fetchMatchTeamIds(): Promise<Pick<Match, 'team1_id' | 'team2_id'>[]> {
+  const { data, error } = await supabase.from('matches').select('team1_id, team2_id');
+
+  if (error) {
+    console.error('[matchService] Error fetching match team ids:', error);
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
 export async function updateMatchScore(
   matchId: string,
   team1Score: number,

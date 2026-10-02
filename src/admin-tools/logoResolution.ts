@@ -4,10 +4,13 @@ import { fetchTeamLogoFromApiSports, resolveTeamLogoFromApiSports } from '../ser
 import { fetchTeamLogoByIdFromTheSportsDb, fetchTeamLogoByNameFromTheSportsDb } from '../services/theSportsDbService';
 import { clearLogoCache, getBundledLogoUrl } from '../services/logoService';
 import { isLogoInStorage } from '../services/logoStorageService';
+import { fetchMatchTeamIds } from '../services/matchService';
+import { ALL_VERSIONS } from '../utils/versionFilter';
 import { normalizeTeamName } from '../utils/normalizeTeamName';
+import { LogoCandidateFilter, countTeamUsage, matchesLogoFilter, prioritizeByUsage } from '../utils/logoCandidates';
 import { RunStats, ToolContext, delay, emptyStats, errorMessage, summarize } from './toolContext';
 
-export interface ResolveAllOptions {
+export interface ResolveAllOptions extends LogoCandidateFilter {
   /** Re-resolve teams that already have an external resolvedLogoUrl. */
   force?: boolean;
   /** Use API-Sports (via the api-sports-logo Edge Function; 100 requests/day). */
@@ -20,9 +23,11 @@ export interface ResolveAllOptions {
 }
 
 /**
- * Resolves crests for every team (API-Sports via the Edge Function first, then
- * TheSportsDB by id / name) and saves them to teams.resolvedLogoUrl.
- * Sequential with a delay to stay friendly to the API-Sports quota.
+ * Resolves crests for every team matching the version / minimum-star filter
+ * (API-Sports via the Edge Function first, then TheSportsDB by id / name) and
+ * saves them to teams.resolvedLogoUrl. Most-played teams go first so the
+ * API-Sports quota is spent where it matters. Sequential with a delay to stay
+ * friendly to the API-Sports quota.
  *
  * Force mode re-resolves external URLs too, but never touches teams whose
  * crest is already hosted in our Supabase Storage (that would undo the
@@ -35,16 +40,25 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
     delayMs = 400,
     maxApiSportsCalls = 100,
     maxConsecutiveApiMisses = 5,
+    version,
+    minRating = 0,
   } = options;
 
-  const teams = await fetchAllTeams();
-  const candidates = teams.filter(t =>
-    force ? !isLogoInStorage(t.resolvedLogoUrl) : !t.resolvedLogoUrl
+  const [allTeams, matchTeamIds] = await Promise.all([fetchAllTeams(), fetchMatchTeamIds()]);
+  const teams = allTeams.filter(t => matchesLogoFilter(t, { version, minRating }));
+  const usage = countTeamUsage(matchTeamIds);
+  const candidates = prioritizeByUsage(
+    teams.filter(t => (force ? !isLogoInStorage(t.resolvedLogoUrl) : !t.resolvedLogoUrl)),
+    usage
   );
   const stats = emptyStats(teams.length);
   stats.skipped = teams.length - candidates.length;
 
-  ctx.log('info', `${candidates.length} team(s) to resolve, ${stats.skipped} skipped (${force ? 'already in storage' : 'already resolved'}).`);
+  const versionLabel = version && version !== ALL_VERSIONS ? version : 'all versions';
+  const ratingLabel = minRating > 0 ? `≥ ${minRating}★` : 'any rating';
+  const played = candidates.filter(t => usage.has(t.id)).length;
+  ctx.log('info', `${teams.length} team(s) in scope (${versionLabel}, ${ratingLabel}).`);
+  ctx.log('info', `${candidates.length} team(s) to resolve (${played} played before — most-played first), ${stats.skipped} skipped (${force ? 'already in storage' : 'already resolved'}).`);
   if (useApiSports) ctx.log('info', `API-Sports enabled — at most ${maxApiSportsCalls} call(s) this run.`);
 
   let apiSportsEnabled = useApiSports;
@@ -96,12 +110,12 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
         // API-Sports results are already persisted by the Edge Function.
         if (source !== 'API-Sports') await updateTeam(team.id, { resolvedLogoUrl: url });
         stats.success++;
-        ctx.log('success', `${team.name} — ${source}`, url);
+        ctx.log('success', `${team.name}${playedSuffix(usage, team)} — ${source}`, url);
       } else {
         if (force && previous) await updateTeam(team.id, { resolvedLogoUrl: previous });
         stats.failed++;
         const bundledHint = getBundledLogoUrl(team.logoUrl) ? ' (bundled crest available — run storage migration)' : '';
-        ctx.log('warn', `${team.name} — no logo found${bundledHint}`);
+        ctx.log('warn', `${team.name}${playedSuffix(usage, team)} — no logo found${bundledHint}`);
       }
     } catch (error) {
       stats.failed++;
@@ -118,6 +132,12 @@ export async function resolveAllTeamLogos(ctx: ToolContext, options: ResolveAllO
   if (useApiSports) ctx.log('info', `API-Sports calls used: ${apiCalls}.`);
   summarize(ctx, 'Resolve logos', stats);
   return stats;
+}
+
+/** " (12×)" for teams that have been played, so the log shows why a team came first. */
+function playedSuffix(usage: Map<string, number>, team: Team): string {
+  const count = usage.get(team.id);
+  return count ? ` (${count}×)` : '';
 }
 
 export function clearCache(ctx: ToolContext): void {

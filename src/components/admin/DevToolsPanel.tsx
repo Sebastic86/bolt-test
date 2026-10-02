@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Database,
   FlaskConical,
@@ -12,8 +12,11 @@ import {
   Upload,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Input, Switch } from '../ui';
-import { teamKeys } from '../../queries/teams';
+import { Button, Card, Input, Select, Switch } from '../ui';
+import { teamKeys, useTeamsQuery } from '../../queries/teams';
+import { isLogoInStorage } from '../../services/logoStorageService';
+import { ALL_VERSIONS, getAvailableVersions, getLatestVersion } from '../../utils/versionFilter';
+import { matchesLogoFilter } from '../../utils/logoCandidates';
 import { LogLevel, ToolContext, errorMessage } from '../../admin-tools/toolContext';
 import {
   clearCache,
@@ -51,6 +54,9 @@ interface Progress {
 
 const MAX_LOG_ENTRIES = 1000;
 
+/** Minimum-star choices for the resolver filter (0 = any rating). */
+const STAR_OPTIONS = [0, 3, 3.5, 4, 4.5, 5];
+
 const LEVEL_CLASSES: Record<LogLevel, string> = {
   info: 'text-gray-300',
   success: 'text-(--color-green-bright)',
@@ -87,6 +93,10 @@ const DevToolsPanel: React.FC = () => {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [useApiSports, setUseApiSports] = useState(true);
   const [teamQuery, setTeamQuery] = useState('');
+  // null = follow the current season (newest version) until the admin picks one.
+  const [versionChoice, setVersionChoice] = useState<string | null>(null);
+  const [minRating, setMinRating] = useState(0);
+  const { data: teams = [] } = useTeamsQuery();
   const abortRef = useRef<AbortController | null>(null);
   const nextId = useRef(0);
   const consoleRef = useRef<HTMLDivElement>(null);
@@ -152,6 +162,18 @@ const DevToolsPanel: React.FC = () => {
   const confirmThen = (message: string, action: () => void) => {
     if (window.confirm(message)) action();
   };
+
+  const versions = useMemo(() => getAvailableVersions(teams), [teams]);
+  const version = versionChoice ?? getLatestVersion(versions) ?? ALL_VERSIONS;
+  const filter = { version, minRating };
+  const scope = useMemo(() => {
+    const inScope = teams.filter(t => matchesLogoFilter(t, { version, minRating }));
+    return {
+      total: inScope.length,
+      missing: inScope.filter(t => !t.resolvedLogoUrl).length,
+      notInStorage: inScope.filter(t => !isLogoInStorage(t.resolvedLogoUrl)).length,
+    };
+  }, [teams, version, minRating]);
 
   const busy = running !== null;
   const query = teamQuery.trim();
@@ -232,8 +254,35 @@ const DevToolsPanel: React.FC = () => {
         <SectionTitle
           icon={<RefreshCw className="h-4 w-4" />}
           title="Logo resolution"
-          hint="Finds crests via API-Sports (server-side, 100 requests/day) then TheSportsDB, and saves them to the team."
+          hint="Finds crests via API-Sports (server-side, 100 requests/day) then TheSportsDB, and saves them to the team. Most-played teams go first."
         />
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <label className="text-xs font-bold text-(--color-ink)">
+            Version
+            <Select value={version} onChange={e => setVersionChoice(e.target.value)} disabled={busy} className="mt-1">
+              <option value={ALL_VERSIONS}>All versions</option>
+              {versions.map(v => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="text-xs font-bold text-(--color-ink)">
+            Min. stars
+            <Select value={minRating} onChange={e => setMinRating(Number(e.target.value))} disabled={busy} className="mt-1">
+              {STAR_OPTIONS.map(r => (
+                <option key={r} value={r}>
+                  {r === 0 ? 'Any' : `${r.toFixed(1)}★+`}
+                </option>
+              ))}
+            </Select>
+          </label>
+        </div>
+        <p className="mb-3 text-xs text-gray-500">
+          <span className="font-black tabular-nums text-(--color-ink)">{scope.total}</span> team(s) in scope ·{' '}
+          <span className="font-black tabular-nums text-(--color-ink)">{scope.missing}</span> without a logo
+        </p>
         <label className="mb-3 flex items-center justify-between gap-3 border-2 border-gray-200 px-3 py-2">
           <span className="text-xs font-bold text-(--color-ink)">
             Use API-Sports
@@ -243,24 +292,24 @@ const DevToolsPanel: React.FC = () => {
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <ToolButton
-            icon={<RefreshCw className={`h-4 w-4 ${running === 'Resolve all logos' ? 'animate-spin' : ''}`} />}
+            icon={<RefreshCw className={`h-4 w-4 ${running === 'Resolve logos' ? 'animate-spin' : ''}`} />}
             disabled={busy}
-            onClick={() => run('Resolve all logos', ctx => resolveAllTeamLogos(ctx, { useApiSports }))}
+            onClick={() => run('Resolve logos', ctx => resolveAllTeamLogos(ctx, { ...filter, useApiSports }))}
           >
-            Resolve all logos
+            Resolve missing ({scope.missing})
           </ToolButton>
           <ToolButton
             variant="outline"
-            icon={<RefreshCw className={`h-4 w-4 ${running === 'Force resolve all logos' ? 'animate-spin' : ''}`} />}
+            icon={<RefreshCw className={`h-4 w-4 ${running === 'Force resolve logos' ? 'animate-spin' : ''}`} />}
             disabled={busy}
             onClick={() =>
               confirmThen(
-                'Re-resolve every team not already in Supabase Storage? This can use a lot of the API-Sports quota.',
-                () => run('Force resolve all logos', ctx => resolveAllTeamLogos(ctx, { force: true, useApiSports }))
+                `Re-resolve ${scope.notInStorage} team(s) not already in Supabase Storage? This can use a lot of the API-Sports quota.`,
+                () => run('Force resolve logos', ctx => resolveAllTeamLogos(ctx, { ...filter, force: true, useApiSports }))
               )
             }
           >
-            Force resolve all
+            Force re-resolve ({scope.notInStorage})
           </ToolButton>
           <ToolButton
             variant="outline"
