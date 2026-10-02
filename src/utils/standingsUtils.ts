@@ -1,9 +1,8 @@
 import { PlayerStanding, MatchHistoryItem, Player, Team } from '../types';
 
 /**
- * Calculate player standings from a set of matches.
- * This is a shared utility used by App.tsx (today + overall standings)
- * and PlayerStandings.tsx (version-filtered standings).
+ * Calculate player standings from a set of matches. Shared by the today/
+ * overall standings views and any version-filtered standings.
  */
 export function calculateStandings(
   matches: MatchHistoryItem[],

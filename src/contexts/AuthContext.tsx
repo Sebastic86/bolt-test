@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { fetchUserProfile as fetchUserProfileFromService } from '../services/userProfileService';
 import { AuthContextType, UserProfile, AuthUser } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,28 +23,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch user profile from database
-  const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
+  const fetchUserProfile = useCallback((userId: string): Promise<UserProfile | null> => {
+    return fetchUserProfileFromService(userId);
   }, []);
 
-  // Set user and profile data (set user immediately, fetch profile in background)
+  // Set the user immediately from the session, then fetch their profile
+  // (role) in the background without blocking the auth-loading state.
   const setUserData = useCallback((supabaseUser: User | null) => {
     if (supabaseUser) {
       const authUser: AuthUser = {
@@ -51,10 +36,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: supabaseUser.email,
         profile: undefined,
       };
-      console.log('User data (initial):', authUser);
       setUser(authUser);
 
-      // Fetch profile asynchronously without blocking auth loading state
       fetchUserProfile(supabaseUser.id)
         .then((profile) => {
           setUserProfile(profile);
@@ -69,19 +52,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [fetchUserProfile]);
 
-  // Initialize auth state
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
-        
         if (error) {
           console.error('Error getting session:', error);
         }
-
         if (mounted) {
           setUserData(session?.user || null);
           setIsLoading(false);
@@ -96,17 +75,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
-        if (mounted) {
-          setUserData(session?.user || null);
-          setIsLoading(false);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setUserData(session?.user || null);
+        setIsLoading(false);
       }
-    );
+    });
 
     return () => {
       mounted = false;
@@ -114,52 +88,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [setUserData]);
 
-  // Sign in function
   const signIn = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // User data will be set by the auth state change listener
-    } catch (error) {
-      setIsLoading(false);
-      throw error;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      // User data is set by the auth state change listener above.
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Sign out function
   const signOut = useCallback(async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        throw error;
-      }
-      // User data will be cleared by the auth state change listener
-    } catch (error) {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
       console.error('Error signing out:', error);
       throw error;
     }
+    // User data is cleared by the auth state change listener above.
   }, []);
 
-  // Refresh profile function
   const refreshProfile = useCallback(async () => {
     if (user) {
       const profile = await fetchUserProfile(user.id);
       setUserProfile(profile);
-      setUser(prev => prev ? { ...prev, profile: profile || undefined } : null);
+      setUser(prev => (prev ? { ...prev, profile: profile || undefined } : null));
     }
   }, [user, fetchUserProfile]);
 
-  // Computed properties
   const isAdmin = userProfile?.role === 'admin';
   const isNormalUser = userProfile?.role === 'normal';
   const isAuthenticated = !!user;
@@ -176,9 +132,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshProfile,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

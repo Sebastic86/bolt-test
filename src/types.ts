@@ -36,23 +36,23 @@ export interface Match {
 
 // Represents a row from the 'match_players' table
 export interface MatchPlayer {
-    id: string;
-    match_id: string;
-    player_id: string;
-    team_number: 1 | 2;
-    created_at: string;
+  id: string;
+  match_id: string;
+  player_id: string;
+  team_number: 1 | 2;
+  created_at: string;
 }
 
 // Extended type for displaying match history easily
 export interface MatchHistoryItem extends Match {
-    team1_name: string;
-    team1_logoUrl: string;
-    team1_version: string;
-    team2_name: string;
-    team2_logoUrl: string;
-    team2_version: string;
-    team1_players: Player[];
-    team2_players: Player[];
+  team1_name: string;
+  team1_logoUrl: string;
+  team1_version: string;
+  team2_name: string;
+  team2_logoUrl: string;
+  team2_version: string;
+  team1_players: Player[];
+  team2_players: Player[];
 }
 
 // Type for player standings data

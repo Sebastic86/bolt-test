@@ -1,90 +1,84 @@
 import React from 'react';
-import { Dices, PlusSquare, Shield, Settings, ArrowLeft } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { ArrowLeft, Dices, PlusSquare, Settings, Shield } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface BottomNavProps {
   onNewMatchup: () => void;
   onAddMatch: () => void;
-  onAdmin: () => void;
   onSettings: () => void;
-  onBackToMain: () => void;
   canGenerateNewMatch: boolean;
   hasMatch: boolean;
-  isAdmin: boolean;
-  canAddMatch?: boolean;
-  currentPage: 'main' | 'allMatches' | 'admin';
+  canAddMatch: boolean;
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({
   onNewMatchup,
   onAddMatch,
-  onAdmin,
   onSettings,
-  onBackToMain,
   canGenerateNewMatch,
   hasMatch,
-  isAdmin,
   canAddMatch,
-  currentPage,
 }) => {
-  if (currentPage === 'allMatches' || currentPage === 'admin') {
+  const { pathname } = useLocation();
+  const { isAdmin } = useAuth();
+  const isOnSubPage = pathname === '/matches' || pathname === '/admin';
+
+  if (isOnSubPage) {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark shadow-[0_-2px_10px_rgba(0,0,0,0.15)] md:hidden bottom-nav">
-        <div className="flex justify-center py-2 px-4">
-          <button
-            onClick={onBackToMain}
-            className="flex flex-col items-center justify-center px-6 py-1.5 text-white/90 hover:text-white transition-colors"
+      <nav className="bottom-nav flex-none border-t-[3px] border-(--color-green-bright) bg-(--color-ink)">
+        <div className="flex justify-center px-4 py-2">
+          <Link
+            to="/"
+            className="flex flex-col items-center justify-center px-6 py-1.5 text-white/90 hover:text-white"
           >
-            <ArrowLeft className="w-6 h-6" />
-            <span className="text-[10px] mt-0.5 font-medium">Back</span>
-          </button>
+            <ArrowLeft className="h-6 w-6" />
+            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wide">Back</span>
+          </Link>
         </div>
       </nav>
     );
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark shadow-[0_-2px_10px_rgba(0,0,0,0.15)] md:hidden bottom-nav">
-      <div className="flex justify-around items-end py-1.5 px-2">
+    <nav className="bottom-nav flex-none border-t-[3px] border-(--color-green-bright) bg-(--color-ink)">
+      <div className="flex items-stretch justify-around px-2 py-1.5">
         <button
           onClick={onNewMatchup}
           disabled={!canGenerateNewMatch}
-          className="flex flex-col items-center justify-center min-w-[60px] py-1 text-white/90 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          title="New Matchup"
+          className="flex min-w-[64px] flex-col items-center justify-center py-1 text-white/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Dices className="w-6 h-6" />
-          <span className="text-[10px] mt-0.5 font-medium">New Match</span>
+          <Dices className="h-6 w-6" />
+          <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wide">New Match</span>
         </button>
 
-        {(canAddMatch ?? isAdmin) && (
+        {canAddMatch && (
           <button
             onClick={onAddMatch}
             disabled={!hasMatch}
-            className="flex flex-col items-center justify-center min-w-[60px] py-1 text-white/90 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Add Match"
+            className="flex min-w-[64px] flex-col items-center justify-center py-1 text-white/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <PlusSquare className="w-6 h-6" />
-            <span className="text-[10px] mt-0.5 font-medium">Add Match</span>
+            <PlusSquare className="h-6 w-6" />
+            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wide">Add Match</span>
           </button>
         )}
 
         {isAdmin && (
-          <button
-            onClick={onAdmin}
-            className="flex flex-col items-center justify-center min-w-[60px] py-1 text-white/90 hover:text-white transition-colors"
-            title="Admin"
+          <Link
+            to="/admin"
+            className="flex min-w-[64px] flex-col items-center justify-center py-1 text-white/90 hover:text-white"
           >
-            <Shield className="w-6 h-6" />
-            <span className="text-[10px] mt-0.5 font-medium">Admin</span>
-          </button>
+            <Shield className="h-6 w-6" />
+            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wide">Admin</span>
+          </Link>
         )}
 
         <button
           onClick={onSettings}
-          className="flex flex-col items-center justify-center min-w-[60px] py-1 text-white/90 hover:text-white transition-colors"
-          title="Settings"
+          className="flex min-w-[64px] flex-col items-center justify-center py-1 text-white/90 hover:text-white"
         >
-          <Settings className="w-6 h-6" />
-          <span className="text-[10px] mt-0.5 font-medium">Settings</span>
+          <Settings className="h-6 w-6" />
+          <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wide">Settings</span>
         </button>
       </div>
     </nav>

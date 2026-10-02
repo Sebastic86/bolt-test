@@ -1,106 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTeamLogo } from '../hooks/useTeamLogo';
-import { Team } from '../types';
+import { TeamBadge } from './TeamBadge';
 
 interface TeamLogoProps {
   team: {
-    id?: string; // Optional: if provided, resolved URLs will be saved to database
+    id?: string | null;
     name: string;
-    logoUrl?: string | null;
     apiTeamId?: string | null;
     apiTeamName?: string | null;
     resolvedLogoUrl?: string | null;
+    logoUrl?: string | null;
   };
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
-  useApiFirst?: boolean; // If true, use API; if false, use local (default: true)
-  showSpinner?: boolean; // Show loading spinner (default: false)
-  alt?: string; // Override alt text
 }
 
-const sizeClasses = {
-  sm: 'w-6 h-6',
-  md: 'w-8 h-8',
-  lg: 'w-12 h-12',
-  xl: 'w-16 h-16'
+const SIZE_CLASSES: Record<'sm' | 'md' | 'lg', string> = {
+  sm: 'h-7 w-7',
+  md: 'h-11 w-11',
+  lg: 'h-14 w-14',
 };
 
 /**
- * TeamLogo Component - Displays team logos with API loading and fallback
- *
- * Features:
- * - Automatically loads logos from TheSportsDB API
- * - **NEW**: Saves resolved URLs to database for instant future loads!
- * - Falls back to local logos if API fails
- * - Shows placeholder on error
- * - Optional loading spinner
- * - Responsive sizing
- *
- * Usage:
- * ```tsx
- * <TeamLogo team={team} size="md" />
- * ```
- *
- * Performance: After first load, logos load instantly from database (no API call!)
+ * Displays a team's real crest once resolved (via logoService — API-Sports
+ * then TheSportsDB), falling back to the TeamBadge colored-initials
+ * placeholder while loading, on error, or if neither API has a match.
  */
-export const TeamLogo: React.FC<TeamLogoProps> = ({
-  team,
-  size = 'md',
-  className = '',
-  useApiFirst = true,
-  showSpinner = false,
-  alt
-}) => {
+export const TeamLogo: React.FC<TeamLogoProps> = ({ team, size = 'md', className = '' }) => {
   const { logoUrl, isLoading, error } = useTeamLogo({
     teamId: team.id,
     apiTeamId: team.apiTeamId,
     apiTeamName: team.apiTeamName,
-    fallbackLogoUrl: team.logoUrl,
     resolvedLogoUrl: team.resolvedLogoUrl,
-    useApiFirst
+    logoUrl: team.logoUrl,
   });
+  const [imgFailed, setImgFailed] = useState(false);
 
-  const sizeClass = sizeClasses[size];
-  const altText = alt || `${team.name} logo`;
-
-  // Show loading spinner if enabled
-  if (isLoading && showSpinner) {
-    return (
-      <div className={`${sizeClass} ${className} flex items-center justify-center`}>
-        <div className="animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 w-full h-full"></div>
-      </div>
-    );
+  if (isLoading || error || !logoUrl || imgFailed) {
+    return <TeamBadge name={team.name} size={size} className={className} />;
   }
 
-  // Show placeholder if error or no logo
-  if (error || !logoUrl) {
-    return (
-      <div
-        className={`${sizeClass} ${className} flex items-center justify-center bg-gray-200 rounded text-gray-500 text-xs font-bold`}
-        title={altText}
-      >
-        {team.name.substring(0, 2).toUpperCase()}
-      </div>
-    );
-  }
-
-  // Show logo
   return (
     <img
       src={logoUrl}
-      alt={altText}
-      className={`${sizeClass} ${className} object-contain`}
-      onError={(e) => {
-        // Fallback to placeholder on image load error
-        const target = e.target as HTMLImageElement;
-        target.style.display = 'none';
-        const placeholder = target.nextElementSibling as HTMLDivElement;
-        if (placeholder) {
-          placeholder.style.display = 'flex';
-        }
-      }}
+      alt={`${team.name} logo`}
+      onError={() => setImgFailed(true)}
+      className={`flex-none border-2 border-(--color-ink) bg-white object-contain p-1 ${SIZE_CLASSES[size]} ${className}`}
     />
   );
 };
-
-export default TeamLogo;

@@ -349,7 +349,7 @@ export function calculatePlayerAchievements(
     }
 
     // Consistency King (3+ wins with same team)
-    const consistentTeams = Array.from(teamWinCounts.entries()).filter(([_, count]) => count >= 3);
+    const consistentTeams = Array.from(teamWinCounts.entries()).filter(([, count]) => count >= 3);
     if (consistentTeams.length > 0) {
       const consistencyMatches: string[] = [];
       for (const match of sortedMatches) {
@@ -457,15 +457,15 @@ export function calculatePlayerAchievements(
       totalMatches,
     };
   })
-  .filter(p => p.totalMatches > 0)
-  .sort((a, b) => {
-    // Sort by longest win streak desc, then current win streak desc
-    if (b.streak.longestWinStreak !== a.streak.longestWinStreak) {
-      return b.streak.longestWinStreak - a.streak.longestWinStreak;
-    }
-    if (b.streak.currentWinStreak !== a.streak.currentWinStreak) {
-      return b.streak.currentWinStreak - a.streak.currentWinStreak;
-    }
-    return b.totalMatches - a.totalMatches;
-  });
+    .filter(p => p.totalMatches > 0)
+    .sort((a, b) => {
+      // Sort by longest win streak desc, then current win streak desc
+      if (b.streak.longestWinStreak !== a.streak.longestWinStreak) {
+        return b.streak.longestWinStreak - a.streak.longestWinStreak;
+      }
+      if (b.streak.currentWinStreak !== a.streak.currentWinStreak) {
+        return b.streak.currentWinStreak - a.streak.currentWinStreak;
+      }
+      return b.totalMatches - a.totalMatches;
+    });
 }

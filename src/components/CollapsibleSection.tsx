@@ -7,6 +7,8 @@ interface CollapsibleSectionProps {
   defaultOpen?: boolean;
   children: React.ReactNode;
   badge?: string | number;
+  /** Wrapper className override — defaults to a full-width block, no max-width. */
+  className?: string;
 }
 
 const getInitialOpen = (storageKey: string, defaultOpen: boolean): boolean => {
@@ -27,6 +29,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   defaultOpen = true,
   children,
   badge,
+  className = 'w-full',
 }) => {
   const [isOpen, setIsOpen] = useState(() => getInitialOpen(storageKey, defaultOpen));
   const contentRef = useRef<HTMLDivElement>(null);
@@ -35,8 +38,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   useEffect(() => {
     if (!contentRef.current) return;
 
-    // Use ResizeObserver to dynamically track content height changes
-    // This handles nested collapsibles (like PlayerAchievements cards)
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContentHeight(entry.target.scrollHeight);
@@ -44,8 +45,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     });
 
     resizeObserver.observe(contentRef.current);
-
-    // Initial height calculation
     setContentHeight(contentRef.current.scrollHeight);
 
     return () => {
@@ -64,26 +63,24 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mt-8">
+    <div className={className}>
       <button
         onClick={handleToggle}
-        className="w-full flex items-center justify-between py-3 px-1 group cursor-pointer focus:outline-none"
+        className="flex w-full items-center justify-between py-3 focus:outline-none"
         aria-expanded={isOpen}
       >
-        <div className="flex items-center space-x-3">
-          <h2 className="text-2xl font-semibold text-gray-700 group-hover:text-brand-dark transition-colors">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-black uppercase tracking-wide text-(--color-ink)">
             {title}
           </h2>
           {badge !== undefined && badge !== '' && (
-            <span className="text-sm font-medium bg-brand-light text-gray-700 px-2 py-0.5 rounded-full">
+            <span className="border border-(--color-ink) bg-(--color-green-bright)/20 px-2 py-0.5 text-xs font-bold text-(--color-ink)">
               {badge}
             </span>
           )}
         </div>
         <ChevronDown
-          className={`w-6 h-6 text-gray-500 group-hover:text-brand-dark transition-transform duration-300 ${
-            isOpen ? 'rotate-180' : ''
-          }`}
+          className={`h-5 w-5 text-(--color-ink) transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
       <div
@@ -93,9 +90,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           opacity: isOpen ? 1 : 0,
         }}
       >
-        <div ref={contentRef}>
-          {children}
-        </div>
+        <div ref={contentRef}>{children}</div>
       </div>
     </div>
   );

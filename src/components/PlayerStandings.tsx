@@ -1,239 +1,166 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { PlayerStanding, MatchHistoryItem, Player, Team } from '../types';
-import PlayerMatchDetails from './PlayerMatchDetails';
-import { supabase } from '../lib/supabaseClient';
+import React, { useMemo, useState } from 'react';
+import { MatchHistoryItem, Player, PlayerStanding, Team } from '../types';
 import { calculateStandings } from '../utils/standingsUtils';
+import MatchDetailsSheet from './MatchDetailsSheet';
+import { LoadingState, ErrorState } from './ui';
 
 interface PlayerStandingsProps {
-  standings: PlayerStanding[];
-  loading: boolean; // Pass loading state if calculation depends on async data
-  error: string | null; // Pass error state
-  title?: string; // Optional title prop
-  hideTitle?: boolean;
-  matches: MatchHistoryItem[]; // Matches data to show when clicking on a player
-  allPlayers?: Player[]; // All players for recalculating standings
-  allTeams?: Team[]; // All teams for recalculating standings
-  enableVersionFilter?: boolean; // Flag to enable version filtering (only for Overall standings)
+  matchesToday: MatchHistoryItem[];
+  allMatches: MatchHistoryItem[];
+  players: Player[];
+  teams: Team[];
+  loadingToday: boolean;
+  loadingAll: boolean;
+  errorToday: string | null;
+  errorAll: string | null;
+  currentUserId?: string;
 }
 
-const PlayerStandings: React.FC<PlayerStandingsProps> = ({ 
-  standings, 
-  loading, 
-  error, 
-  title = "Player Standings", 
-  matches,
-  allPlayers,
-  allTeams,
-  enableVersionFilter = false,
-  hideTitle = false
-}) => {
-  const [selectedPlayer, setSelectedPlayer] = useState<{ id: string; name: string } | null>(null);
-  const [selectedVersion, setSelectedVersion] = useState<string>('All');
-  const [availableVersions, setAvailableVersions] = useState<string[]>([]);
-  const [versionsLoading, setVersionsLoading] = useState<boolean>(false);
+const MEDAL_GREEN = '#22c55e';
 
-  // Fetch available versions when version filter is enabled
-  useEffect(() => {
-    if (enableVersionFilter) {
-      const fetchVersions = async () => {
-        setVersionsLoading(true);
-        try {
-          console.log('[PlayerStandings] Fetching available versions...');
-          const { data, error } = await supabase
-            .from('teams')
-            .select('version')
-            .order('version');
-          
-          if (error) {
-            console.error('[PlayerStandings] Error fetching versions:', error);
-            throw error;
-          }
-          
-          const versions = Array.from(new Set(data?.map(item => item.version) || []));
-          console.log('[PlayerStandings] Available versions:', versions);
-          setAvailableVersions(versions);
-        } catch (error) {
-          console.error('[PlayerStandings] Error in fetchVersions:', error);
-          // Fallback to default versions if fetch fails
-          setAvailableVersions(['FC25', 'FC26']);
-        } finally {
-          setVersionsLoading(false);
-        }
-      };
-      
-      fetchVersions();
-    }
-  }, [enableVersionFilter]);
+function StandingRow({ standing, rank, onViewMatches }: { standing: PlayerStanding; rank: number; onViewMatches: (standing: PlayerStanding) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const winRate = standing.matchesPlayed > 0 ? ((standing.points / standing.matchesPlayed) * 100) : 0;
+  const avgOvr = standing.matchesPlayed > 0 ? (standing.totalOverallRating / standing.matchesPlayed) : 0;
+  const initial = standing.playerName.charAt(0).toUpperCase() || '?';
 
-  // Filter matches by version and recalculate standings if version filter is enabled
-  const filteredStandings = useMemo(() => {
-    if (!enableVersionFilter || selectedVersion === 'All' || !allPlayers || !allTeams) {
-      return standings;
-    }
-
-    console.log(`[PlayerStandings] Filtering matches for version: ${selectedVersion}`);
-    
-    // Filter matches by version
-    const versionFilteredMatches = matches.filter(match => 
-      match.team1_version === selectedVersion && match.team2_version === selectedVersion
-    );
-
-    console.log(`[PlayerStandings] Filtered ${versionFilteredMatches.length} matches for version ${selectedVersion}`);
-
-    // Recalculate standings based on filtered matches using shared utility
-    return calculateStandings(versionFilteredMatches, allPlayers, allTeams);
-  }, [enableVersionFilter, selectedVersion, matches, allPlayers, allTeams, standings]);
-
-  // Use filtered matches for the player details modal
-  const filteredMatches = useMemo(() => {
-    if (!enableVersionFilter || selectedVersion === 'All') {
-      return matches;
-    }
-    return matches.filter(match => 
-      match.team1_version === selectedVersion && match.team2_version === selectedVersion
-    );
-  }, [enableVersionFilter, selectedVersion, matches]);
-  
   return (
-    <div className="w-full max-w-4xl">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-        {!hideTitle && <h2 className="text-2xl font-semibold text-gray-700">{title}</h2>}
-        
-        {/* Version Filter Dropdown - only shown when enableVersionFilter is true */}
-        {enableVersionFilter && (
-          <div className="flex items-center gap-2">
-            <label htmlFor="version-filter" className="text-sm font-medium text-gray-700">
-              Version:
-            </label>
-            <select
-              id="version-filter"
-              value={selectedVersion}
-              onChange={(e) => setSelectedVersion(e.target.value)}
-              disabled={versionsLoading}
-              className="px-3 py-1.5 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-brand-medium focus:border-brand-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="All">All Versions</option>
-              {availableVersions.map(version => (
-                <option key={version} value={version}>{version}</option>
-              ))}
-            </select>
-          </div>
-        )}
+    <div
+      className="flex cursor-pointer flex-wrap items-center gap-2.5 border-2 border-(--color-ink) bg-white p-3"
+      onClick={() => setExpanded(e => !e)}
+    >
+      <div
+        className="flex h-6 w-6 flex-none items-center justify-center text-xs font-black text-white"
+        style={{ background: rank === 1 ? MEDAL_GREEN : '#111111' }}
+      >
+        {rank}
+      </div>
+      <div className="flex h-8 w-8 flex-none items-center justify-center border border-(--color-ink) bg-gray-100 text-xs font-black text-(--color-ink)">
+        {initial}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-black uppercase tracking-wide text-(--color-ink)">
+          {standing.playerName}
+        </div>
+        <div className="text-xs text-gray-500">
+          Win {winRate.toFixed(1)}% &middot; {standing.matchesPlayed} played
+        </div>
+      </div>
+      <div className="flex-none text-right">
+        <div className="text-lg font-black tabular-nums text-(--color-green-mid)">{standing.points}</div>
+        <div className="text-[9px] font-black uppercase tracking-wide text-gray-400">Pts</div>
       </div>
 
-      {loading && <p className="text-center text-gray-600">Calculating standings...</p>}
-      {error && <p className="text-center text-red-600 bg-red-100 p-3 rounded-sm">{error}</p>}
-
-      {!loading && !error && filteredStandings.length === 0 && (
-        <p className="text-center text-gray-500">No completed matches with players to calculate standings.</p>
-      )}
-
-      {!loading && !error && filteredStandings.length > 0 && (
-        <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-brand-light">
-          <table className="min-w-full divide-y divide-brand-light">
-            <thead className="bg-brand-light">
-              <tr>
-                <th scope="col" className="px-1 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-12">
-                  Rank
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Name
-                </th>
-                <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
-                  Pts
-                </th>
-                <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20" title="Win Rate">
-                  Win %
-                </th>
-                <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
-                  GF
-                </th>
-                <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
-                  GA
-                </th>
-                 <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
-                  GD
-                </th>
-                <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
-                  Matches
-                </th>
-                <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-24" title="Average Overall Rating of Teams Played">
-                  Avg OVR
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-brand-light">
-              {filteredStandings.map((player, index) => {
-                // Find the full player object to get avatar
-                const fullPlayer = (allPlayers || []).find(p => p.id === player.playerId);
-                const avatarUrl = fullPlayer?.avatar_url;
-
-                // Create background style with avatar on left 30% with diagonal cut
-                const bgColor = index % 2 === 0 ? 'rgb(255, 255, 255)' : 'rgb(240, 249, 255)';
-                const backgroundStyle: React.CSSProperties = avatarUrl ? {
-                  backgroundImage: `
-                    linear-gradient(115deg, transparent 28%, ${bgColor} 32%),
-                    linear-gradient(to right, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.4) 30%),
-                    url(${avatarUrl})
-                  `,
-                  backgroundSize: '100% 100%, 30% 100%, 30% auto',
-                  backgroundPosition: 'center, left center, left top',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundColor: bgColor,
-                } : {};
-
-                return (
-                  <tr
-                    key={player.playerId}
-                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-brand-lighter'} hover:brightness-95 cursor-pointer transition-all duration-150 relative`}
-                    style={backgroundStyle}
-                    onClick={() => setSelectedPlayer({ id: player.playerId, name: player.playerName })}
-                  >
-                    <td className="px-1 py-4 whitespace-nowrap text-base font-bold text-gray-900 text-center relative z-10">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 relative z-10" style={{ textShadow: '0 1px 2px rgba(255, 255, 255, 0.8)' }}>
-                      {player.playerName}
-                    </td>
-                  <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold text-gray-800 text-center relative z-10">
-                    {player.points}
-                  </td>
-                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
-                    {player.matchesPlayed > 0 ? `${((player.points / player.matchesPlayed) * 100).toFixed(1)}%` : '-'}
-                  </td>
-                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
-                    {player.goalsFor}
-                  </td>
-                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
-                    {player.goalsAgainst}
-                  </td>
-                   <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
-                    {player.goalDifference >= 0 ? `+${player.goalDifference}` : player.goalDifference}
-                  </td>
-                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
-                    {player.matchesPlayed}
-                  </td>
-                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 text-center relative z-10">
-                    {player.matchesPlayed > 0 ? (player.totalOverallRating / player.matchesPlayed).toFixed(1) : '-'}
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {expanded && (
+        <div className="w-full border-t-2 border-(--color-ink) pt-2.5">
+          <div className="grid grid-cols-3 gap-1.5">
+            <StatChip label="GF" value={standing.goalsFor} />
+            <StatChip label="GA" value={standing.goalsAgainst} />
+            <StatChip label="GD" value={standing.goalDifference >= 0 ? `+${standing.goalDifference}` : standing.goalDifference} />
+            <StatChip label="MP" value={standing.matchesPlayed} />
+            <StatChip label="Win%" value={`${winRate.toFixed(1)}%`} />
+            <StatChip label="Avg OVR" value={standing.matchesPlayed > 0 ? avgOvr.toFixed(1) : '-'} />
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onViewMatches(standing); }}
+            className="mt-2 w-full border-2 border-(--color-ink) bg-white py-1.5 text-xs font-bold uppercase tracking-wide text-(--color-ink)"
+          >
+            View Matches
+          </button>
         </div>
       )}
-       <p className="text-xs text-gray-500 mt-2 text-center">Pts: Points (1 per win, including penalties wins), Win %: Win Rate percentage, GF: Goals For, GA: Goals Against, GD: Goal Difference, Matches: Total matches played, Avg OVR: Average Overall Rating of Teams Played. Sorted by Pts, then GD, then GF. Click on a player to see all their matches.</p>
-      
-      {/* Player Match Details Modal */}
-      {selectedPlayer && (
-        <PlayerMatchDetails
-          playerId={selectedPlayer.id}
-          playerName={selectedPlayer.name}
-          matches={filteredMatches}
-          onClose={() => setSelectedPlayer(null)}
-        />
+    </div>
+  );
+}
+
+function StatChip({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="border border-gray-200 bg-gray-50 py-1 text-center">
+      <div className="text-sm font-black tabular-nums text-(--color-ink)">{value}</div>
+      <div className="text-[9px] font-bold uppercase tracking-wide text-gray-500">{label}</div>
+    </div>
+  );
+}
+
+const PlayerStandings: React.FC<PlayerStandingsProps> = ({
+  matchesToday,
+  allMatches,
+  players,
+  teams,
+  loadingToday,
+  loadingAll,
+  errorToday,
+  errorAll,
+  currentUserId,
+}) => {
+  const [tab, setTab] = useState<'today' | 'overall'>('today');
+  const [selectedStanding, setSelectedStanding] = useState<PlayerStanding | null>(null);
+
+  const todayStandings = useMemo(
+    () => calculateStandings(matchesToday, players, teams).filter(s => s.matchesPlayed > 0),
+    [matchesToday, players, teams]
+  );
+  const overallStandings = useMemo(
+    () => calculateStandings(allMatches, players, teams).filter(s => s.matchesPlayed > 0),
+    [allMatches, players, teams]
+  );
+
+  const activeStandings = tab === 'today' ? todayStandings : overallStandings;
+  const activeMatches = tab === 'today' ? matchesToday : allMatches;
+  const loading = tab === 'today' ? loadingToday : loadingAll;
+  const error = tab === 'today' ? errorToday : errorAll;
+
+  const selectedPlayerMatches = useMemo(() => {
+    if (!selectedStanding) return [];
+    return activeMatches.filter(m =>
+      m.team1_players.some(p => p.id === selectedStanding.playerId)
+      || m.team2_players.some(p => p.id === selectedStanding.playerId)
+    );
+  }, [activeMatches, selectedStanding]);
+
+  return (
+    <div>
+      <div className="mb-2.5 flex border border-(--color-ink)">
+        <button
+          onClick={() => setTab('today')}
+          className={`flex-1 py-2 text-xs font-black uppercase tracking-wide ${tab === 'today' ? 'bg-(--color-green-deep) text-white' : 'bg-gray-100 text-gray-600'}`}
+        >
+          Today
+        </button>
+        <button
+          onClick={() => setTab('overall')}
+          className={`flex-1 py-2 text-xs font-black uppercase tracking-wide ${tab === 'overall' ? 'bg-(--color-green-deep) text-white' : 'bg-gray-100 text-gray-600'}`}
+        >
+          Overall
+        </button>
+      </div>
+
+      {loading && activeStandings.length === 0 && <LoadingState label="Calculating standings..." />}
+      {error && <ErrorState message={error} />}
+      {!loading && !error && activeStandings.length === 0 && (
+        <p className="py-4 text-center text-sm text-gray-500">No completed matches yet.</p>
       )}
+
+      {activeStandings.length > 0 && (
+        <div className="space-y-2.5">
+          {activeStandings.map((standing, index) => (
+            <StandingRow key={standing.playerId} standing={standing} rank={index + 1} onViewMatches={setSelectedStanding} />
+          ))}
+        </div>
+      )}
+
+      <p className="mt-2.5 text-center text-[10px] uppercase tracking-wide text-gray-400">
+        Pts points &middot; GF/GA goals for/against &middot; GD goal difference &middot; MP matches played &middot; tap a player for full stats
+      </p>
+
+      <MatchDetailsSheet
+        isOpen={selectedStanding !== null}
+        onClose={() => setSelectedStanding(null)}
+        title={selectedStanding ? `Matches — ${selectedStanding.playerName}` : ''}
+        matches={selectedPlayerMatches}
+        players={players}
+        currentUserId={currentUserId}
+      />
     </div>
   );
 };
