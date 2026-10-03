@@ -15,6 +15,7 @@ import PlayerAchievements from '../components/PlayerAchievements';
 import CollapsibleSection from '../components/CollapsibleSection';
 import ErrorBoundary from '../components/ErrorBoundary';
 import EditTeamModal from '../components/EditTeamModal';
+import TeamDataCheckSheet from '../components/TeamDataCheckSheet';
 import { LoadingState, ErrorState } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { getFilterWarning, getStatDifferences } from '../utils/matchDisplay';
@@ -36,6 +37,7 @@ export default function DashboardPage() {
   const { user, isAdmin } = useAuth();
 
   const [editingSlot, setEditingSlot] = useState<0 | 1 | null>(null);
+  const [checkingSlot, setCheckingSlot] = useState<0 | 1 | null>(null);
   const [jokerOpen, setJokerOpen] = useState(false);
   const closeJoker = useCallback(() => setJokerOpen(false), []);
 
@@ -118,7 +120,12 @@ export default function DashboardPage() {
             />
           ) : match ? (
             <>
-              <TeamCard team={match[0]} differences={differences?.[0]} onEdit={isAdmin ? () => setEditingSlot(0) : undefined} />
+              <TeamCard
+                team={match[0]}
+                differences={differences?.[0]}
+                onEdit={isAdmin ? () => setEditingSlot(0) : undefined}
+                onCheckData={isAdmin ? () => setCheckingSlot(0) : undefined}
+              />
               <div className="flex items-center gap-2.5">
                 <div className="h-0.5 flex-1 bg-(--color-ink)" />
                 <div className="flex h-9 w-9 flex-none items-center justify-center border-2 border-(--color-ink) bg-(--color-green-bright) text-xs font-black text-(--color-ink)">
@@ -139,7 +146,12 @@ export default function DashboardPage() {
                   </button>
                 )}
               </div>
-              <TeamCard team={match[1]} differences={differences?.[1]} onEdit={isAdmin ? () => setEditingSlot(1) : undefined} />
+              <TeamCard
+                team={match[1]}
+                differences={differences?.[1]}
+                onEdit={isAdmin ? () => setEditingSlot(1) : undefined}
+                onCheckData={isAdmin ? () => setCheckingSlot(1) : undefined}
+              />
               <MatchComparison team1={match[0]} team2={match[1]} />
               {showNightMatchup && night && (
                 <ErrorBoundary fallbackTitle="Error loading predictions">
@@ -249,6 +261,19 @@ export default function DashboardPage() {
           if (editingSlot !== null) handleUpdateTeam(team, editingSlot);
         }}
       />
+
+      {isAdmin && (
+        <TeamDataCheckSheet
+          team={checkingSlot !== null && match ? match[checkingSlot] : null}
+          onClose={() => setCheckingSlot(null)}
+          starFilter={filterSettings}
+          onUpdated={(saved) => {
+            // The matchup holds copies of the team rows; swap in the saved one so the card shows the new ratings.
+            const slot = match?.findIndex(t => t.id === saved.id);
+            if (slot === 0 || slot === 1) handleUpdateTeam(saved, slot, { keepOpponent: true });
+          }}
+        />
+      )}
 
       {night && match && jokersQuery.data && (
         <JokerSheet

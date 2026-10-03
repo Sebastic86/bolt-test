@@ -22,7 +22,7 @@ export function starRatingFor(overall: number): number {
 /** Bundled-crest filename convention from the notebook: "Arsenal FC" → "arsenalfc.png". */
 export const logoFileName = (name: string) => `${name.replace(/ /g, '').toLowerCase()}.png`;
 
-const matchKey = (name: string) => normalizeTeamName(name).toLowerCase().replace(/\s+/g, ' ');
+const matchKey = (name: string) => normalizeTeamName(name).toLowerCase().replace(/\s+/g, ' ').trim();
 
 /** The team columns SoFIFA is the source of truth for. */
 export type SyncedField = 'overallRating' | 'attackRating' | 'midfieldRating' | 'defendRating' | 'rating' | 'league';
@@ -91,22 +91,34 @@ export function diffTeamData(source: SofifaTeam[], dbTeams: Team[]): TeamDataDif
       continue;
     }
 
-    const [team] = rows;
-    const next = syncedValues(src);
-    const changes: FieldChange[] = [];
-    const updates: Partial<SyncedValues> = {};
-    for (const field of Object.keys(next) as SyncedField[]) {
-      if (team[field] !== next[field]) {
-        changes.push({ field, from: team[field], to: next[field] });
-        Object.assign(updates, { [field]: next[field] });
-      }
-    }
-    if (changes.length > 0) diff.changed.push({ team, source: src, changes, updates });
+    const update = compareTeam(rows[0], src);
+    if (update.changes.length > 0) diff.changed.push(update);
     else diff.unchanged++;
   }
 
   diff.missing = dbTeams.filter(t => !matched.has(matchKey(t.name)));
   return diff;
+}
+
+/** What would change on `team` if it took SoFIFA's values (empty `changes` = up to date). */
+export function compareTeam(team: Team, source: SofifaTeam): TeamUpdate {
+  const next = syncedValues(source);
+  const changes: FieldChange[] = [];
+  const updates: Partial<SyncedValues> = {};
+  for (const field of Object.keys(next) as SyncedField[]) {
+    if (team[field] !== next[field]) {
+      changes.push({ field, from: team[field], to: next[field] });
+      Object.assign(updates, { [field]: next[field] });
+    }
+  }
+  return { team, source, changes, updates };
+}
+
+/** SoFIFA search results whose name matches the team's (accent- and case-insensitive). */
+export function findSameTeam(team: Team, candidates: SofifaTeam[]): SofifaTeam | null {
+  const key = matchKey(team.name);
+  const exact = candidates.filter(c => matchKey(c.name) === key);
+  return exact.length === 1 ? exact[0] : null;
 }
 
 /**
@@ -124,7 +136,7 @@ export function newTeamRow(source: SofifaTeam, version: string): Omit<Team, 'id'
   };
 }
 
-const FIELD_LABELS: Record<SyncedField, string> = {
+export const FIELD_LABELS: Record<SyncedField, string> = {
   overallRating: 'OVR',
   attackRating: 'ATT',
   midfieldRating: 'MID',
@@ -132,6 +144,15 @@ const FIELD_LABELS: Record<SyncedField, string> = {
   rating: '★',
   league: 'league',
 };
+
+/**
+ * True when an update moves the team's stars outside the dashboard's star
+ * filter — the match generator then drops it from the current matchup.
+ */
+export function leavesStarFilter(update: TeamUpdate, { minRating, maxRating }: { minRating: number; maxRating: number }): boolean {
+  const stars = update.updates.rating;
+  return stars !== undefined && (stars < minRating || stars > maxRating);
+}
 
 /** "OVR 82→83, ★ 4.5→5" */
 export const describeChanges = (changes: FieldChange[]) =>

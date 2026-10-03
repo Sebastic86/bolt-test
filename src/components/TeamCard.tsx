@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pencil, Star } from 'lucide-react';
+import { Pencil, RefreshCw, Star } from 'lucide-react';
 import { Team } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { Card } from './ui';
@@ -12,6 +12,8 @@ interface TeamCardProps {
   /** This team's rating minus the opponent's, per stat — rendered as +n / −n under each value. */
   differences?: StatDifferences;
   onEdit?: () => void;
+  /** Admin: compare this team with SoFIFA (opens TeamDataCheckSheet). */
+  onCheckData?: () => void;
 }
 
 const diffColor = (diff: number) =>
@@ -28,7 +30,7 @@ const Diff: React.FC<{ value: number | undefined; className?: string }> = ({ val
     </span>
   );
 
-const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
+const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit, onCheckData }) => {
   const tiles = [
     { label: 'ATT', value: team.attackRating, diff: differences?.attack },
     { label: 'MID', value: team.midfieldRating, diff: differences?.midfield },
@@ -45,6 +47,16 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
             aria-label={`Edit ${team.name}`}
           >
             <Pencil className="h-4 w-4" />
+          </button>
+        )}
+        {onCheckData && (
+          <button
+            onClick={onCheckData}
+            className={`absolute right-2 flex h-10 w-10 items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink) ${onEdit ? 'top-14' : 'top-2'}`}
+            aria-label={`Check ${team.name} on SoFIFA`}
+            title="Check team data on SoFIFA"
+          >
+            <RefreshCw className="h-4 w-4" />
           </button>
         )}
       </AdminOnly>
@@ -73,7 +85,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit }) => {
           <Diff value={differences?.overall} className="text-xs" />
         </div>
 
-        <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <div className={`mt-2 grid grid-cols-3 gap-1.5 ${onEdit && onCheckData ? 'pr-12' : ''}`}>
           {tiles.map(tile => {
             const tier = ratingTier(tile.value);
             return (

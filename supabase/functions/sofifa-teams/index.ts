@@ -2,17 +2,18 @@
 // The browser can't fetch sofifa.com itself (CORS), so this returns the raw HTML of
 // one list page and the app parses it (src/admin-tools/sofifaParser.ts).
 //
-// POST { offset, roster? } → admins only; { status, html }.
-//   offset: row offset, a multiple of 60 (SoFIFA's page size).
-//   roster: SoFIFA roster id (e.g. 270003) to pin every page to the same roster
-//           update; omit to get the latest one.
+// POST { offset, roster?, keyword? } → admins only; { status, html, keyword }.
+//   offset:  row offset, a multiple of 60 (SoFIFA's page size).
+//   roster:  SoFIFA roster id (e.g. 270003) to pin every page to the same roster
+//            update; omit to get the latest one.
+//   keyword: team name search (single-team check on the dashboard). Echoed back so the
+//            app can tell this version apart from an older deployment that ignores it.
 //
 // The URL is built here from a fixed base, so this is not an open proxy.
 // No secrets needed (uses the SUPABASE_URL / SUPABASE_ANON_KEY the edge runtime provides).
 //
-// Deploy (self-hosted Supabase): copy this file to <supabase dir>/volumes/functions/sofifa-teams/index.ts
-// on the server — the edge runtime serves /functions/v1/<name> from that folder. Until it's there, every
-// call fails with "worker boot error: failed to read path".
+// Deploy (self-hosted Supabase on Coolify): the `supabase-functions-sync` service downloads this
+// file from GitHub `main` on every deploy — merge, then restart the Supabase service.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const SOFIFA_TEAMS_URL = 'https://sofifa.com/teams?type=all&oal=50&hl=en-US';
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
   const { data: isAdmin } = await userClient.rpc('is_admin');
   if (!isAdmin) return json({ error: 'Forbidden' }, 403);
 
-  let body: { offset?: number; roster?: string | number };
+  let body: { offset?: number; roster?: string | number; keyword?: string };
   try {
     body = await req.json();
   } catch {
@@ -59,9 +60,14 @@ Deno.serve(async (req) => {
   }
   const roster = body.roster == null ? null : String(body.roster);
   if (roster !== null && !/^\d{5,7}$/.test(roster)) return json({ error: 'roster must be a SoFIFA roster id' }, 400);
+  const keyword = typeof body.keyword === 'string' ? body.keyword.trim() : null;
+  if (keyword !== null && (keyword.length === 0 || keyword.length > 60)) {
+    return json({ error: 'keyword must be 1-60 characters' }, 400);
+  }
 
   // `set=true` makes SoFIFA honour `r` for this request (without it, it serves the latest roster).
-  const url = `${SOFIFA_TEAMS_URL}&offset=${offset}${roster ? `&r=${roster}&set=true` : ''}`;
+  const url = `${SOFIFA_TEAMS_URL}&offset=${offset}${roster ? `&r=${roster}&set=true` : ''}` +
+    (keyword ? `&keyword=${encodeURIComponent(keyword)}` : '');
 
   try {
     const response = await fetch(url, {
@@ -72,7 +78,7 @@ Deno.serve(async (req) => {
       },
     });
     // Pass SoFIFA's status through so the tool can tell "SoFIFA blocked us" apart from a bug.
-    return json({ status: response.status, html: response.ok ? await response.text() : '' });
+    return json({ status: response.status, html: response.ok ? await response.text() : '', keyword });
   } catch (err) {
     return json({ error: `Could not reach SoFIFA: ${err instanceof Error ? err.message : 'unknown error'}` }, 502);
   }
