@@ -4,6 +4,7 @@
  * allow cross-origin requests from the browser.
  */
 import { supabase } from '../lib/supabaseClient';
+import { SofifaPage, parseSofifaTeamsPage } from '../admin-tools/sofifaParser';
 
 export interface SofifaPageResponse {
   /** SoFIFA's HTTP status; anything but 200 means SoFIFA refused the request. */
@@ -30,11 +31,28 @@ async function describeFunctionError(error: unknown): Promise<string> {
   return `The sofifa-teams Edge Function failed (HTTP ${response.status}: ${detail}).`;
 }
 
-export async function fetchSofifaTeamsPage(offset: number, roster?: string | null): Promise<SofifaPageResponse> {
-  const { data, error } = await supabase.functions.invoke<SofifaPageResponse>('sofifa-teams', {
-    body: { offset, roster: roster ?? undefined },
-  });
+async function invokeSofifaTeams(body: { offset: number; roster?: string; keyword?: string }) {
+  const { data, error } = await supabase.functions.invoke<SofifaPageResponse & { keyword?: string | null }>('sofifa-teams', { body });
   if (error) throw new Error(await describeFunctionError(error));
   if (!data) throw new Error('Empty response from the sofifa-teams Edge Function');
   return data;
+}
+
+export async function fetchSofifaTeamsPage(offset: number, roster?: string | null): Promise<SofifaPageResponse> {
+  return invokeSofifaTeams({ offset, roster: roster ?? undefined });
+}
+
+/**
+ * SoFIFA's team search (accent-insensitive, partial names match) for the
+ * current game version's latest roster update — one request.
+ */
+export async function searchSofifaTeams(keyword: string): Promise<SofifaPage> {
+  const data = await invokeSofifaTeams({ offset: 0, keyword: keyword.trim() });
+  // An older deployment ignores `keyword` and returns the top 60 teams instead — that would look
+  // like a valid but wrong result, so refuse it.
+  if (data.keyword !== keyword.trim()) {
+    throw new Error('The sofifa-teams Edge Function on the server is outdated — restart the Supabase service in Coolify so it syncs from main.');
+  }
+  if (data.status !== 200) throw new Error(`SoFIFA answered HTTP ${data.status} — it is blocking the server's requests. Try again later.`);
+  return parseSofifaTeamsPage(data.html);
 }

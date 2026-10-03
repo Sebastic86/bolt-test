@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SofifaTeam } from '../admin-tools/sofifaParser';
 import { makeTeam } from '../test/fixtures';
 import { Team } from '../types';
-import { describeChanges, diffTeamData, logoFileName, newTeamRow, starRatingFor } from './teamDataDiff';
+import { compareTeam, describeChanges, diffTeamData, findSameTeam, leavesStarFilter, logoFileName, newTeamRow, starRatingFor } from './teamDataDiff';
 
 const sofifa = (name: string, overall: number, league: string | null = 'Premier League'): SofifaTeam => ({
   sofifaId: overall,
@@ -94,5 +94,42 @@ describe('newTeamRow', () => {
 
   it('builds the bundled crest filename like the notebook', () => {
     expect(logoFileName('Real Betis Balompié')).toBe('realbetisbalompié.png');
+  });
+});
+
+describe('compareTeam', () => {
+  it('lists only the fields that differ', () => {
+    const update = compareTeam(synced('a', 'Arsenal FC', 84), sofifa('Arsenal FC', 85));
+    expect(update.updates).toEqual({ overallRating: 85, attackRating: 86, midfieldRating: 85, defendRating: 84 });
+  });
+
+  it('is empty when the team already matches', () => {
+    expect(compareTeam(synced('a', 'Arsenal FC', 85), sofifa('Arsenal FC', 85)).changes).toEqual([]);
+  });
+});
+
+describe('findSameTeam', () => {
+  const team = synced('b', 'Bayern Munchen', 84);
+
+  it('picks the search result with the same name, ignoring accents', () => {
+    const results = [sofifa('Bayern München', 84), sofifa('Bayern München II', 60)];
+    expect(findSameTeam(team, results)?.name).toBe('Bayern München');
+  });
+
+  it('returns null when only partial matches come back, so the admin picks one', () => {
+    expect(findSameTeam(synced('l', 'Liverpool', 83), [sofifa('Liverpool FC', 83)])).toBeNull();
+  });
+});
+
+describe('leavesStarFilter', () => {
+  const filter = { minRating: 3, maxRating: 4.5 };
+
+  it('warns when the new stars fall outside the filter', () => {
+    expect(leavesStarFilter(compareTeam(synced('m', 'Manchester United', 82), sofifa('Manchester United', 83)), filter)).toBe(true);
+  });
+
+  it('stays quiet when the stars do not change or stay inside the filter', () => {
+    expect(leavesStarFilter(compareTeam(synced('a', 'Aston Villa', 79), sofifa('Aston Villa', 80)), filter)).toBe(false);
+    expect(leavesStarFilter(compareTeam(synced('c', 'Chelsea FC', 78), sofifa('Chelsea FC', 79)), filter)).toBe(false);
   });
 });
