@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ChevronRight, Settings, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Settings, Sparkles, Swords } from 'lucide-react';
 import { useAppLayoutContext } from '../components/AppLayout';
 import TeamCard from '../components/TeamCard';
 import MatchComparison from '../components/MatchComparison';
@@ -16,6 +16,7 @@ import CollapsibleSection from '../components/CollapsibleSection';
 import ErrorBoundary from '../components/ErrorBoundary';
 import EditTeamModal from '../components/EditTeamModal';
 import TeamDataCheckSheet from '../components/TeamDataCheckSheet';
+import PickBanSheet from '../components/PickBanSheet';
 import { LoadingState, ErrorState } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { getFilterWarning, getStatDifferences } from '../utils/matchDisplay';
@@ -25,6 +26,7 @@ import JokerSheet from '../components/night/JokerSheet';
 import PredictionPanel from '../components/night/PredictionPanel';
 import { useActiveNightQuery, useJokersQuery } from '../queries/nights';
 import { getJokersRemaining, getNightMatches, getNightPlayers } from '../utils/nightStats';
+import { Team } from '../types';
 
 export default function DashboardPage() {
   const {
@@ -33,6 +35,7 @@ export default function DashboardPage() {
     match, matchError, isAnimating, pendingMatch, availableTeamsForEdit,
     filteredTeams, filterSettings, openSettings,
     handleAnimationComplete, handleUpdateTeam, maxOvrDiff, canWrite,
+    canGenerateNewMatch, drawPickBan, applyMatch,
   } = useAppLayoutContext();
   const { user, isAdmin } = useAuth();
 
@@ -40,6 +43,20 @@ export default function DashboardPage() {
   const [checkingSlot, setCheckingSlot] = useState<0 | 1 | null>(null);
   const [jokerOpen, setJokerOpen] = useState(false);
   const closeJoker = useCallback(() => setJokerOpen(false), []);
+
+  // Pick & Ban: one draw per opening; `drawId` remounts the sheet so it starts fresh.
+  const [pickBan, setPickBan] = useState<{ drawId: number; options: [Team[], Team[]] } | null>(null);
+  const [pickBanError, setPickBanError] = useState<string | null>(null);
+  const closePickBan = useCallback(() => setPickBan(null), []);
+  const openPickBan = () => {
+    const options = drawPickBan();
+    if (!options) {
+      setPickBanError(`Not enough teams for Pick & Ban: it needs at least 4 unplayed teams within ${maxOvrDiff} OVR of each other. Widen the filters or the max OVR diff.`);
+      return;
+    }
+    setPickBanError(null);
+    setPickBan({ drawId: Date.now(), options });
+  };
 
   // Game night. A failing query (e.g. migration not applied yet) hides
   // every night feature rather than breaking the dashboard.
@@ -120,6 +137,16 @@ export default function DashboardPage() {
             />
           ) : match ? (
             <>
+              <button
+                type="button"
+                onClick={openPickBan}
+                disabled={!canGenerateNewMatch}
+                className="flex h-10 items-center justify-center gap-2 border-2 border-(--color-ink) bg-white text-xs font-black uppercase tracking-wide text-(--color-ink) disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Swords className="h-4 w-4" aria-hidden="true" />
+                Pick &amp; Ban instead
+              </button>
+              {pickBanError && <ErrorState message={pickBanError} />}
               <TeamCard
                 team={match[0]}
                 differences={differences?.[0]}
@@ -272,6 +299,16 @@ export default function DashboardPage() {
             const slot = match?.findIndex(t => t.id === saved.id);
             if (slot === 0 || slot === 1) handleUpdateTeam(saved, slot, { keepOpponent: true });
           }}
+        />
+      )}
+
+      {pickBan && (
+        <PickBanSheet
+          key={pickBan.drawId}
+          isOpen
+          onClose={closePickBan}
+          options={pickBan.options}
+          onConfirm={applyMatch}
         />
       )}
 

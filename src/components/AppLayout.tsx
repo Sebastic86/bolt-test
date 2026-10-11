@@ -47,6 +47,10 @@ export interface AppLayoutContextValue {
   handleGenerateNewMatch: (excludeTeamIds?: string[]) => void;
   handleAnimationComplete: () => void;
   handleUpdateTeam: (team: Team, slot: 0 | 1, options?: UpdateTeamOptions) => void;
+  /** Pick & Ban: draws options per side from the "New Matchup" pool, or null if it's too small. */
+  drawPickBan: () => [Team[], Team[]] | null;
+  /** Pick & Ban: commits the drafted matchup (plays the reveal animation). */
+  applyMatch: (match: [Team, Team]) => void;
   /** Max OVR difference allowed between the two sides (settings) — the joker draw respects it. */
   maxOvrDiff: number;
   /** Signed-in users with a profile — RLS only lets them write matches, picks and jokers. */
@@ -110,7 +114,7 @@ const AppLayout: React.FC = () => {
 
   const {
     match, pendingMatch, isAnimating, error: matchError, canGenerateNewMatch, playedTeamIdsToday,
-    handleGenerateNewMatch, handleAnimationComplete, handleUpdateTeam,
+    handleGenerateNewMatch, handleAnimationComplete, handleUpdateTeam, drawPickBan, applyMatch,
   } = useMatchGenerator({
     filteredTeams,
     matchesToday,
@@ -158,6 +162,8 @@ const AppLayout: React.FC = () => {
     handleGenerateNewMatch,
     handleAnimationComplete,
     handleUpdateTeam,
+    drawPickBan,
+    applyMatch,
     maxOvrDiff,
     canWrite: isAdmin || isNormalUser,
   };

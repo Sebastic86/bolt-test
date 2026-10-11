@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Team, MatchHistoryItem } from '../types';
 import { buildMatchupStats, getSmartMatch, getSmartOpponent } from '../utils/matchupAlgorithm';
+import { drawPickBanOptions } from '../utils/pickBan';
 
 export interface UpdateTeamOptions {
   /** Keep the other side as-is instead of re-validating it against the filters. */
@@ -147,6 +148,19 @@ export function useMatchGenerator({
     setMatch(updated);
   }, [match, filteredTeams, playedTeamIdsToday, maxOvrDiff, matchupStats]);
 
+  /** Draws Pick & Ban options from the same pool as "New Matchup" (filters, not played today). */
+  const drawPickBan = useCallback((): [Team[], Team[]] | null => {
+    const available = filteredTeams.filter(team => !playedTeamIdsToday.has(team.id));
+    return drawPickBanOptions({ pool: available, stats: matchupStats, now: Date.now(), maxOvrDiff });
+  }, [filteredTeams, playedTeamIdsToday, matchupStats, maxOvrDiff]);
+
+  /** Commits a matchup chosen outside the generator (Pick & Ban), with the reveal animation. */
+  const applyMatch = useCallback((newMatch: [Team, Team]) => {
+    setPendingMatch(newMatch);
+    setIsAnimating(true);
+    setError(null);
+  }, []);
+
   return {
     match,
     pendingMatch,
@@ -157,5 +171,7 @@ export function useMatchGenerator({
     handleGenerateNewMatch,
     handleAnimationComplete,
     handleUpdateTeam,
+    drawPickBan,
+    applyMatch,
   };
 }
