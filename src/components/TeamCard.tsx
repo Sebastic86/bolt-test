@@ -12,7 +12,7 @@ interface TeamCardProps {
   /** This team's rating minus the opponent's, per stat — rendered as +n / −n under each value. */
   differences?: StatDifferences;
   onEdit?: () => void;
-  /** Admin: compare this team with SoFIFA (opens TeamDataCheckSheet). */
+  /** Admin: compare this team with FIFA Index (opens TeamDataCheckSheet). */
   onCheckData?: () => void;
 }
 
@@ -53,8 +53,8 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, differences, onEdit, onCheckD
           <button
             onClick={onCheckData}
             className={`absolute right-2 flex h-10 w-10 items-center justify-center border-2 border-(--color-ink) bg-white text-(--color-ink) ${onEdit ? 'top-14' : 'top-2'}`}
-            aria-label={`Check ${team.name} on SoFIFA`}
-            title="Check team data on SoFIFA"
+            aria-label={`Check ${team.name} on FIFA Index`}
+            title="Check team data on FIFA Index"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
