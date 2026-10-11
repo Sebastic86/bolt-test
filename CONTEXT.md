@@ -9,7 +9,7 @@ check UI at phone width first.
 
 - React 19 + TypeScript, Vite 6, Tailwind v4 (CSS-first `@theme` tokens in `src/index.css`)
 - react-router 7, TanStack Query 5, lucide-react icons
-- Supabase (auth, Postgres with RLS, realtime, storage, one Edge Function), **self-hosted on Coolify**
+- Supabase (auth, Postgres with RLS, realtime, storage, Edge Functions), **self-hosted on Coolify**
 - Vitest for unit tests, Playwright for e2e
 - Installable as a PWA (`public/manifest.webmanifest`, `public/sw.js`, which caches nothing on purpose)
 
@@ -18,13 +18,14 @@ check UI at phone width first.
 - **Match generator** (Dashboard, `/`): filter teams by rating, FC version (FC27 is the default), and
   nations; generate a matchup with a reveal animation; save the score, including penalties.
   The weighting logic in `src/utils/matchupAlgorithm.ts` favors teams and pairings that were played
-  less often or less recently.
+  less often or less recently. Admins can check a drawn team's ratings against FIFA Index from its card
+  (`TeamDataCheckSheet`).
 - **Stats**: player standings, head-to-head win matrix, top teams per player, team leaderboard,
   achievements and milestones (milestones show as toasts).
 - **Game nights** (`/night`): a session of matches with a live table, jokers, "Who wins?" predictions
   with a leaderboard, a recap card, past nights, and deleting a night.
 - **All matches** (`/matches`) and **Admin** (`/admin`): teams, players and avatars, users and roles,
-  and logo resolution and migration tools.
+  bulk team-data sync from FIFA Index, and logo resolution and migration tools.
 - **Roles** (`user_profiles.role`): `admin` or `normal`. Normal users can add matches and edit their own.
 
 ## Code layout
@@ -34,14 +35,15 @@ check UI at phone width first.
 | `src/pages/` | Route pages (`App.tsx` defines the routes; `NightPage` is lazy-loaded) |
 | `src/components/` | Feature components; `ui/` holds hand-rolled primitives (Button, Card, BottomSheet, Toast…); `night/`, `stats/`, `install/` group features |
 | `src/queries/` | TanStack Query hooks per entity |
-| `src/services/` | Supabase data access plus logo providers (API-Sports via the Edge Function, TheSportsDB) |
+| `src/services/` | Supabase data access, FIFA Index team data, and crest providers (API-Sports via an Edge Function, TheSportsDB, Wikipedia) |
+| `src/admin-tools/` | Admin tool logic: FIFA Index HTML parser, team-data update, logo resolution, storage migration |
 | `src/utils/` | Pure logic (matchups, standings, nights, predictions, milestones…), mostly unit tested next to the source |
 | `src/hooks/` | `useMatchGenerator`, realtime match sync, settings (localStorage `fcGenerator*` keys) |
 | `src/contexts/AuthContext.tsx` | Session and role (`isAdmin`, `isNormalUser`) |
 | `src/mock/` | In-browser fake Supabase used by mock mode |
 | `src/assets/logos/` | Bundled club crests, used as a fallback for legacy `logoUrl` filenames |
 | `supabase/migrations/` | SQL schema and RLS. Main tables: `teams`, `players`, `matches`, `match_players`, `user_profiles`, `game_nights`, `predictions`, `night_jokers` |
-| `supabase/functions/api-sports-logo/` | Edge Function that keeps the API-Sports key server-side (`API_SPORTS_KEY` secret) |
+| `supabase/functions/` | Edge Functions: `api-sports-logo` keeps the API-Sports key server-side (`API_SPORTS_KEY` secret), and `fifaindex-teams` fetches FIFA Index list pages, which the browser can't do because of CORS (admins only). SoFIFA was dropped because it blocks visitors with a Cloudflare check |
 
 ## Commands
 
