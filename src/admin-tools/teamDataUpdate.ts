@@ -1,68 +1,69 @@
 import { createTeam, fetchAllTeams, updateTeam } from '../services/teamService';
-import { fetchSofifaTeamsPage } from '../services/sofifaService';
+import { FifaIndexCategory, blockedMessage, fetchFifaIndexPage } from '../services/fifaIndexService';
 import { describeChanges, diffTeamData, newTeamRow, starRatingFor } from '../utils/teamDataDiff';
-import { SOFIFA_PAGE_SIZE, SofifaTeam, parseSofifaTeamsPage } from './sofifaParser';
+import { FIFAINDEX_PAGE_SIZE, SourceTeam, parseFifaIndexTeamsPage } from './fifaIndexParser';
 import { RunStats, ToolContext, delay, emptyStats, errorMessage, summarize } from './toolContext';
 
-/** Safety cap: ~13 pages today (735 teams), so 30 leaves plenty of room. */
+/** Safety cap per category: ~16 club pages today (775 teams), so 30 leaves plenty of room. */
 const MAX_PAGES = 30;
 
-export interface SofifaSnapshot {
-  teams: SofifaTeam[];
+export interface SourceSnapshot {
+  teams: SourceTeam[];
   version: string;
-  rosterId: string | null;
-  rosterDate: string | null;
 }
 
+const LABELS: Record<FifaIndexCategory, string> = { clubs: 'clubs', nations: 'national teams' };
+
 /**
- * Downloads every team of SoFIFA's latest roster update, page by page, until
- * a short page. Later pages are pinned to the roster of the first page so a
- * roster update landing mid-run can't mix two datasets. Returns null if
- * cancelled or SoFIFA refused.
+ * Downloads every men's club and national team of FIFA Index's current game
+ * version, page by page, until a short page. Returns null if cancelled or
+ * FIFA Index refused.
  */
-export async function fetchSofifaSnapshot(ctx: ToolContext, { delayMs = 1000 } = {}): Promise<SofifaSnapshot | null> {
-  const teams = new Map<number, SofifaTeam>();
+export async function fetchSourceSnapshot(ctx: ToolContext, { delayMs = 1000 } = {}): Promise<SourceSnapshot | null> {
+  const teams = new Map<number, SourceTeam>();
   let version: string | null = null;
-  let rosterId: string | null = null;
-  let rosterDate: string | null = null;
+  let step = 0;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    if (ctx.signal.aborted) return null;
-    ctx.progress(page, page + 1, `SoFIFA page ${page + 1} (${teams.size} teams so far)`);
+  for (const category of ['clubs', 'nations'] as FifaIndexCategory[]) {
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      if (ctx.signal.aborted) return null;
+      ctx.progress(step, step + 1, `FIFA Index ${LABELS[category]} page ${page} (${teams.size} teams so far)`);
+      step++;
 
-    const response = await fetchSofifaTeamsPage(page * SOFIFA_PAGE_SIZE, rosterId);
-    if (response.status !== 200) {
-      ctx.log('error', `SoFIFA answered HTTP ${response.status} on page ${page + 1} — it is blocking the Edge Function's requests (not a bug in the tool). Try again later.`);
-      return null;
-    }
-
-    const parsed = parseSofifaTeamsPage(response.html);
-    if (page === 0) {
-      ({ version, rosterId, rosterDate } = parsed);
-      if (!version) {
-        ctx.log('error', 'Could not read the game version from SoFIFA — the page layout may have changed.');
+      const response = await fetchFifaIndexPage(page, { category });
+      if (response.status !== 200) {
+        ctx.log('error', `${blockedMessage(response.status)} (${LABELS[category]} page ${page})`);
         return null;
       }
-      ctx.log('info', `SoFIFA: ${version}, roster update ${rosterDate ?? 'unknown date'}${rosterId ? ` (r=${rosterId})` : ''}.`);
-    }
-    if (parsed.teams.length < parsed.rowCount) {
-      ctx.log('warn', `Page ${page + 1}: ${parsed.rowCount - parsed.teams.length} row(s) could not be parsed.`);
-    }
-    // The list order can shift between requests; dedupe by SoFIFA id.
-    parsed.teams.forEach(t => teams.set(t.sofifaId, t));
 
-    if (parsed.rowCount < SOFIFA_PAGE_SIZE) break;
-    if (page === MAX_PAGES - 1) ctx.log('warn', `Stopped after ${MAX_PAGES} pages — there may be more teams.`);
-    await delay(delayMs, ctx.signal);
+      const parsed = parseFifaIndexTeamsPage(response.html);
+      if (!version) {
+        version = parsed.version;
+        if (!version) {
+          ctx.log('error', 'Could not read the game version from FIFA Index — the page layout may have changed.');
+          return null;
+        }
+        ctx.log('info', `FIFA Index: ${version}.`);
+      } else if (parsed.version && parsed.version !== version) {
+        ctx.log('error', `FIFA Index switched from ${version} to ${parsed.version} mid-run — run the tool again.`);
+        return null;
+      }
+      // The list order can shift between requests; dedupe by EA team id.
+      parsed.teams.forEach(t => teams.set(t.teamId, t));
+
+      if (parsed.rowCount < FIFAINDEX_PAGE_SIZE) break;
+      if (page === MAX_PAGES) ctx.log('warn', `Stopped after ${MAX_PAGES} ${LABELS[category]} pages — there may be more teams.`);
+      await delay(delayMs, ctx.signal);
+    }
   }
 
   if (ctx.signal.aborted) return null;
   if (teams.size === 0) {
-    ctx.log('error', 'SoFIFA returned no teams — the page layout may have changed.');
+    ctx.log('error', 'FIFA Index returned no teams — the page layout may have changed.');
     return null;
   }
-  ctx.log('info', `Fetched ${teams.size} teams from SoFIFA.`);
-  return { teams: [...teams.values()], version: version!, rosterId, rosterDate };
+  ctx.log('info', `Fetched ${teams.size} teams from FIFA Index.`);
+  return { teams: [...teams.values()], version: version! };
 }
 
 export interface UpdateTeamDataOptions {
@@ -71,12 +72,12 @@ export interface UpdateTeamDataOptions {
 }
 
 /**
- * Brings the teams of the latest game version in line with SoFIFA: updates
- * OVR/ATT/MID/DEF, stars and league of existing teams and adds missing ones.
+ * Brings the teams of the latest game version in line with FIFA Index: updates
+ * OVR/ATT/MID/DEF and stars of existing teams and adds missing ones.
  * Logos are never touched on existing teams, and nothing is ever deleted.
  */
 export async function updateTeamData(ctx: ToolContext, { apply = false }: UpdateTeamDataOptions = {}): Promise<RunStats | null> {
-  const snapshot = await fetchSofifaSnapshot(ctx);
+  const snapshot = await fetchSourceSnapshot(ctx);
   if (!snapshot) {
     if (ctx.signal.aborted) ctx.log('warn', 'Cancelled — nothing was changed.');
     return null;
@@ -94,7 +95,7 @@ export async function updateTeamData(ctx: ToolContext, { apply = false }: Update
   );
   diff.ambiguous.forEach(name => ctx.log('warn', `! ${name}: more than one ${version} row with this name — skipped, fix by hand.`));
   if (diff.missing.length > 0) {
-    ctx.log('warn', `${diff.missing.length} ${version} team(s) not on SoFIFA (left untouched — renamed or removed?): ${diff.missing.map(t => t.name).join(', ')}`);
+    ctx.log('warn', `${diff.missing.length} ${version} team(s) not on FIFA Index (left untouched — renamed or removed?): ${diff.missing.map(t => t.name).join(', ')}`);
   }
 
   if (!apply) {
