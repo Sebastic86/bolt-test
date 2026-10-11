@@ -150,7 +150,22 @@ export function createClient() {
     },
 
     functions: {
-      async invoke(name: string, options: { body?: { teamId?: string; page?: number; category?: string; q?: string } } = {}) {
+      async invoke(name: string, options: { body?: { teamId?: string; page?: number; category?: string; q?: string; image?: string; teams?: string[] } } = {}) {
+        if (name === 'scan-match-result') {
+          // Fake vision reading: the second team "was home" and lost 1-3, so the app has to swap sides.
+          if (!options.body?.image) return { data: null, error: new Error('image is required') };
+          const [team1, team2] = options.body.teams ?? ['Home', 'Away'];
+          await new Promise(resolve => setTimeout(resolve, 600));
+          return {
+            data: {
+              reading: {
+                found: true, home_team: team2, away_team: team1, home_score: 1, away_score: 3,
+                home_penalties: null, away_penalties: null,
+              },
+            },
+            error: null,
+          };
+        }
         if (name === 'api-sports-logo') {
           const team = options.body?.teamId ? getTable('teams').find(t => t.id === options.body?.teamId) : null;
           return { data: { logoUrl: (team?.resolvedLogoUrl as string | null) ?? null }, error: null };
