@@ -35,7 +35,8 @@ test('a full game night on a phone', async ({ page }) => {
   await expect(sheet).toBeHidden();
 
   // Predictions: each player picks the home team; picks reveal once all 4 picked.
-  const firstPick = page.getByRole('button', { name: /^Pick / }).first();
+  // "Pick & Ban instead" also starts with "Pick"; only prediction buttons are wanted here.
+  const firstPick = page.getByRole('button', { name: /^Pick (?!& Ban)/ }).first();
   const homeTeam = (await firstPick.getAttribute('aria-label'))!.replace(/^Pick /, '');
   for (let i = 0; i < 4; i++) {
     await page.getByRole('button', { name: `Pick ${homeTeam}` }).first().click();

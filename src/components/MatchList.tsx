@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, ChevronDown, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Camera, ChevronDown, Loader2, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import { MatchHistoryItem, Player } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { PlayerBadge } from './PlayerBadge';
@@ -20,6 +20,8 @@ import {
   MatchPerspective,
   MatchResult,
 } from '../utils/matchDisplay';
+import { mapScanToMatch } from '../utils/scanResult';
+import { scanMatchResult } from '../services/scanResultService';
 
 interface MatchListProps {
   matches: MatchHistoryItem[];
@@ -100,6 +102,10 @@ const MatchList: React.FC<MatchListProps> = ({
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
   const [penaltiesWinner, setPenaltiesWinner] = useState<1 | 2 | null>(null);
+  // "Scan the result": photo → vision model → prefilled score the user still confirms.
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<{ summary: string; warnings: string[] } | null>(null);
   const [editingPlayersMatchId, setEditingPlayersMatchId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
 
@@ -112,6 +118,7 @@ const MatchList: React.FC<MatchListProps> = ({
 
   const handleEditScoreClick = (match: MatchHistoryItem) => {
     setEditingScoreMatchId(match.id);
+    setScanNote(null);
     setScore1Input(match.team1_score?.toString() ?? '');
     setScore2Input(match.team2_score?.toString() ?? '');
     setPenaltiesWinner(match.penalties_winner);
@@ -119,9 +126,35 @@ const MatchList: React.FC<MatchListProps> = ({
 
   const handleCancelEditScore = () => {
     setEditingScoreMatchId(null);
+    setScanNote(null);
     setScore1Input('');
     setScore2Input('');
     setPenaltiesWinner(null);
+  };
+
+  const handleScanFile = async (match: MatchHistoryItem, file: File | undefined) => {
+    if (!file) return;
+    setScanning(true);
+    setScanNote(null);
+    try {
+      const reading = await scanMatchResult(file, [match.team1_name, match.team2_name]);
+      const mapped = mapScanToMatch(reading, match.team1_name, match.team2_name);
+      if (!mapped.ok) {
+        showError(mapped.error);
+        return;
+      }
+      const { team1Score, team2Score, penaltiesWinner: winner, warnings } = mapped.outcome;
+      setScore1Input(String(team1Score));
+      setScore2Input(String(team2Score));
+      setPenaltiesWinner(winner);
+      const pens = winner ? ` (pens: ${winner === 1 ? match.team1_name : match.team2_name})` : '';
+      setScanNote({ summary: `Scanned: ${match.team1_name} ${team1Score}–${team2Score} ${match.team2_name}${pens}. Check it, then save.`, warnings });
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Scanning failed.');
+    } finally {
+      setScanning(false);
+      if (scanInputRef.current) scanInputRef.current.value = '';
+    }
   };
 
   const handleSaveScore = (matchId: string) => {
@@ -142,6 +175,7 @@ const MatchList: React.FC<MatchListProps> = ({
         onSuccess: () => {
           setEditingScoreMatchId(null);
           setPenaltiesWinner(null);
+          setScanNote(null);
         },
         onError: () => showError('Failed to save score.'),
       }
@@ -277,6 +311,36 @@ const MatchList: React.FC<MatchListProps> = ({
 
             {isEditingScore && (
               <div className="mt-2 flex flex-wrap items-center justify-center gap-2 border-2 border-(--color-ink) bg-gray-50 p-2">
+                <input
+                  ref={scanInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  aria-label="Photo of the result screen"
+                  onChange={e => handleScanFile(match, e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => scanInputRef.current?.click()}
+                  disabled={scanning || updateScore.isPending}
+                  className={`${BUTTON_BASE} w-full gap-2 bg-white text-(--color-ink)`}
+                >
+                  {scanning
+                    ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Reading the score…</>
+                    : <><Camera className="h-4 w-4" aria-hidden="true" />Scan result screen</>}
+                </button>
+                {scanNote && (
+                  <div role="status" className="w-full text-xs">
+                    <p className="font-bold text-(--color-green-deep)">{scanNote.summary}</p>
+                    {scanNote.warnings.map(w => (
+                      <p key={w} className="mt-1 flex items-start gap-1.5 border-2 border-yellow-400 bg-yellow-50 p-1.5 font-bold text-(--color-ink)">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none text-yellow-700" aria-hidden="true" />
+                        {w}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 <input
                   type="number" inputMode="numeric" min="0" value={score1Input}
                   onChange={e => setScore1Input(e.target.value)}

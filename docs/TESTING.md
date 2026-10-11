@@ -18,6 +18,7 @@ Production builds never include it (it is swapped in by `vite --mode mock` only)
   error, blocked updates silently change nothing), the match-nights triggers
   (match → active night, predictions → saved match), `admin_list_users`,
   storage uploads (kept as data URLs). The `api-sports-logo` function returns no logo;
+  `scan-match-result` returns a fixed reading (second team home, 1-3) for any photo;
   TheSportsDB lookups still go to the internet.
 
 Not emulated: real Postgres SQL, policies as written in the migrations, Edge Function

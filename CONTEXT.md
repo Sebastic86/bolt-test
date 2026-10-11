@@ -20,6 +20,7 @@ check UI at phone width first.
   The weighting logic in `src/utils/matchupAlgorithm.ts` favors teams and pairings that were played
   less often or less recently. Admins can check a drawn team's ratings against FIFA Index from its card
   (`TeamDataCheckSheet`).
+- **Scan the result**: in the score editor, "Scan result screen" takes a photo of the EA FC full-time screen and prefills the score and penalties winner (`src/utils/scanResult.ts` maps the in-game home/away order onto team1/team2). The user always checks and saves.
 - **Stats**: player standings, head-to-head win matrix, top teams per player, team leaderboard,
   achievements and milestones (milestones show as toasts).
 - **Game nights** (`/night`): a session of matches with a live table, jokers, "Who wins?" predictions
@@ -43,7 +44,7 @@ check UI at phone width first.
 | `src/mock/` | In-browser fake Supabase used by mock mode |
 | `src/assets/logos/` | Bundled club crests, used as a fallback for legacy `logoUrl` filenames |
 | `supabase/migrations/` | SQL schema and RLS. Main tables: `teams`, `players`, `matches`, `match_players`, `user_profiles`, `game_nights`, `predictions`, `night_jokers` |
-| `supabase/functions/` | Edge Functions: `api-sports-logo` keeps the API-Sports key server-side (`API_SPORTS_KEY` secret), and `fifaindex-teams` fetches FIFA Index list pages, which the browser can't do because of CORS (admins only). SoFIFA was dropped because it blocks visitors with a Cloudflare check |
+| `supabase/functions/` | Edge Functions: `api-sports-logo` keeps the API-Sports key server-side (`API_SPORTS_KEY` secret), and `fifaindex-teams` fetches FIFA Index list pages, which the browser can't do because of CORS (admins only). SoFIFA was dropped because it blocks visitors with a Cloudflare check. `scan-match-result` reads the final score off a photo of the full-time screen with Claude (`ANTHROPIC_API_KEY` secret, optional `SCAN_MODEL`) |
 
 ## Commands
 
