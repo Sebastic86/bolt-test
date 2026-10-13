@@ -8,6 +8,7 @@ import AddMatchModal from './AddMatchModal';
 import { useMatchesRealtimeSync } from '../hooks/useMatchesRealtimeSync';
 import { useSettings } from '../hooks/useSettings';
 import { UpdateTeamOptions, useMatchGenerator } from '../hooks/useMatchGenerator';
+import { useTvMatchupPublisher } from '../hooks/useTvSync';
 import { useTeamsQuery } from '../queries/teams';
 import { usePlayersQuery } from '../queries/players';
 import { useAllMatchesQuery, useMatchesTodayQuery } from '../queries/matches';
@@ -113,7 +114,7 @@ const AppLayout: React.FC = () => {
   const ready = teamsQuery.isSuccess && playersQuery.isSuccess && matchesTodayQuery.isSuccess;
 
   const {
-    match, pendingMatch, isAnimating, error: matchError, canGenerateNewMatch, playedTeamIdsToday,
+    match, matchSetAt, pendingMatch, isAnimating, error: matchError, canGenerateNewMatch, playedTeamIdsToday,
     handleGenerateNewMatch, handleAnimationComplete, handleUpdateTeam, drawPickBan, applyMatch,
   } = useMatchGenerator({
     filteredTeams,
@@ -125,6 +126,8 @@ const AppLayout: React.FC = () => {
     maxRating,
     ready,
   });
+
+  useTvMatchupPublisher({ match, matchSetAt, pendingMatch, isAnimating });
 
   const availableTeamsForEdit = useMemo(
     () => filteredTeams.filter(t => !playedTeamIdsToday.has(t.id)),

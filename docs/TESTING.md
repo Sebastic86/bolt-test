@@ -14,6 +14,7 @@ Production builds never include it (it is swapped in by `vite --mode mock` only)
   No role, Signed out — open a second tab as a player, or reset data.
   URL shortcut: `?mockRole=admin|normal|none|out`. Slow network: `?mockLatency=800`.
 - **Two phones**: open two tabs. Writes sync between tabs like realtime does.
+- **TV mode**: open `/tv` in another tab. Realtime broadcast messages (the phone's matchup) go between tabs too.
 - **Emulated server behaviour**: unique constraints, FK cascades, RLS (blocked inserts
   error, blocked updates silently change nothing), the match-nights triggers
   (match → active night, predictions → saved match), `admin_list_users`,

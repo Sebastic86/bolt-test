@@ -7,10 +7,20 @@ import AdminRoute from './pages/AdminRoute';
 import { LoadingState } from './components/ui';
 
 const NightPage = lazy(() => import('./pages/NightPage'));
+const TvPage = lazy(() => import('./pages/TvPage'));
 
 function App() {
   return (
     <Routes>
+      {/* TV mode: full screen, no header or bottom nav. */}
+      <Route
+        path="tv"
+        element={
+          <Suspense fallback={<LoadingState label="Loading TV mode..." />}>
+            <TvPage />
+          </Suspense>
+        }
+      />
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="matches" element={<AllMatchesPage />} />

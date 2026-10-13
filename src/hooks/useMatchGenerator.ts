@@ -43,6 +43,8 @@ export function useMatchGenerator({
   const [pendingMatch, setPendingMatch] = useState<[Team, Team] | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** When `match` was last set by an explicit action — null for the automatic draw (TV mode only follows explicit ones). */
+  const [matchSetAt, setMatchSetAt] = useState<number | null>(null);
 
   const matchupStats = useMemo(() => buildMatchupStats(allMatches), [allMatches]);
 
@@ -105,6 +107,7 @@ export function useMatchGenerator({
   /** Called by MatchRevealAnimation once the reveal has finished playing. */
   const handleAnimationComplete = useCallback(() => {
     setMatch(pendingMatch);
+    setMatchSetAt(Date.now());
     setPendingMatch(null);
     setIsAnimating(false);
   }, [pendingMatch]);
@@ -125,6 +128,7 @@ export function useMatchGenerator({
       const updated: [Team, Team] = [...match];
       updated[slot] = newTeam;
       setMatch(updated);
+      setMatchSetAt(Date.now());
       return;
     }
 
@@ -146,6 +150,7 @@ export function useMatchGenerator({
     updated[slot] = newTeam;
     updated[otherSlot] = newOpponent;
     setMatch(updated);
+    setMatchSetAt(Date.now());
   }, [match, filteredTeams, playedTeamIdsToday, maxOvrDiff, matchupStats]);
 
   /** Draws Pick & Ban options from the same pool as "New Matchup" (filters, not played today). */
@@ -163,6 +168,7 @@ export function useMatchGenerator({
 
   return {
     match,
+    matchSetAt,
     pendingMatch,
     isAnimating,
     error,

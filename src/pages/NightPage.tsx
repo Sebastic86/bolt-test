@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { AlertTriangle, Moon, Share2, Ticket, Trash2 } from 'lucide-react';
+import { AlertTriangle, Moon, Share2, Ticket, Trash2, Tv } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAppLayoutContext } from '../components/AppLayout';
 import MatchList from '../components/MatchList';
 import PlayerBadge from '../components/PlayerBadge';
@@ -132,6 +133,13 @@ export default function NightPage() {
 
   return (
     <div className="mx-auto w-full max-w-md p-4">
+      <Link
+        to="/tv"
+        className="mb-4 flex h-10 items-center justify-center gap-2 border-2 border-(--color-ink) bg-white text-xs font-black uppercase tracking-wide text-(--color-ink)"
+      >
+        <Tv className="h-4 w-4" aria-hidden="true" />
+        Open TV mode
+      </Link>
       {content}
       <NightRecapSheet isOpen={recapNight !== null} onClose={closeRecap} data={recapData} />
       <DeleteNightSheet
