@@ -36,14 +36,27 @@ function fail(message: string, code = 'P0001') {
   return Promise.resolve({ data: null, error: { message, code, details: null, hint: null } });
 }
 
+type BroadcastCallback = (message: { type: 'broadcast'; event: string; payload: unknown }) => void;
+
+/**
+ * postgres_changes are fed from the mock db's change feed; broadcast messages
+ * go to the same channel name in other tabs (a BroadcastChannel per name),
+ * not back to the sender — like Supabase's default `broadcast.self: false`.
+ */
 class MockChannel {
   private bindings: { table: string; event: string; callback: ChangeCallback }[] = [];
+  private broadcastBindings: { event: string; callback: BroadcastCallback }[] = [];
   private unsubscribe: (() => void) | null = null;
+  private bus: BroadcastChannel | null = null;
 
   constructor(public name: string) {}
 
-  on(_type: string, filter: { event?: string; table?: string }, callback: ChangeCallback) {
-    this.bindings.push({ table: filter.table ?? '*', event: filter.event ?? '*', callback });
+  on(type: string, filter: { event?: string; table?: string }, callback: ChangeCallback | BroadcastCallback) {
+    if (type === 'broadcast') {
+      this.broadcastBindings.push({ event: filter.event ?? '*', callback: callback as BroadcastCallback });
+    } else {
+      this.bindings.push({ table: filter.table ?? '*', event: filter.event ?? '*', callback: callback as ChangeCallback });
+    }
     return this;
   }
 
@@ -59,12 +72,32 @@ class MockChannel {
         }
       }
     });
+    if (this.broadcastBindings.length > 0 && typeof BroadcastChannel !== 'undefined') {
+      this.bus = new BroadcastChannel(`mock-realtime:${this.name}`);
+      this.bus.onmessage = (e: MessageEvent<{ event: string; payload: unknown }>) => {
+        for (const binding of this.broadcastBindings) {
+          if (binding.event === '*' || binding.event === e.data.event) {
+            binding.callback({ type: 'broadcast', event: e.data.event, payload: e.data.payload });
+          }
+        }
+      };
+    }
     status?.('SUBSCRIBED');
     return this;
   }
 
+  async send(message: { type: string; event: string; payload?: unknown }) {
+    if (message.type !== 'broadcast' || typeof BroadcastChannel === 'undefined') return 'error';
+    const bus = this.bus ?? new BroadcastChannel(`mock-realtime:${this.name}`);
+    bus.postMessage({ event: message.event, payload: message.payload ?? null });
+    if (!this.bus) bus.close();
+    return 'ok';
+  }
+
   close() {
     this.unsubscribe?.();
+    this.bus?.close();
+    this.bus = null;
   }
 }
 
@@ -168,6 +201,7 @@ export function createClient() {
       },
     },
 
+    // Real supabase-js takes channel options (e.g. broadcast config) as a 2nd argument; the mock ignores them.
     channel: (name: string) => new MockChannel(name),
     removeChannel(channel: MockChannel) {
       channel.close();

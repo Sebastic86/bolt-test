@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Volleyball, LogOut, User, Shield, Smartphone } from 'lucide-react';
+import { Volleyball, LogOut, User, Shield, Smartphone, Tv } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserInfo, AuthenticatedOnly, AdminOnly } from './RoleBasedComponents';
 import { useInstallFlow } from './install/useInstallFlow';
@@ -41,6 +41,15 @@ const Header: React.FC = () => {
               <div className="border-b border-gray-200 px-4 py-2">
                 <UserInfo />
               </div>
+
+              <Link
+                to="/tv"
+                onClick={() => setShowUserMenu(false)}
+                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <Tv className="h-4 w-4" />
+                <span>TV mode</span>
+              </Link>
 
               <AdminOnly>
                 <Link

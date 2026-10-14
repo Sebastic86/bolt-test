@@ -20,6 +20,7 @@ check UI at phone width first.
   The weighting logic in `src/utils/matchupAlgorithm.ts` favors teams and pairings that were played
   less often or less recently. Admins can check a drawn team's ratings against FIFA Index from its card
   (`TeamDataCheckSheet`).
+- **TV mode** (`/tv`): full-screen view for a TV/laptop with the current matchup (incl. reveal and tonight's picks), the live table and the latest results. Phones announce their matchup over a Supabase Realtime *broadcast* channel (`tv-matchup`, no table) after an explicit action and answer a TV's "hello"; tonight's newest open prediction is the fallback (`src/utils/tvSync.ts`).
 - **Stats**: player standings, head-to-head win matrix, top teams per player, team leaderboard,
   achievements and milestones (milestones show as toasts).
 - **Game nights** (`/night`): a session of matches with a live table, jokers, "Who wins?" predictions
