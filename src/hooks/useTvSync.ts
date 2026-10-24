@@ -9,10 +9,37 @@ type Channel = ReturnType<typeof supabase.channel>;
 
 const openChannel = () => supabase.channel(TV_CHANNEL, { config: { broadcast: { self: false } } });
 
+/**
+ * Sends over Realtime's HTTP endpoint instead of the websocket: the
+ * self-hosted Realtime server (older than v2.97) closes the socket with 1011
+ * on every websocket broadcast from this client version, while HTTP
+ * broadcasts are delivered to subscribers fine. (`httpSend()` needs v2.97+.)
+ * The mock client has no server, so it keeps using the channel.
+ */
+export async function sendBroadcast(channel: Channel, event: string, payload: unknown): Promise<void> {
+  if (import.meta.env.MODE === 'mock') {
+    await channel.send({ type: 'broadcast', event, payload });
+    return;
+  }
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const { data } = await supabase.auth.getSession();
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/realtime/v1/api/broadcast`, {
+    method: 'POST',
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${data.session?.access_token ?? anonKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messages: [{ topic: TV_CHANNEL, event, payload }] }),
+  });
+  if (!response.ok) throw new Error(`Realtime broadcast failed: HTTP ${response.status}`);
+}
+
 const send = (channel: Channel | null, event: string, payload: unknown) => {
   if (!channel) return;
-  void channel.send({ type: 'broadcast', event, payload }).catch(() => {
+  void sendBroadcast(channel, event, payload).catch(err => {
     // Best effort: the TV also falls back to tonight's predictions.
+    console.warn(`[tv] ${event} not sent:`, err instanceof Error ? err.message : err);
   });
 };
 
