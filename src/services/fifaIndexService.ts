@@ -28,7 +28,7 @@ async function describeFunctionError(error: unknown): Promise<string> {
 
   // The self-hosted edge runtime answers this for any function folder it can't find.
   if (/worker boot error|failed to read path|not found/i.test(detail) || response.status === 404) {
-    return `The ${FUNCTION} Edge Function is not deployed on the Supabase server (HTTP ${response.status}: ${detail}) — merge to main and restart the Supabase service in Coolify.`;
+    return `The ${FUNCTION} Edge Function is not deployed on the Supabase server (HTTP ${response.status}: ${detail}) — check that it is in the supabase-functions-sync list of the Coolify compose, then redeploy the Supabase service.`;
   }
   if (response.status === 401 || response.status === 403) {
     return `The ${FUNCTION} Edge Function refused the request (HTTP ${response.status}: ${detail}) — sign in as an admin.`;
@@ -37,7 +37,9 @@ async function describeFunctionError(error: unknown): Promise<string> {
 }
 
 export const blockedMessage = (status: number) =>
-  `FIFA Index answered HTTP ${status} — it is blocking the server's requests. Try again later.`;
+  status === 403
+    ? `FIFA Index answered HTTP 403 — it now blocks automated requests behind a bot check. Enter the ratings by hand instead (team card → check team data, or Admin → Teams).`
+    : `FIFA Index answered HTTP ${status} — it is blocking the server's requests. Try again later.`;
 
 export async function fetchFifaIndexPage(
   page: number,
