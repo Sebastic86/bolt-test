@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Pencil, RefreshCw, Save, Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Team } from '../types';
 import { BottomSheet, Button, ErrorState, Input, LoadingState, useToast } from './ui';
@@ -12,6 +12,7 @@ import {
   compareTeam,
   findSameTeam,
   leavesStarFilter,
+  starRatingFor,
   syncedValues,
 } from '../utils/teamDataDiff';
 
@@ -30,6 +31,25 @@ const FIELDS = COMPARED_FIELDS;
 const formatValue = (field: SyncedField, value: string | number) =>
   field === 'rating' ? Number(value).toFixed(1) : String(value);
 
+type RatingField = 'overallRating' | 'attackRating' | 'midfieldRating' | 'defendRating';
+const RATING_FIELDS: RatingField[] = ['overallRating', 'attackRating', 'midfieldRating', 'defendRating'];
+/** Typed values stay strings so a field can be cleared while typing. */
+type Draft = Record<RatingField | 'rating', string>;
+
+const draftFrom = (team: Team): Draft => ({
+  overallRating: String(team.overallRating),
+  attackRating: String(team.attackRating),
+  midfieldRating: String(team.midfieldRating),
+  defendRating: String(team.defendRating),
+  rating: String(team.rating),
+});
+
+const validRating = (value: string) => /^\d{1,2}$/.test(value.trim());
+const validStars = (value: string) => {
+  const stars = Number(value);
+  return value.trim() !== '' && stars >= 0 && stars <= 5 && Number.isInteger(stars * 2);
+};
+
 /**
  * Admin check of one team against FIFA Index's current ratings — for when
  * the ratings in the game differ from the card. Shows a side-by-side preview
@@ -41,12 +61,19 @@ const TeamDataCheckSheet: React.FC<TeamDataCheckSheetProps> = ({ team, onClose, 
   const [keyword, setKeyword] = useState('');
   const [searchFor, setSearchFor] = useState('');
   const [pickedId, setPickedId] = useState<number | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  // Stars follow OVR until the admin sets them.
+  const [starsTouched, setStarsTouched] = useState(false);
 
   // Start every opening with a search for the team's own name.
   useEffect(() => {
     setKeyword(team?.name ?? '');
     setSearchFor(team?.name ?? '');
     setPickedId(null);
+    setManualOpen(false);
+    setDraft(team ? draftFrom(team) : null);
+    setStarsTouched(false);
     updateMutation.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team?.id]);
@@ -70,16 +97,37 @@ const TeamDataCheckSheet: React.FC<TeamDataCheckSheetProps> = ({ team, onClose, 
   const upToDate = !!update && update.changes.length === 0;
   const canUpdate = !!update && !upToDate && !versionMismatch && !updateMutation.isPending;
 
+  // By hand: FIFA Index blocks automated lookups, so the admin can type the in-game ratings instead.
+  const manual = manualOpen || search.isError;
+  const manualValid = !!draft && RATING_FIELDS.every(f => validRating(draft[f])) && validStars(draft.rating);
+  const manualUpdates: Partial<Team> = {};
+  if (draft && manualValid) {
+    for (const f of RATING_FIELDS) if (Number(draft[f]) !== team[f]) manualUpdates[f] = Number(draft[f]);
+    if (Number(draft.rating) !== team.rating) manualUpdates.rating = Number(draft.rating);
+  }
+  const manualChanged = Object.keys(manualUpdates).length > 0;
+  const canSaveManual = manualValid && manualChanged && !updateMutation.isPending;
+  const manualStars = manualUpdates.rating;
+  const manualLeavesFilter =
+    manualStars !== undefined && (manualStars < starFilter.minRating || manualStars > starFilter.maxRating);
+
+  const setDraftField = (field: RatingField, value: string) =>
+    setDraft(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, [field]: value };
+      if (field === 'overallRating' && !starsTouched && validRating(value)) next.rating = String(starRatingFor(Number(value)));
+      return next;
+    });
+
   const runSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPickedId(null);
     setSearchFor(keyword.trim());
   };
 
-  const handleUpdate = () => {
-    if (!update || !canUpdate) return;
+  const save = (updates: Partial<Team>) =>
     updateMutation.mutate(
-      { id: team.id, updates: update.updates },
+      { id: team.id, updates },
       {
         onSuccess: saved => {
           toast({ variant: 'success', title: `${saved.name} updated`, detail: `Now OVR ${saved.overallRating} · ★ ${saved.rating.toFixed(1)}` });
@@ -88,6 +136,13 @@ const TeamDataCheckSheet: React.FC<TeamDataCheckSheetProps> = ({ team, onClose, 
         },
       }
     );
+
+  const handleUpdate = () => {
+    if (manual) {
+      if (canSaveManual) save(manualUpdates);
+    } else if (update && canUpdate) {
+      save(update.updates);
+    }
   };
 
   return (
@@ -100,8 +155,12 @@ const TeamDataCheckSheet: React.FC<TeamDataCheckSheetProps> = ({ team, onClose, 
           <Button variant="outline" onClick={onClose} disabled={updateMutation.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleUpdate} disabled={!canUpdate}>
-            {upToDate ? (
+          <Button onClick={handleUpdate} disabled={manual ? !canSaveManual : !canUpdate}>
+            {manual ? (
+              <>
+                <Save className="h-4 w-4" /> {updateMutation.isPending ? 'Saving…' : 'Save ratings'}
+              </>
+            ) : upToDate ? (
               <>
                 <CheckCircle2 className="h-4 w-4" /> Up to date
               </>
@@ -118,28 +177,112 @@ const TeamDataCheckSheet: React.FC<TeamDataCheckSheetProps> = ({ team, onClose, 
       <div className="space-y-3">
         <p className="text-xs text-gray-600">
           Compares <strong className="text-(--color-ink)">{team.name}</strong> ({team.version}) with FIFA Index's
-          ratings — the ones shown in the game. Nothing changes until you tap Update team.
+          ratings — the ones shown in the game — or lets you enter them by hand. Nothing changes until you save.
         </p>
 
-        <form onSubmit={runSearch} className="flex gap-2">
-          <Input
-            value={keyword}
-            onChange={e => setKeyword(e.target.value)}
-            aria-label="FIFA Index search"
-            placeholder="Team name on FIFA Index"
-            className="min-w-0 flex-1"
-          />
-          <Button type="submit" variant="outline" className="flex-none px-3" aria-label="Search FIFA Index" disabled={!keyword.trim()}>
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
+        {!manual && (
+          <form onSubmit={runSearch} className="flex gap-2">
+            <Input
+              value={keyword}
+              onChange={e => setKeyword(e.target.value)}
+              aria-label="FIFA Index search"
+              placeholder="Team name on FIFA Index"
+              className="min-w-0 flex-1"
+            />
+            <Button type="submit" variant="outline" className="flex-none px-3" aria-label="Search FIFA Index" disabled={!keyword.trim()}>
+              <Search className="h-4 w-4" />
+            </Button>
+          </form>
+        )}
 
-        {search.isFetching && <LoadingState label={`Looking up "${searchFor}" on FIFA Index…`} />}
+        {!manual && search.isFetching && <LoadingState label={`Looking up "${searchFor}" on FIFA Index…`} />}
         {search.isError && !search.isFetching && (
           <ErrorState message={search.error instanceof Error ? search.error.message : 'FIFA Index lookup failed.'} />
         )}
 
-        {page && !search.isFetching && (
+        {manual && draft && (
+          <div>
+            <p className="mb-1 text-xs font-black uppercase tracking-wide text-(--color-ink)">Enter the ratings by hand</p>
+            <p className="mb-3 text-xs text-gray-600">Copy them from the team select screen in the game.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {RATING_FIELDS.map(field => (
+                <label key={field} className="block">
+                  <span className="mb-1 block text-xs font-black uppercase tracking-wide text-gray-600">{FIELD_LABELS[field]}</span>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={99}
+                    value={draft[field]}
+                    onChange={e => setDraftField(field, e.target.value)}
+                    aria-invalid={!validRating(draft[field])}
+                    disabled={updateMutation.isPending}
+                    className="h-11 tabular-nums"
+                  />
+                </label>
+              ))}
+              <div className="col-span-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-black uppercase tracking-wide text-gray-600">{FIELD_LABELS.rating} Stars</span>
+                  <Input
+                    aria-describedby="manual-stars-hint"
+                    type="number"
+                    inputMode="decimal"
+                    step={0.5}
+                    min={0}
+                    max={5}
+                    value={draft.rating}
+                    onChange={e => {
+                      setStarsTouched(true);
+                      setDraft(prev => (prev ? { ...prev, rating: e.target.value } : prev));
+                    }}
+                    aria-invalid={!validStars(draft.rating)}
+                    disabled={updateMutation.isPending}
+                    className="h-11 tabular-nums"
+                  />
+                </label>
+                <p id="manual-stars-hint" className="mt-1 text-[11px] text-gray-500">
+                  {starsTouched ? 'Set by hand.' : 'Follows OVR. Change it if the game shows different stars.'}
+                </p>
+              </div>
+            </div>
+
+            {!manualValid && (
+              <p role="alert" className="mt-2 text-xs font-bold text-red-600">
+                Ratings must be whole numbers from 0 to 99, and stars 0–5 in steps of 0.5.
+              </p>
+            )}
+            {manualValid && !manualChanged && <p className="mt-2 text-xs text-gray-500">Same as the current ratings.</p>}
+            {manualValid && manualLeavesFilter && (
+              <p role="alert" className="mt-2 flex items-start gap-2 border-2 border-yellow-400 bg-yellow-50 p-2.5 text-xs font-bold text-(--color-ink)">
+                <AlertTriangle className="h-4 w-4 flex-none text-yellow-700" aria-hidden="true" />
+                ★ {manualStars?.toFixed(1)} is outside your star filter ({starFilter.minRating.toFixed(1)}–
+                {starFilter.maxRating.toFixed(1)}) — a new matchup will be drawn after saving.
+              </p>
+            )}
+            {!search.isError && (
+              <button
+                type="button"
+                onClick={() => setManualOpen(false)}
+                className="mt-2 min-h-11 text-xs font-bold uppercase tracking-wide text-gray-500 underline"
+              >
+                Back to FIFA Index
+              </button>
+            )}
+          </div>
+        )}
+
+        {!manual && !search.isFetching && (
+          <button
+            type="button"
+            onClick={() => setManualOpen(true)}
+            className="flex min-h-11 items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-gray-500 underline"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Enter ratings by hand
+          </button>
+        )}
+
+        {!manual && page && !search.isFetching && (
           <>
             {versionMismatch && (
               <p role="alert" className="flex items-start gap-2 border-2 border-yellow-400 bg-yellow-50 p-2.5 text-xs font-bold text-(--color-ink)">

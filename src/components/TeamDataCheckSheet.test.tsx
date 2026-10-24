@@ -93,6 +93,57 @@ describe('TeamDataCheckSheet', () => {
     expect(await screen.findByText(/outside your star filter/i)).toBeInTheDocument();
   });
 
+  it('falls back to entering the ratings by hand when FIFA Index blocks the lookup', async () => {
+    searchFifaIndexTeams.mockRejectedValue(new Error('FIFA Index answered HTTP 403'));
+    updateTeam.mockImplementation(async (id: string, updates: Partial<Team>) => ({ ...arsenal, ...updates, id }));
+    const { onUpdated, onClose } = renderSheet();
+
+    const ovr = await screen.findByRole('spinbutton', { name: /^ovr$/i });
+    expect(screen.getByText(/http 403/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save ratings/i })).toBeDisabled();
+
+    fireEvent.change(ovr, { target: { value: '86' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: /^def$/i }), { target: { value: '84' } });
+    fireEvent.click(screen.getByRole('button', { name: /save ratings/i }));
+
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ id: 'a', overallRating: 86 })));
+    expect(updateTeam).toHaveBeenCalledWith('a', { overallRating: 86, defendRating: 84 });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('derives the stars from a typed OVR unless they were set by hand', async () => {
+    searchFifaIndexTeams.mockRejectedValue(new Error('blocked'));
+    renderSheet({ ...arsenal, overallRating: 84, rating: 5 }, { minRating: 4.5, maxRating: 5 });
+
+    fireEvent.change(await screen.findByRole('spinbutton', { name: /^ovr$/i }), { target: { value: '78' } });
+    const stars = screen.getByRole('spinbutton', { name: /stars/i });
+    expect(stars).toHaveValue(4);
+    expect(screen.getByText(/outside your star filter/i)).toBeInTheDocument();
+
+    fireEvent.change(stars, { target: { value: '4.5' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: /^ovr$/i }), { target: { value: '70' } });
+    expect(stars).toHaveValue(4.5);
+  });
+
+  it('rejects ratings outside 0-99', async () => {
+    searchFifaIndexTeams.mockRejectedValue(new Error('blocked'));
+    renderSheet();
+    fireEvent.change(await screen.findByRole('spinbutton', { name: /^att$/i }), { target: { value: '120' } });
+    expect(screen.getByText(/whole numbers from 0 to 99/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save ratings/i })).toBeDisabled();
+  });
+
+  it('offers entering by hand even when the lookup works', async () => {
+    searchFifaIndexTeams.mockResolvedValue(result([{}]));
+    renderSheet();
+    await screen.findByRole('row', { name: /ovr/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /enter ratings by hand/i }));
+    expect(screen.getByRole('spinbutton', { name: /^ovr$/i })).toHaveValue(84);
+    fireEvent.click(screen.getByRole('button', { name: /back to fifa index/i }));
+    expect(screen.getByRole('row', { name: /ovr/i })).toBeInTheDocument();
+  });
+
   it('searches again with another spelling', async () => {
     searchFifaIndexTeams.mockResolvedValueOnce(result([])).mockResolvedValueOnce(result([{}]));
     renderSheet();
