@@ -11,7 +11,7 @@ interface AddMatchModalProps {
   matchTeams: [Team, Team] | null;
   players: Player[];
   currentUserId?: string;
-  onSaved: (action: 'rematch' | 'next') => void;
+  onSaved: (action: 'save' | 'next') => void;
 }
 
 const MAX_PLAYERS_PER_TEAM = 4;
@@ -32,7 +32,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
 
   const createMatch = useCreateMatchMutation();
 
-  // After "Save & Rematch", reopening for the same two teams keeps the same line-ups.
+  // After a plain Save the matchup stays on screen; adding it again (a rematch) keeps the same line-ups.
   const lastRematchRef = useRef<{ teamIds: [string, string]; team1PlayerIds: string[]; team2PlayerIds: string[] } | null>(null);
 
   useEffect(() => {
@@ -78,7 +78,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
 
   const playerName = (id: string) => players.find(p => p.id === id)?.name ?? '?';
 
-  const handleSave = (action: 'rematch' | 'next') => {
+  const handleSave = (action: 'save' | 'next') => {
     if (!matchTeams) return;
     if (team1PlayerIds.length === 0 && team2PlayerIds.length === 0) {
       setError('Please add at least one player to the match.');
@@ -95,7 +95,7 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
       },
       {
         onSuccess: () => {
-          lastRematchRef.current = action === 'rematch'
+          lastRematchRef.current = action === 'save'
             ? { teamIds: [matchTeams[0].id, matchTeams[1].id], team1PlayerIds, team2PlayerIds }
             : null;
           onSaved(action);
@@ -116,8 +116,8 @@ const AddMatchModal: React.FC<AddMatchModalProps> = ({
       title="Add Match"
       footer={
         <div className="flex flex-col gap-2">
-          <Button variant="secondary" className="w-full" disabled={createMatch.isPending} onClick={() => handleSave('rematch')}>
-            Save &amp; Rematch
+          <Button variant="secondary" className="w-full" disabled={createMatch.isPending} onClick={() => handleSave('save')}>
+            Save
           </Button>
           <Button variant="primary" className="w-full" disabled={createMatch.isPending} onClick={() => handleSave('next')}>
             Save &amp; Next Matchup
