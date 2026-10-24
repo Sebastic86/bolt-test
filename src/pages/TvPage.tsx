@@ -5,7 +5,7 @@ import AuthWrapper from '../components/AuthWrapper';
 import MatchRevealAnimation from '../components/MatchRevealAnimation';
 import TvMatchup from '../components/tv/TvMatchup';
 import { TvLatestResults, TvTable } from '../components/tv/TvSidePanel';
-import { useMatchesRealtimeSync } from '../hooks/useMatchesRealtimeSync';
+import { useMatchesRealtimeSync, useTvPeriodicRefresh } from '../hooks/useMatchesRealtimeSync';
 import { useTvMatchupSubscriber } from '../hooks/useTvSync';
 import { useTeamsQuery } from '../queries/teams';
 import { usePlayersQuery } from '../queries/players';
@@ -67,6 +67,7 @@ function useClock() {
 
 function TvScreen() {
   useMatchesRealtimeSync();
+  useTvPeriodicRefresh();
   useWakeLock();
   const clock = useClock();
 

@@ -52,6 +52,8 @@ class MockChannel {
   constructor(public name: string) {}
 
   on(type: string, filter: { event?: string; table?: string }, callback: ChangeCallback | BroadcastCallback) {
+    // Realtime status messages: the mock never fails a subscription.
+    if (type === 'system') return this;
     if (type === 'broadcast') {
       this.broadcastBindings.push({ event: filter.event ?? '*', callback: callback as BroadcastCallback });
     } else {
