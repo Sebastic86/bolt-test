@@ -134,7 +134,7 @@ const AppLayout: React.FC = () => {
     [filteredTeams, playedTeamIdsToday]
   );
 
-  const handleMatchSaved = (action: 'rematch' | 'next') => {
+  const handleMatchSaved = (action: 'save' | 'next') => {
     if (action === 'next' && match) handleGenerateNewMatch([match[0].id, match[1].id]);
   };
 
